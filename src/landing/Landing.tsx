@@ -227,7 +227,7 @@ export default function Landing() {
           <Reveal>
             <div className="login-card">
               <h2 className="display" style={{ margin: '0 0 8px' }}>Create your free account</h2>
-              <p className="hint">One login holds every score sheet, streak and PDF — on every device. Google, GitHub, Facebook, LinkedIn or plain email on the next screen. Twenty seconds, then Set 1.</p>
+              <p className="hint">One login holds every score sheet, streak and PDF — on every device. Google, GitHub or plain email on the next screen. Twenty seconds, then Set 1.</p>
               <Magnetic strength={24}>
                 <button className="btn-big" onClick={onEnter}>
                   {userId ? 'Continue practising →' : 'Get started — it’s free'}
