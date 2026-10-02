@@ -5,7 +5,7 @@ import { useSession } from '../stores/session';
 import { isDbConfigured } from '../lib/supabase';
 import { AVATARS, avatarById } from '../data/avatars';
 import { isUsernameTaken, validUsername } from '../lib/store';
-import { GithubLogo, GoogleLogo } from './BrandLogos';
+import { GoogleLogo } from './BrandLogos';
 
 export function AvatarFace({ id, size = 40 }: { id: number; size?: number }) {
   const a = avatarById(id);
@@ -34,7 +34,6 @@ export function LoginButtons({ column = false }: { column?: boolean }) {
   const { login } = useAuthActions();
   const btns = [
     { p: 'google' as OAuthProvider, label: 'Google', Logo: GoogleLogo },
-    { p: 'github' as OAuthProvider, label: 'GitHub', Logo: GithubLogo },
   ];
   return (
     <div className={column ? 'oauth-col' : 'btnrow'}>

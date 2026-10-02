@@ -165,7 +165,7 @@ export default function Landing() {
             <p className="sub">Most people loop this three or four times. Scores climb because the answer script shows its working.</p>
           </Reveal>
           <div className="steps">
-            <div className="step"><h3>Log in with Google</h3><p>One account keeps all your score sheets together — even if you switch between Google and GitHub later.</p></div>
+            <div className="step"><h3>Log in with Google</h3><p>One account keeps all your score sheets together across every device.</p></div>
             <div className="step"><h3>Take a timed set</h3><p>Four sections, palette navigation, mark-for-review — the hall feel, minus the hall.</p></div>
             <div className="step"><h3>Read your script</h3><p>Every answer explained. Download the report and the study sheet as PDF, then take a brand-new set.</p></div>
           </div>
@@ -227,7 +227,7 @@ export default function Landing() {
           <Reveal>
             <div className="login-card">
               <h2 className="display" style={{ margin: '0 0 8px' }}>Create your free account</h2>
-              <p className="hint">One login holds every score sheet, streak and PDF — on every device. Google, GitHub or plain email on the next screen. Twenty seconds, then Set 1.</p>
+              <p className="hint">One login holds every score sheet, streak and PDF — on every device. Google or plain email on the next screen. Twenty seconds, then Set 1.</p>
               <Magnetic strength={24}>
                 <button className="btn-big" onClick={onEnter}>
                   {userId ? 'Continue practising →' : 'Get started — it’s free'}

@@ -137,8 +137,8 @@ function localSheets(): ScoreSheet[] {
 }
 
 /**
-  * Clerk already merges Google/GitHub logins that share a verified
- * email into ONE user id, so history is keyed on user_id alone.
+  * Clerk already merges Google logins that share a verified
+  * email into ONE user id, so history is keyed on user_id alone.
  */
 export async function saveScoreSheet(s: ScoreSheet): Promise<void> {
   const arr = [s, ...localSheets()].slice(0, 100);

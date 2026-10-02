@@ -11,7 +11,7 @@ Minimal AMCAT-style practice app for the Concentrix hiring exam. Built for a fri
 - **Speaking & listening lab** (`/app/speaking`): SVAR-style — listen & answer with transcripts revealed, read-aloud with mic recording, repeat-after-me side-by-side. Runs on your self-hosted Piper TTS voice server (`VITE_TTS_URL` + `VITE_TTS_TOKEN`); read-aloud works without it. See "Voice server" below.
 - **Mock interview** (`/app/interview`): full 7-part spoken exam — short answers, situations, read-aloud, repeat, 30s+60s extempore, spoken cloze, grammar correction. Once-only audio, per-answer timers, session history.
 - **Landing page (Aceternity-style)**: dark spotlight hero with a playable demo question, exact-pattern cards, syllabus marquee, 3-step flow, answer-script preview, login band. No test without login.
-- **Accounts (required, Clerk)**: login with Google, GitHub or email; unique username + 1 of 16 avatars. Clerk merges same-email logins into one account, so history follows the person everywhere.
+- **Accounts (required, Clerk)**: login with Google or email; unique username + 1 of 16 avatars. Clerk merges same-email logins into one account, so history follows the person everywhere.
 - **Score sheets**: every attempt auto-saves (browser always, cloud when logged in). **My sheets** page shows attempts/best/average trend, review, delete.
 - **PDF downloads**: test report card + full Q&A sheet with explanations as notes (jsPDF, generated on-device).
 - **Settings page**: username, avatar, linked logins, erase-local-data, logout.
@@ -138,7 +138,7 @@ alter table sheets add column if not exists origin text not null default 'offlin
 
 **1. Clerk** (clerk.com → create application):
 - API keys → copy the **publishable key** → `VITE_CLERK_PUBLISHABLE_KEY`.
-- User & authentication → Email: on. Social connections: enable Google and GitHub (paste each provider's OAuth client ID/secret — create those in Google Cloud / GitHub consoles).
+- User & authentication → Email: on. Social connections: enable Google (paste the OAuth client ID/secret — create it in the Google Cloud console).
 - Paths/redirects: add `http://localhost:5173` and your antideploy URL as allowed origins/redirects.
 
 **2. Supabase** (supabase.com → create project):
