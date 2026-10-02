@@ -102,7 +102,7 @@ export default function Settings() {
       ) : (
         <p className="hint">No linked-provider details available.</p>
       )}
-      <p className="hint">Clerk merges Google/GitHub/Facebook logins that share a verified email into one account automatically — one history everywhere.</p>
+      <p className="hint">Clerk merges Google/GitHub/Facebook/LinkedIn logins that share a verified email into one account automatically — one history everywhere.</p>
 
       <h4>Account</h4>
       <div className="btnrow">

@@ -2,12 +2,13 @@ import { useCallback } from 'react';
 import { useClerk, useSignIn, useSignUp } from '@clerk/clerk-react';
 import { useSession } from '../stores/session';
 
-export type OAuthProvider = 'google' | 'github' | 'facebook';
+export type OAuthProvider = 'google' | 'github' | 'facebook' | 'linkedin';
 
 const STRATEGY: Record<OAuthProvider, string> = {
   google: 'oauth_google',
   github: 'oauth_github',
   facebook: 'oauth_facebook',
+  linkedin: 'oauth_linkedin_oidc',
 };
 
 export function useAuthActions() {
