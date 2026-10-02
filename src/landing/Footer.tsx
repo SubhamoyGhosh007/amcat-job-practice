@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom';
 import { scrollToId } from './fx';
 
 export default function Footer({ onEnter }: { onEnter: () => void }) {
+  const navigate = useNavigate();
   const go = (id: string) => () => scrollToId(id);
   const top = () => window.scrollTo({ top: 0, behavior: 'smooth' });
   return (
@@ -28,6 +30,7 @@ export default function Footer({ onEnter }: { onEnter: () => void }) {
           <h4>Account</h4>
           <button className="link" onClick={go('login')}>Log in</button>
           <button className="link" onClick={onEnter}>Create account</button>
+          <button className="link" onClick={() => navigate('/privacy')}>Privacy policy</button>
           <button className="link" onClick={top}>Back to top</button>
         </div>
       </div>
