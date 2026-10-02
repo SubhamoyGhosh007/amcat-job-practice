@@ -11,7 +11,7 @@ const STRATEGY: Record<OAuthProvider, string> = {
   linkedin: 'oauth_linkedin_oidc',
 };
 
-// Only Google is offered in the UI; the rest stay wired but unlisted.
+// Google + GitHub are offered in the UI; the rest stay wired but unlisted.
 
 export function useAuthActions() {
   const { signIn } = useSignIn();
