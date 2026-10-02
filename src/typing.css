@@ -1,0 +1,54 @@
+/* Typing arena — monkeytype-style, AMCAT-dressed. Exam UI untouched. */
+
+.type-config { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.type-config .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+.t-live { display: flex; gap: 26px; align-items: baseline; margin: 2px 0 12px; font-variant-numeric: tabular-nums; }
+.t-live .v { font-family: 'Space Grotesk'; font-size: 30px; font-weight: 700; color: var(--blue-dark, #143c7a); }
+.t-live .l { font-size: 12px; color: var(--muted); display: block; }
+
+.t-stage {
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 26px 24px; position: relative; cursor: text;
+}
+.t-words {
+  font-size: 21px; line-height: 2;
+  max-height: 8.4em; overflow: hidden;
+  font-family: 'Space Grotesk', monospace; letter-spacing: .01em;
+  user-select: none;
+}
+.t-word { margin-right: .55em; display: inline-block; white-space: nowrap; }
+.t-word.done { color: #9aa7c2; }
+.t-char.ok { color: #1e2430; }
+.t-char.bad { color: #d64545; }
+.t-char.extra { color: #b7791f; }
+.t-word.current .t-char.todo { color: #9aa7c2; }
+.t-word.todo { color: #b6c1d6; }
+.t-caret {
+  display: inline-block; width: 2.5px; height: 1.15em; background: #1b4fa0;
+  vertical-align: text-bottom; margin-right: -2.5px;
+  animation: tblink 1s steps(1) infinite; border-radius: 2px;
+}
+@keyframes tblink { 50% { opacity: 0; } }
+
+.t-focus {
+  position: absolute; inset: 0; border-radius: 14px;
+  background: rgba(246,248,252,.82); backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; color: #1b4fa0; font-size: 16px; cursor: pointer;
+}
+
+.t-results { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 4px 0 14px; }
+@media (max-width: 760px) { .t-results { grid-template-columns: repeat(2, 1fr); } }
+.t-stat { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 18px; text-align: center; }
+.t-stat b { display: block; font-family: 'Space Grotesk'; font-size: 36px; }
+.t-stat span { font-size: 12.5px; color: var(--muted); }
+.t-stat.hero { background: radial-gradient(130% 170% at 15% 0%, #1c3268, #0a1633 60%, #060d21); border-color: rgba(125,160,255,.25); }
+.t-stat.hero b { color: #fff; }
+.t-stat.hero span { color: #9fb0cc; }
+
+.t-row { display: flex; gap: 12px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; margin-top: 8px; flex-wrap: wrap; }
+.t-row .meta { flex: 1; min-width: 180px; }
+.t-crown { color: #b7791f; font-weight: 800; }
+
+@media (prefers-reduced-motion: reduce) { .t-caret { animation: none; } }

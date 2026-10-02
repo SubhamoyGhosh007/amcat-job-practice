@@ -1,0 +1,84 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { SECTIONS, totalMinutes, totalQuestions } from '../types';
+import { describeSource, generateSet } from '../lib/generator';
+import { useExam } from '../stores/exam';
+
+export default function Instructions() {
+  const navigate = useNavigate();
+  const start = useExam((s) => s.start);
+  const difficulty = useExam((s) => s.difficulty);
+  const pyq = useExam((s) => s.pyq);
+  const setPrefs = useExam((s) => s.setPrefs);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function startGeneration() {
+    setLoading(true);
+    setError('');
+    try {
+      const s = await generateSet({ difficulty, pyq });
+      start(s);
+      navigate('/app/exam');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to generate set. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="page-hero">
+        <h2>How the set runs</h2>
+        <p>
+          {totalQuestions} questions across {SECTIONS.length} sections in {totalMinutes} minutes. Sections run in order —
+          once submitted you cannot go back, like the real AMCAT. The timer auto-submits at 0:00.
+          No negative marking, so attempt everything. Finish for the answer script, then a brand-new set.
+        </p>
+      </div>
+      <div className="hover-grid">
+        {SECTIONS.map((s) => (
+          <div className="hover-card" key={s.id}>
+            <div className="glow" />
+            <span className="tag">{s.count} Q • {s.minutes} min</span>
+            <div className="big display">{s.count}</div>
+            <h3>{s.name}</h3>
+            <p>{s.description}</p>
+          </div>
+        ))}
+      </div>
+      <div className="card" style={{ marginTop: 14 }}>
+        <div style={{ margin: '2px 0 12px' }}>
+          <span className="chip green">■ answered</span>{' '}
+          <span className="chip" style={{ background: '#ede9fe', color: '#6d28d9' }}>■ marked for review</span>{' '}
+          <span className="chip">■ not answered</span>
+        </div>
+            <div className="field">
+              <label>Difficulty</label>
+              <div className="radio-row">
+                {(['easy', 'medium', 'hard'] as const).map((d) => (
+                  <div key={d} className={`radio-pill ${difficulty === d ? 'active' : ''}`} onClick={() => setPrefs({ difficulty: d })} style={{ textTransform: 'capitalize' }}>{d}</div>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <label>Question bank</label>
+              <div className="radio-row">
+                <div className={`radio-pill ${!pyq ? 'active' : ''}`} onClick={() => setPrefs({ pyq: false })}>✨ Fresh AI</div>
+                <div className={`radio-pill ${pyq ? 'active' : ''}`} onClick={() => setPrefs({ pyq: true })}>📜 PYQ papers</div>
+              </div>
+              <p className="hint">{pyq ? 'Previous-year AMCAT style, recalled from 2021–2024 papers.' : 'Brand-new questions in the exact AMCAT pattern.'} Served from the shared bank if you haven’t attempted one — otherwise freshly generated and shared for others.</p>
+            </div>
+            {error && <div className="err">{error}</div>}
+        <div className="btnrow">
+          <button className="btn-ghost" onClick={() => navigate('/app')}>← Back</button>
+          <button className="btn-big" disabled={loading} onClick={startGeneration}>
+            {loading ? <><span className="spinner" />Generating fresh set…</> : 'Generate set & start'}
+          </button>
+        </div>
+        <p className="hint">Source: {describeSource()}. If AI fails, the offline bank is used automatically.</p>
+      </div>
+    </div>
+  );
+}

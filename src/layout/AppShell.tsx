@@ -1,0 +1,118 @@
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Activity,
+  Briefcase,
+  ClipboardList,
+  Keyboard,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Mic,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Settings as SettingsIcon,
+} from 'lucide-react';
+import { useAuthActions } from '../auth/actions';
+import { AvatarFace, UsernameModal } from '../components/AuthWidgets';
+import { ConfirmDialog } from '../ui/alert-dialog';
+import { useSession } from '../stores/session';
+import { useUi } from '../stores/ui';
+
+const TITLES: Record<string, string> = {
+  '/app': 'Practice',
+  '/app/instructions': 'New set',
+  '/app/exam': 'Exam',
+  '/app/result': 'Answer script',
+  '/app/sheets': 'My sheets',
+  '/app/settings': 'Settings',
+  '/app/typing': 'Typing arena',
+  '/app/speaking': 'Speaking lab',
+  '/app/interview': 'Mock interview',
+  '/app/health': 'Health check',
+};
+
+const NAV = [
+  { to: '/app', end: true, label: 'Practice', Icon: LayoutDashboard },
+  { to: '/app/sheets', end: false, label: 'My sheets', Icon: ClipboardList },
+  { to: '/app/typing', end: false, label: 'Typing arena', Icon: Keyboard },
+  { to: '/app/speaking', end: false, label: 'Speaking lab', Icon: Mic },
+  { to: '/app/interview', end: false, label: 'Mock interview', Icon: Briefcase },
+  { to: '/app/settings', end: false, label: 'Settings', Icon: SettingsIcon },
+  { to: '/app/health', end: false, label: 'Health check', Icon: Activity },
+];
+
+export default function AppShell() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { logout } = useAuthActions();
+  const profile = useSession((s) => s.profile);
+  const collapsed = useUi((s) => s.collapsed);
+  const toggleCollapsed = useUi((s) => s.toggleCollapsed);
+  const mobileOpen = useUi((s) => s.mobileOpen);
+  const setMobileOpen = useUi((s) => s.setMobileOpen);
+
+  async function doLogout() {
+    await logout().catch(() => {});
+    navigate('/', { replace: true });
+  }
+
+  return (
+    <div>
+      {mobileOpen && <div className="sb-overlay" onClick={() => setMobileOpen(false)} />}
+      <aside className={`sb${collapsed ? ' collapsed' : ''}${mobileOpen ? ' open' : ''}`}>
+        <div className="sb-head">
+          <span className="sb-logo" />
+          <span className="sb-name">Concentrix AMCAT<small>practice ground</small></span>
+          <button className="sb-collapse" onClick={toggleCollapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
+        </div>
+        <nav className="sb-nav">
+          <div className="sb-label">Menu</div>
+          {NAV.map(({ to, end, label, Icon }) => (
+            <NavLink key={to} to={to} end={end} className={({ isActive }) => `sb-link${isActive ? ' active' : ''}`} title={label} onClick={() => setMobileOpen(false)}>
+              <Icon size={19} />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+          <div className="sb-label">Quick action</div>
+          <NavLink to="/app/instructions" className="sb-link" title="New set" onClick={() => setMobileOpen(false)}>
+            <Plus size={19} />
+            <span>New set</span>
+          </NavLink>
+        </nav>
+        <div className="sb-foot">
+          <AvatarFace id={profile?.avatarId ?? 0} size={34} />
+          <span className="sb-user">
+            <b>@{profile?.username || '…'}</b>
+            <span>score sheets sync</span>
+          </span>
+          <button className="sb-iconbtn" onClick={doLogout} title="Log out">
+            <LogOut size={17} />
+          </button>
+        </div>
+      </aside>
+
+      <div className={`sb-main${collapsed ? ' wide' : ''}`}>
+        <header className="sb-top">
+          <button className="sb-iconbtn sb-hamburger" onClick={() => setMobileOpen(true)} title="Menu" style={{ color: '#1b4fa0' }}>
+            <Menu size={20} />
+          </button>
+          <span className="sb-title">{TITLES[location.pathname] || 'Practice'}</span>
+          <span className="spacer" />
+          <AvatarFace id={profile?.avatarId ?? 0} size={30} />
+          <b style={{ fontSize: 13 }}>@{profile?.username || '…'}</b>
+          <button className="sb-iconbtn" onClick={doLogout} title="Log out" style={{ color: '#1b4fa0' }}>
+            <LogOut size={17} />
+          </button>
+        </header>
+        <div className="wrap">
+          <Outlet />
+        </div>
+      </div>
+      <UsernameModal />
+      <ConfirmDialog />
+    </div>
+  );
+}
