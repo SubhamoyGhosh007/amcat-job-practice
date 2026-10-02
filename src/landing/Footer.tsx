@@ -31,6 +31,7 @@ export default function Footer({ onEnter }: { onEnter: () => void }) {
           <button className="link" onClick={go('login')}>Log in</button>
           <button className="link" onClick={onEnter}>Create account</button>
           <button className="link" onClick={() => navigate('/privacy')}>Privacy policy</button>
+          <button className="link" onClick={() => navigate('/terms')}>Terms of service</button>
           <button className="link" onClick={top}>Back to top</button>
         </div>
       </div>

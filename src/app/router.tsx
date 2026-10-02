@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
 import Landing from '../landing/Landing';
 import Privacy from '../pages/Privacy';
+import Terms from '../pages/Terms';
 import AuthPage from '../pages/AuthPage';
 import AppShell from '../layout/AppShell';
 import Dashboard from '../pages/Dashboard';
@@ -48,6 +49,7 @@ export default function AppRouter() {
       <Routes>
         <Route path="/" element={<Root />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/app" element={<RequireAuth />}>
           <Route index element={<Dashboard />} />
