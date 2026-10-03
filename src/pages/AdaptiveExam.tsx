@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { SECTIONS, totalMinutes } from '../types';
 import { saveScoreSheet, sheetFromExam } from '../lib/store';
+import { sourceLabel } from '../lib/friendly';
+import { useUi } from '../stores/ui';
 import { recordAttempt } from '../lib/bank';
 import { useExam } from '../stores/exam';
 import { useSession } from '../stores/session';
@@ -18,6 +20,9 @@ export default function AdaptiveExam() {
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [timeLeft, setTimeLeft] = useState(totalMinutes * 60);
+  const finishedRef = useRef(false);
+  const finalizeRef = useRef(() => {});
+  const setLeaveGuard = useUi((s) => s.setLeaveGuard);
 
   const grouped = useMemo(() => {
     if (!activeSet) return [];
@@ -76,7 +81,8 @@ export default function AdaptiveExam() {
   }
 
   function finishExam() {
-    if (!activeSet) return;
+    if (!activeSet || finishedRef.current) return;
+    finishedRef.current = true;
     const correct = activeSet.questions.filter((q) => answers[q.id] === q.answerIndex).length;
     const pct = Math.round((correct / activeSet.questions.length) * 100);
     try {
@@ -91,6 +97,21 @@ export default function AdaptiveExam() {
     recordAttempt(userId, activeSet.id, sh.correct, sh.total, sh.pct).catch(() => {});
     navigate('/app/result');
   }
+
+  // Leaving mid-exam submits it as-is: unanswered count as wrong. The set
+  // quota was already counted at generation; the sheet is what gets saved.
+  finalizeRef.current = () => {
+    finishExam();
+  };
+  useEffect(() => {
+    if (!activeSet || finishedRef.current) {
+      if (finishedRef.current) setLeaveGuard(null);
+      return;
+    }
+    setLeaveGuard({ confirmLeave: () => finalizeRef.current() });
+    return () => setLeaveGuard(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSet]);
 
   function submitAll() {
     const unanswered = total - answered;
@@ -127,7 +148,7 @@ export default function AdaptiveExam() {
         <div>
           <div className="brand">Concentrix AMCAT • Full paper</div>
           <div className="sub">
-            Set #{activeSet.id} • {activeSet.source} • answered {answered}/{total}
+            {sourceLabel(activeSet.source, activeSet.origin)} • answered {answered}/{total}
           </div>
         </div>
         <div className={`timer ${timeLeft < 60 ? 'danger' : ''}`}>⏱ {mmss}</div>

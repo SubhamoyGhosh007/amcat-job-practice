@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SECTIONS, totalMinutes, totalQuestions } from '../types';
-import { describeSource } from '../lib/generator';
 import { useSession } from '../stores/session';
 
 export default function Dashboard() {
@@ -41,7 +40,7 @@ export default function Dashboard() {
           <div className="hero-cta">
               <button className="btn-big" onClick={() => navigate('/app/instructions')}>Start a new set →</button>
               {tier === 'pro' ? <span className="chip green">PRO • unlimited</span> : null}
-          <span className="hint">{totalQuestions} Q • {totalMinutes} min • {describeSource()}</span>
+          <span className="hint">{totalQuestions} Q • {totalMinutes} min • fresh questions every set</span>
         </div>
       </div>
       <div className="hover-grid">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { VoicePlayer } from '../components/VoicePlayer';
 import { useConfirm } from '../ui/alert-dialog';
+import { PageSkeleton } from '../ui/page-skeleton';
 import { useUi } from '../stores/ui';
 import { speak, ttsConfigured } from '../lib/tts';
 import { useSession } from '../stores/session';
@@ -339,7 +340,10 @@ export default function Interview() {
   // Set once the user confirms leaving (via sidebar/logout/back) so the
   // follow-up popstate from our own history juggling is ignored.
   const leavingRef = useRef(false);
+  // savedRef makes the final save once-only no matter which exit fires first.
+  const savedRef = useRef(false);
   const setLeaveGuard = useUi((s) => s.setLeaveGuard);
+  const finalizeRef = useRef(() => {});
 
   const steps = useMemo(buildSteps, []);
   const step = steps[stepIdx];
@@ -408,22 +412,20 @@ export default function Interview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // In-app navigation (sidebar links, logout, back button): SPA route changes
-  // never hide the tab, so the visibility listener above can't see them.
-  // The interview registers a guard; AppShell consults it before navigating.
+  // Leaving mid-mock submits it as a completed session (counts the daily lock).
+  // finalizeRef stays fresh every render so the guard always saves the latest.
+  finalizeRef.current = () => {
+    if (phase !== 'running' || savedRef.current) return;
+    flagsRef.current += 1;
+    saveSession();
+  };
   useEffect(() => {
     if (phase !== 'running') {
       setLeaveGuard(null);
       return;
     }
     leavingRef.current = false;
-    setLeaveGuard({
-      confirmLeave: () => {
-        flagsRef.current += 1;
-        leavingRef.current = true;
-        cancelAttempt();
-      },
-    });
+    setLeaveGuard({ confirmLeave: () => finalizeRef.current() });
     return () => setLeaveGuard(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, setLeaveGuard]);
@@ -443,16 +445,8 @@ export default function Interview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // Tab close / reload / refresh while running: the browser shows its own
-  // generic prompt (custom text isn't allowed), but the attempt isn't lost silently.
-  useEffect(() => {
-    if (phase !== 'running') return;
-    const fn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener('beforeunload', fn);
-    return () => window.removeEventListener('beforeunload', fn);
-  }, [phase]);
+  // Tab close / reload is covered by AppShell's beforeunload guard, which
+  // submits the session via the same finalize path (local-first, always lands).
 
   async function startInterview() {
     try {
@@ -461,6 +455,7 @@ export default function Interview() {
       /* unsupported/denied — the run still starts monitored */
     }
     flagsRef.current = 0;
+    savedRef.current = false;
     setT0(Date.now());
     setStepIdx(0);
     setAnswers(0);
@@ -479,8 +474,8 @@ export default function Interview() {
           : kind === 'fullscreen'
             ? 'Fullscreen was exited'
             : 'Leave the interview?',
-      description: 'The screen is monitored during the mock. Cancel this mock test, or resume where you left off? Leaving is recorded on your session.',
-      actionLabel: 'Cancel mock test',
+      description: 'Leaving now submits this mock as-is and uses today’s slot. Resume to keep going instead.',
+      actionLabel: 'Leave & submit',
       cancelLabel: 'Resume interview',
       danger: true,
     });
@@ -489,22 +484,16 @@ export default function Interview() {
     if (kind === 'back') {
       // Re-armed history above; step back for real exactly once.
       leavingRef.current = true;
-      cancelAttempt();
+      saveSession();
       window.history.back();
     } else {
-      cancelAttempt();
+      saveSession();
     }
   }
 
-  function cancelAttempt() {
-    setPhase('idle');
-    setStepIdx(0);
-    setAnswers(0);
-    setPlayedCtx({});
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  }
-
   function saveSession() {
+    if (savedRef.current) return;
+    savedRef.current = true;
     const durationSec = Math.round((Date.now() - t0) / 1000);
     const s: MockSession = {
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
@@ -531,14 +520,7 @@ export default function Interview() {
   }
 
   if (locked === null) {
-    return (
-      <div>
-        <div className="page-hero">
-          <h2>Mock interview</h2>
-          <p>Checking today’s slot…</p>
-        </div>
-      </div>
-    );
+    return <PageSkeleton variant="app" />;
   }
 
   if (locked) {

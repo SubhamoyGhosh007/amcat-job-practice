@@ -13,6 +13,7 @@ import {
   type TypingTest,
 } from '../lib/typing';
 import { useSession } from '../stores/session';
+import { useUi } from '../stores/ui';
 import { useConfirm } from '../ui/alert-dialog';
 import { bumpQuota, quotaStatus } from '../lib/usage';
 import '../typing.css';
@@ -50,6 +51,8 @@ export default function Typing() {
   const samplesRef = useRef<number[]>([]);
   const savedRef = useRef(false);
   const doneRef = useRef(false);
+  const finishRef = useRef((_e: number) => {});
+  const setLeaveGuard = useUi((s) => s.setLeaveGuard);
 
   const owner = userId || 'guest';
 
@@ -134,6 +137,21 @@ export default function Typing() {
     },
     [words, submitted, wordIdx, current, mode, amount, owner, load]
   );
+
+  // Leaving mid-test submits it: typed words stand, the rest count as missed,
+  // and the finish path saves + counts the quota. doneRef keeps it once-only.
+  finishRef.current = finish;
+  useEffect(() => {
+    if (phase !== 'running') {
+      setLeaveGuard(null);
+      return;
+    }
+    setLeaveGuard({
+      confirmLeave: () => finishRef.current(Math.max(0, (Date.now() - startRef.current) / 1000)),
+    });
+    return () => setLeaveGuard(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, setLeaveGuard]);
 
   // ticking clock + end-of-time + per-tick samples
   useEffect(() => {
@@ -375,7 +393,7 @@ export default function Typing() {
       ))}
       <p className="hint">
         Signed in as {profile?.username || email || 'you'} — tests save in this browser
-        {cloudOk === true ? ' and in your cloud account ✓' : cloudOk === false ? ', and will also sync to cloud once you run the typing SQL in the README' : '…'}
+        {cloudOk === true ? ' and in your cloud account ✓' : cloudOk === false ? ' — cloud backup will switch on automatically when available' : '…'}
         .
       </p>
     </div>

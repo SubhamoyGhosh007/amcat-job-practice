@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { MouseEvent, ReactNode } from 'react';
 import {
@@ -20,6 +21,7 @@ import { AvatarFace, UsernameModal } from '../components/AuthWidgets';
 import { ConfirmDialog, useConfirm } from '../ui/alert-dialog';
 import { useSession } from '../stores/session';
 import { useUi } from '../stores/ui';
+import type { ConfirmOptions } from '../stores/ui';
 
 const TITLES: Record<string, string> = {
   '/app': 'Practice',
@@ -46,6 +48,36 @@ const NAV = [
   { to: '/app/health', end: false, label: 'Health check', Icon: Activity },
 ];
 
+/** Re-entry flag: one leave prompt at a time across links + logout. */
+let leavePromptOpen = false;
+
+type AskFn = (o: ConfirmOptions) => Promise<boolean>;
+
+/**
+ * Shared leave flow: leaving submits the running session as-is — everything
+ * unanswered counts as wrong, and it uses one session from the limit.
+ */
+async function askLeave(ask: AskFn): Promise<boolean> {
+  if (leavePromptOpen) return false;
+  const guard = useUi.getState().leaveGuard;
+  if (!guard) return true;
+  leavePromptOpen = true;
+  try {
+    const ok = await ask({
+      title: 'Leave and submit?',
+      description:
+        'Leaving now submits this session as-is: everything unanswered counts as wrong, and it uses one session from your limit.',
+      actionLabel: 'Leave & submit',
+      cancelLabel: 'Stay & continue',
+      danger: true,
+    });
+    if (ok) guard.confirmLeave();
+    return ok;
+  } finally {
+    leavePromptOpen = false;
+  }
+}
+
 function GuardedLink({
   to,
   end,
@@ -65,20 +97,9 @@ function GuardedLink({
   const ask = useConfirm();
   async function onClick(e: MouseEvent) {
     onNav?.();
-    const guard = useUi.getState().leaveGuard;
-    if (!guard) return;
-    e.preventDefault();
-    const ok = await ask({
-      title: 'Leave the interview?',
-      description:
-        'The screen is monitored during the mock. Cancel this mock test, or resume where you left off? Leaving is recorded on your session.',
-      actionLabel: 'Cancel mock test',
-      cancelLabel: 'Resume interview',
-      danger: true,
-    });
-    if (!ok) return;
-    guard.confirmLeave();
-    navigate(to);
+    if (useUi.getState().leaveGuard) e.preventDefault();
+    else return;
+    if (await askLeave(ask)) navigate(to);
   }
   return (
     <NavLink to={to} end={end} className={className} title={title} onClick={onClick}>
@@ -98,25 +119,25 @@ export default function AppShell() {
   const mobileOpen = useUi((s) => s.mobileOpen);
   const setMobileOpen = useUi((s) => s.setMobileOpen);
 
-  // A running mock interview registers a guard: leaving (sidebar, back, logout)
-  // must ask first — Cancel mock test discards it, Resume stays put.
-  async function checkLeaveGuard(): Promise<boolean> {
-    const guard = useUi.getState().leaveGuard;
-    if (!guard) return true;
-    const ok = await ask({
-      title: 'Leave the interview?',
-      description:
-        'The screen is monitored during the mock. Cancel this mock test, or resume where you left off? Leaving is recorded on your session.',
-      actionLabel: 'Cancel mock test',
-      cancelLabel: 'Resume interview',
-      danger: true,
-    });
-    if (ok) guard.confirmLeave();
-    return ok;
-  }
+  // Closing / reloading the tab mid-session also submits it as completed
+  // (local persist is sync, so it always lands; cloud sync best-effort).
+  useEffect(() => {
+    const fn = (e: BeforeUnloadEvent) => {
+      const guard = useUi.getState().leaveGuard;
+      if (!guard) return;
+      e.preventDefault();
+      try {
+        guard.confirmLeave();
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener('beforeunload', fn);
+    return () => window.removeEventListener('beforeunload', fn);
+  }, []);
 
   async function doLogout() {
-    if (!(await checkLeaveGuard())) return;
+    if (!(await askLeave(ask))) return;
     await logout().catch(() => {});
     navigate('/', { replace: true });
   }

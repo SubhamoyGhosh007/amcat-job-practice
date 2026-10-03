@@ -12,10 +12,12 @@ import {
 import { formatWait, mathQuotaStatus } from '../lib/mathQuota';
 import { downloadMathSheet } from '../lib/pdf';
 import { useSession } from '../stores/session';
+import { useUi } from '../stores/ui';
 import { useConfirm } from '../ui/alert-dialog';
 import { PaginationControl } from '../ui/pagination';
+import { Skeleton } from '../ui/primitives';
 
-const PER_PAGE = 10;
+const PER_PAGE = 4;
 
 type Phase = 'idle' | 'loading' | 'answering' | 'sheet';
 
@@ -90,7 +92,10 @@ export default function MathPractice() {
   const [pages, setPages] = useState<Question[][]>([]);
   const questions = pages.flat();
   const pagesRef = useRef<Question[][]>([]);
+  const answersRef = useRef<Record<string, number>>({});
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const finalizeRef = useRef(() => {});
+  const setLeaveGuard = useUi((s) => s.setLeaveGuard);
   const [page, setPage] = useState(0);
   const [pageLoading, setPageLoading] = useState(false);
   const [session, setSession] = useState<MathSession | null>(null);
@@ -110,6 +115,32 @@ export default function MathPractice() {
   useEffect(() => {
     listMathSessions(userId).then(setHistory).catch(() => {});
   }, [userId]);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  // Leaving mid-sheet submits what exists: unanswered count as wrong, and the
+  // session save stamps the 4h free quota. Local-first, so tab-close lands too.
+  finalizeRef.current = () => {
+    const qs = pagesRef.current.flat();
+    if (!qs.length) return;
+    const s = mathSessionFromAnswers(
+      { userId: userId!, username: profile?.username || (email ? email.split('@')[0] : 'friend') },
+      qs,
+      answersRef.current
+    );
+    saveMathSession(s).catch(() => {});
+  };
+  useEffect(() => {
+    if (phase !== 'answering') {
+      setLeaveGuard(null);
+      return;
+    }
+    setLeaveGuard({ confirmLeave: () => finalizeRef.current() });
+    return () => setLeaveGuard(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, setLeaveGuard]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 30000);
@@ -247,9 +278,9 @@ export default function MathPractice() {
       <div className="page-hero">
         <h2>Maths practice</h2>
         <p>
-          40 AMCAT quant questions in one sitting — 4 from each of the 10 maths families. Each paginated sheet of 10
-          generates fresh as you turn to it, then you get your answer script: what you wrote, the actual answer, how
-          to solve it, and the speed tricks.
+          40 AMCAT quant questions in one sitting — 4 from each of the 10 maths families. Ten short sheets of 4,
+          one maths family per sheet, each generating fresh as you turn to it. Then your answer script: what you
+          wrote, the actual answer, how to solve it, and the speed tricks.
         </p>
         <div style={{ marginTop: 10 }}>
           <span className="chip ghost">🧮 40 Q • 10 topics</span>{' '}
@@ -283,10 +314,17 @@ export default function MathPractice() {
       )}
 
       {phase === 'loading' && (
-        <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
-          <div style={{ fontSize: 40 }}>🧮</div>
-          <h3>Setting page 1…</h3>
-          <p className="hint">Fresh numbers, fresh sentences — further pages generate as you turn to them.</p>
+        <div className="svar-card" aria-busy="true" aria-label="Setting questions">
+          <Skeleton style={{ width: 180, height: 18 }} />
+          <div style={{ marginTop: 12 }}>
+            <Skeleton style={{ width: '90%', height: 20 }} />
+          </div>
+          <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+            <Skeleton style={{ width: '100%', height: 40 }} />
+            <Skeleton style={{ width: '100%', height: 40 }} />
+            <Skeleton style={{ width: '100%', height: 40 }} />
+            <Skeleton style={{ width: '100%', height: 40 }} />
+          </div>
         </div>
       )}
 
@@ -328,10 +366,17 @@ export default function MathPractice() {
           </div>
 
           {pageLoading && !pageQs.length && (
-            <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-              <div style={{ fontSize: 36 }}>🧮</div>
-              <h3>Setting page {page + 1}…</h3>
-              <p className="hint">10 fresh questions, coming up.</p>
+            <div className="svar-card" aria-busy="true" aria-label="Setting questions">
+              <Skeleton style={{ width: 180, height: 18 }} />
+              <div style={{ marginTop: 12 }}>
+                <Skeleton style={{ width: '90%', height: 20 }} />
+              </div>
+              <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+                <Skeleton style={{ width: '100%', height: 40 }} />
+                <Skeleton style={{ width: '100%', height: 40 }} />
+                <Skeleton style={{ width: '100%', height: 40 }} />
+                <Skeleton style={{ width: '100%', height: 40 }} />
+              </div>
             </div>
           )}
 

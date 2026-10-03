@@ -82,7 +82,7 @@ async function callMath(spec: SliceSpec, seed: number, avoid: string[]): Promise
   const prompt = mathPrompt(spec, seed, avoid);
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.9, maxOutputTokens: 8000, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0.9, maxOutputTokens: 4000, responseMimeType: 'application/json' },
   };
   // Prefer the self-hosted proxy (key never touches the browser).
   if (ttsConfigured()) {
@@ -108,9 +108,9 @@ async function callMath(spec: SliceSpec, seed: number, avoid: string[]): Promise
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * One answer-sheet page = one small generation (10 questions). Small calls
- * finish in seconds, never near proxy timeouts, and cost fewer tokens.
- * The four slices below cover every topic exactly 4 times (40 total).
+ * One answer-sheet page = one small generation (4 questions, one topic).
+ * Tiny calls finish in seconds, never near proxy timeouts, and cost fewer tokens.
+ * Ten pages cover every AMCAT maths family (40 total).
  */
 export interface MathSliceItem {
   topic: string;
@@ -119,28 +119,7 @@ export interface MathSliceItem {
 
 export type SliceSpec = MathSliceItem[];
 
-export const MATH_PAGE_SLICES: SliceSpec[] = [
-  [
-    { topic: 'percent', count: 4 },
-    { topic: 'profit', count: 4 },
-    { topic: 'interest', count: 2 },
-  ],
-  [
-    { topic: 'interest', count: 2 },
-    { topic: 'average', count: 4 },
-    { topic: 'ratio', count: 4 },
-  ],
-  [
-    { topic: 'tsd', count: 4 },
-    { topic: 'work', count: 4 },
-    { topic: 'number', count: 2 },
-  ],
-  [
-    { topic: 'number', count: 2 },
-    { topic: 'ages', count: 4 },
-    { topic: 'alligation', count: 4 },
-  ],
-];
+export const MATH_PAGE_SLICES: SliceSpec[] = MATH_TOPICS.map((t) => [{ topic: t.id, count: 4 }]);
 
 export const MATH_TOTAL_PAGES = MATH_PAGE_SLICES.length;
 
@@ -172,7 +151,7 @@ export async function generateMathPage(page: number): Promise<Question[]> {
     }
   }
   const out = spec.flatMap((s) => capped.get(s.topic) || []);
-  if (out.length < 8) throw new Error('AI returned an incomplete maths page — retry once.');
+  if (out.length < 3) throw new Error('AI returned an incomplete maths page — retry once.');
   rememberAvoid(out);
   return shuffle(out);
 }

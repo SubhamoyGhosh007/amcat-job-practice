@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { SECTIONS } from '../types';
+import { sourceLabel } from '../lib/friendly';
 import { generateSet } from '../lib/generator';
 import { bumpQuota, quotaStatus } from '../lib/usage';
 import { useConfirm } from '../ui/alert-dialog';
@@ -88,7 +89,7 @@ export default function Result() {
           <div className="ring dark" style={{ '--p': score.pct } as any}><span>{score.pct}%</span></div>
           <div style={{ flex: 1, minWidth: 220 }}>
             <h2>{score.pct >= 70 ? 'Test-hall ready 🎉' : score.pct >= 50 ? 'Getting there' : 'Keep practising'}</h2>
-                <p>Set #{set.id} • {set.source} • {sheet.difficulty || 'medium'} • {(sheet.origin || 'offline') === 'pyq' ? 'PYQ papers' : (sheet.origin || 'offline')}{set.adaptive ? ' • 🎯 adaptive' : ''} • {new Date(set.createdAt).toLocaleString()} • {score.correct} correct out of {set.questions.length}</p>
+                <p>{sourceLabel(set.source, set.origin)} • {sheet.difficulty || 'medium'}{set.adaptive ? ' • 🎯 adaptive' : ''} • {new Date(set.createdAt).toLocaleString()} • {score.correct} correct out of {set.questions.length}</p>
                 {set.adaptive && (
                   <div style={{ marginTop: 8 }}>
                     {SECTIONS.map((s) => {

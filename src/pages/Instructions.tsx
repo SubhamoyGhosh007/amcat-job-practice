@@ -120,7 +120,7 @@ export default function Instructions() {
             {loading ? <><span className="spinner" />Generating fresh set…</> : 'Generate set & start'}
           </button>
         </div>
-            <p className="hint">Source: {describeSource()}. If AI fails, the offline bank is used automatically.{left !== null && (tier === 'pro' ? 'Pro plan: unlimited sets.' : <> Free plan: <b>{left} of 5</b> new sets left today.</>)}</p>
+            <p className="hint">{describeSource().startsWith('offline') ? 'Practice-bank questions, shuffled fresh every attempt.' : 'Fresh AI questions, newly made for every attempt.'}{left !== null && (tier === 'pro' ? 'Pro plan: unlimited sets.' : <> Free plan: <b>{left} of 5</b> new sets left today.</>)}</p>
       </div>
     </div>
   );

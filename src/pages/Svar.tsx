@@ -3,6 +3,7 @@ import { LISTEN_BANK, READ_BANK, REPEAT_BANK } from '../data/svar';
 import { speak, ttsConfigured } from '../lib/tts';
 import { bumpQuota, quotaStatus } from '../lib/usage';
 import { useSession } from '../stores/session';
+import { useUi } from '../stores/ui';
 import { TTSVoicePlayer as PlayButton, VoicePlayer } from '../components/VoicePlayer';
 import '../svar.css';
 
@@ -362,6 +363,26 @@ export default function Svar() {
   const [tab, setTab] = useState<Tab>('listen');
   const [stats, setStats] = useState<SvarStats>(() => readStats());
   const [leftS, setLeftS] = useState<number | null>(null);
+  const setLeaveGuard = useUi((s) => s.setLeaveGuard);
+  // Recordings made this visit that were never submitted. Leaving counts one
+  // voice session against the limit — the "submit" for unfinished practice.
+  const baseRecords = useRef<number | null>(null);
+  if (baseRecords.current === null) baseRecords.current = stats.records;
+  const dirty = stats.records > (baseRecords.current || 0);
+
+  useEffect(() => {
+    if (!dirty) {
+      setLeaveGuard(null);
+      return;
+    }
+    setLeaveGuard({
+      confirmLeave: () => {
+        if (userId) bumpQuota('speaking', userId).catch(() => {});
+      },
+    });
+    return () => setLeaveGuard(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, setLeaveGuard]);
 
   async function refreshQuota() {
     if (!userId) {
