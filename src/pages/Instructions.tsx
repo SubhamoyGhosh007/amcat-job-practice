@@ -75,9 +75,9 @@ export default function Instructions() {
       <div className="page-hero">
         <h2>How the set runs</h2>
         <p>
-          {totalQuestions} questions across {SECTIONS.length} sections in {totalMinutes} minutes. Sections run in order —
-          once submitted you cannot go back, like the real AMCAT. The timer auto-submits at 0:00.
-          No negative marking, so attempt everything. Finish for the answer script, then a brand-new set.
+          {totalQuestions} questions across {SECTIONS.length} sections in {totalMinutes} minutes. The whole paper is on one
+          page — scroll through English, Quant, Logical and Customer Service (Concentrix) and answer everything at once.
+          The timer auto-submits at 0:00. No negative marking, so attempt everything. Finish for the answer script, then a brand-new set.
         </p>
       </div>
       <div className="hover-grid">
