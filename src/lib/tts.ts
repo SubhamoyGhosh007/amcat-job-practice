@@ -22,10 +22,12 @@ function evict() {
 }
 
 /** Speak text → object URL of WAV audio. Throws with status on failure. */
-export async function speak(text: string): Promise<string> {
+export async function speak(text: string, opts?: { voice?: string }): Promise<string> {
   const key = text.trim().slice(0, 3000);
   if (!key) throw new Error('Nothing to speak.');
-  const hit = cache.get(key);
+  const voice = (opts?.voice || '').trim().toLowerCase();
+  const cacheKey = `${voice || 'default'}::${key}`;
+  const hit = cache.get(cacheKey);
   if (hit) return hit;
   const res = await fetch(`${TTS_URL}/speak`, {
     method: 'POST',
@@ -33,11 +35,11 @@ export async function speak(text: string): Promise<string> {
       'Content-Type': 'application/json',
       ...(TTS_TOKEN ? { 'X-TTS-Token': TTS_TOKEN } : {}),
     },
-    body: JSON.stringify({ text: key }),
+    body: JSON.stringify({ text: key, ...(voice ? { voice } : {}) }),
   });
   if (!res.ok) throw new Error(`Voice server answered ${res.status}. Check VITE_TTS_URL / token.`);
   const url = URL.createObjectURL(await res.blob());
-  cache.set(key, url);
+  cache.set(cacheKey, url);
   evict();
   return url;
 }

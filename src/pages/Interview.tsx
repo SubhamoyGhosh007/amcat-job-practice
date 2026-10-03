@@ -36,7 +36,7 @@ function useCountdown(seconds: number, active: boolean, onDone?: () => void) {
   return left;
 }
 
-/* ---------------- audio played exactly once (exam rule) ---------------- */
+/* ---------------- audio played exactly once (exam rule, HIGH voice for mocks) ---------------- */
 function OnceAudio({ text, label, onPlayed }: { text: string; label: string; onPlayed?: () => void }) {
   const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'done'>('idle');
   const [error, setError] = useState('');
@@ -46,7 +46,7 @@ function OnceAudio({ text, label, onPlayed }: { text: string; label: string; onP
     setError('');
     setState('loading');
     try {
-      const url = await speak(text);
+      const url = await speak(text, { voice: 'high' });
       const a = new Audio(url);
       audioRef.current = a;
       setState('playing');

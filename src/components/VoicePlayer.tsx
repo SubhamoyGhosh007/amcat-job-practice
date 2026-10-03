@@ -87,7 +87,7 @@ export function VoicePlayer({ src, autoPlay = false }: { src: string; autoPlay?:
 }
 
 /** Fetches TTS audio, then hands it to the player (autoplays). */
-export function TTSVoicePlayer({ text, label, onPlayed }: { text: string; label?: string; onPlayed?: () => void }) {
+export function TTSVoicePlayer({ text, label, voice, onPlayed }: { text: string; label?: string; voice?: string; onPlayed?: () => void }) {
   const [src, setSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -96,7 +96,7 @@ export function TTSVoicePlayer({ text, label, onPlayed }: { text: string; label?
     setError('');
     setLoading(true);
     try {
-      const u = await speak(text);
+      const u = await speak(text, voice ? { voice } : undefined);
       setSrc(u);
       onPlayed?.();
     } catch (e: any) {
