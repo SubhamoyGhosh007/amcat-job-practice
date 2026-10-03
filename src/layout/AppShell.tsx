@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import type { MouseEvent, ReactNode } from 'react';
 import {
   Activity,
   Briefcase,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuthActions } from '../auth/actions';
 import { AvatarFace, UsernameModal } from '../components/AuthWidgets';
-import { ConfirmDialog } from '../ui/alert-dialog';
+import { ConfirmDialog, useConfirm } from '../ui/alert-dialog';
 import { useSession } from '../stores/session';
 import { useUi } from '../stores/ui';
 
@@ -42,17 +43,77 @@ const NAV = [
   { to: '/app/health', end: false, label: 'Health check', Icon: Activity },
 ];
 
+function GuardedLink({
+  to,
+  end,
+  className,
+  title,
+  onNav,
+  children,
+}: {
+  to: string;
+  end?: boolean;
+  className: string | ((p: { isActive: boolean }) => string);
+  title?: string;
+  onNav?: () => void;
+  children: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const ask = useConfirm();
+  async function onClick(e: MouseEvent) {
+    onNav?.();
+    const guard = useUi.getState().leaveGuard;
+    if (!guard) return;
+    e.preventDefault();
+    const ok = await ask({
+      title: 'Leave the interview?',
+      description:
+        'The screen is monitored during the mock. Cancel this mock test, or resume where you left off? Leaving is recorded on your session.',
+      actionLabel: 'Cancel mock test',
+      cancelLabel: 'Resume interview',
+      danger: true,
+    });
+    if (!ok) return;
+    guard.confirmLeave();
+    navigate(to);
+  }
+  return (
+    <NavLink to={to} end={end} className={className} title={title} onClick={onClick}>
+      {children}
+    </NavLink>
+  );
+}
+
 export default function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuthActions();
+  const ask = useConfirm();
   const profile = useSession((s) => s.profile);
   const collapsed = useUi((s) => s.collapsed);
   const toggleCollapsed = useUi((s) => s.toggleCollapsed);
   const mobileOpen = useUi((s) => s.mobileOpen);
   const setMobileOpen = useUi((s) => s.setMobileOpen);
 
+  // A running mock interview registers a guard: leaving (sidebar, back, logout)
+  // must ask first — Cancel mock test discards it, Resume stays put.
+  async function checkLeaveGuard(): Promise<boolean> {
+    const guard = useUi.getState().leaveGuard;
+    if (!guard) return true;
+    const ok = await ask({
+      title: 'Leave the interview?',
+      description:
+        'The screen is monitored during the mock. Cancel this mock test, or resume where you left off? Leaving is recorded on your session.',
+      actionLabel: 'Cancel mock test',
+      cancelLabel: 'Resume interview',
+      danger: true,
+    });
+    if (ok) guard.confirmLeave();
+    return ok;
+  }
+
   async function doLogout() {
+    if (!(await checkLeaveGuard())) return;
     await logout().catch(() => {});
     navigate('/', { replace: true });
   }
@@ -71,16 +132,16 @@ export default function AppShell() {
         <nav className="sb-nav">
           <div className="sb-label">Menu</div>
           {NAV.map(({ to, end, label, Icon }) => (
-            <NavLink key={to} to={to} end={end} className={({ isActive }) => `sb-link${isActive ? ' active' : ''}`} title={label} onClick={() => setMobileOpen(false)}>
+            <GuardedLink key={to} to={to} end={end} className={({ isActive }) => `sb-link${isActive ? ' active' : ''}`} title={label} onNav={() => setMobileOpen(false)}>
               <Icon size={19} />
               <span>{label}</span>
-            </NavLink>
+            </GuardedLink>
           ))}
           <div className="sb-label">Quick action</div>
-          <NavLink to="/app/instructions" className="sb-link" title="New set" onClick={() => setMobileOpen(false)}>
+          <GuardedLink to="/app/instructions" className="sb-link" title="New set" onNav={() => setMobileOpen(false)}>
             <Plus size={19} />
             <span>New set</span>
-          </NavLink>
+          </GuardedLink>
         </nav>
         <div className="sb-foot">
           <AvatarFace id={profile?.avatarId ?? 0} size={34} />

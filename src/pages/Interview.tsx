@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useBlocker } from 'react-router-dom';
 import { VoicePlayer } from '../components/VoicePlayer';
 import { useConfirm } from '../ui/alert-dialog';
+import { useUi } from '../stores/ui';
 import { speak, ttsConfigured } from '../lib/tts';
 import { useSession } from '../stores/session';
 import {
@@ -336,9 +336,10 @@ export default function Interview() {
   const [camTick, setCamTick] = useState(0);
   const flagsRef = useRef(0);
   const dialogOpen = useRef(false);
-  // Block sidebar/in-app navigation while the mock is running — visibilitychange
-  // never fires for SPA route changes, so without this the attempt dies silently.
-  const blocker = useBlocker(phase === 'running');
+  // Set once the user confirms leaving (via sidebar/logout/back) so the
+  // follow-up popstate from our own history juggling is ignored.
+  const leavingRef = useRef(false);
+  const setLeaveGuard = useUi((s) => s.setLeaveGuard);
 
   const steps = useMemo(buildSteps, []);
   const step = steps[stepIdx];
@@ -407,13 +408,40 @@ export default function Interview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  // In-app navigation (sidebar links, logout): SPA route changes never hide the
-  // tab, so the visibility listener above can't see them — block and ask instead.
+  // In-app navigation (sidebar links, logout, back button): SPA route changes
+  // never hide the tab, so the visibility listener above can't see them.
+  // The interview registers a guard; AppShell consults it before navigating.
   useEffect(() => {
-    if (blocker.state !== 'blocked') return;
-    void handleViolationLeave('navigate');
+    if (phase !== 'running') {
+      setLeaveGuard(null);
+      return;
+    }
+    leavingRef.current = false;
+    setLeaveGuard({
+      confirmLeave: () => {
+        flagsRef.current += 1;
+        leavingRef.current = true;
+        cancelAttempt();
+      },
+    });
+    return () => setLeaveGuard(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocker.state]);
+  }, [phase, setLeaveGuard]);
+
+  // Browser back button while running: re-arm history so we stay, then ask.
+  // Confirming discards the attempt and steps back for real.
+  useEffect(() => {
+    if (phase !== 'running') return;
+    window.history.pushState({ amcatMock: true }, '');
+    const onPop = () => {
+      if (leavingRef.current) return;
+      window.history.pushState({ amcatMock: true }, '');
+      void handleViolationLeave('back');
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   // Tab close / reload / refresh while running: the browser shows its own
   // generic prompt (custom text isn't allowed), but the attempt isn't lost silently.
@@ -440,7 +468,7 @@ export default function Interview() {
     setPhase('running');
   }
 
-  async function handleViolationLeave(kind: 'tab' | 'fullscreen' | 'navigate') {
+  async function handleViolationLeave(kind: 'tab' | 'fullscreen' | 'back') {
     if (dialogOpen.current || phase !== 'running') return;
     dialogOpen.current = true;
     flagsRef.current += 1;
@@ -457,11 +485,14 @@ export default function Interview() {
       danger: true,
     });
     dialogOpen.current = false;
-    if (ok) {
-      if (kind === 'navigate' && blocker.state === 'blocked') blocker.proceed();
+    if (!ok) return;
+    if (kind === 'back') {
+      // Re-armed history above; step back for real exactly once.
+      leavingRef.current = true;
       cancelAttempt();
-    } else if (kind === 'navigate' && blocker.state === 'blocked') {
-      blocker.reset();
+      window.history.back();
+    } else {
+      cancelAttempt();
     }
   }
 

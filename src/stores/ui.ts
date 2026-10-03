@@ -9,12 +9,20 @@ export interface ConfirmOptions {
   danger?: boolean;
 }
 
+export interface LeaveGuard {
+  /** Called when the user confirms leaving (records the flag, discards the attempt). */
+  confirmLeave: () => void;
+}
+
 interface UiState {
   collapsed: boolean;
   mobileOpen: boolean;
   dialog: ConfirmOptions | null;
+  /** Set while a monitored mock interview is running; sidebar/logout consult it. */
+  leaveGuard: LeaveGuard | null;
   toggleCollapsed: () => void;
   setMobileOpen: (v: boolean) => void;
+  setLeaveGuard: (g: LeaveGuard | null) => void;
   ask: (o: ConfirmOptions) => Promise<boolean>;
   answer: (v: boolean) => void;
 }
@@ -27,8 +35,10 @@ export const useUi = create<UiState>()(
       collapsed: false,
       mobileOpen: false,
       dialog: null,
+      leaveGuard: null,
       toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
       setMobileOpen: (v) => set({ mobileOpen: v }),
+      setLeaveGuard: (g) => set({ leaveGuard: g }),
       ask: (o) =>
         new Promise<boolean>((resolve) => {
           pending = resolve;
