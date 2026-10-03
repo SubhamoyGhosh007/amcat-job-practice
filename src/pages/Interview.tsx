@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { VoicePlayer } from '../components/VoicePlayer';
 import { useConfirm } from '../ui/alert-dialog';
 import { speak, ttsConfigured } from '../lib/tts';
+import { useSession } from '../stores/session';
 import {
   MOCK_TEST_01,
   deleteMockSession,
@@ -14,7 +15,6 @@ import {
   type MockSession,
   type PartEItem,
 } from '../data/mockInterview';
-import { useSession } from '../stores/session';
 import '../svar.css';
 
 const T = MOCK_TEST_01.sections;
@@ -41,7 +41,7 @@ function useCountdown(seconds: number, active: boolean, onDone?: () => void) {
   return left;
 }
 
-/* ---------------- audio played exactly once (exam rule, HIGH voice for mocks) ---------------- */
+/* ---------------- audio played exactly once (exam rule, HIGH voice) ---------------- */
 function OnceAudio({ text, label, onPlayed }: { text: string; label: string; onPlayed?: () => void }) {
   const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'done'>('idle');
   const [error, setError] = useState('');
@@ -196,14 +196,54 @@ function TtsGate() {
   );
 }
 
-function SectionHead({ n, title, rule }: { n: string; title: string; rule: string }) {
-  return (
-    <div style={{ margin: '26px 0 10px' }}>
-      <span className="topic">{n}</span>
-      <h3 style={{ margin: '6px 0 4px' }}>{title}</h3>
-      <p className="hint" style={{ margin: 0 }}>{rule}</p>
-    </div>
-  );
+/* ---------------- step model: exactly one screen per item ---------------- */
+type Step =
+  | { kind: 'scenario'; part: 'A' | 'B'; sid: string; context: string }
+  | { kind: 'qa'; part: 'A' | 'B'; sid: string; qi: number; q: string; expected: string }
+  | { kind: 'read'; id: string; text: string; tip: string }
+  | { kind: 'repeat'; id: string; text: string }
+  | { kind: 'extempore'; item: PartEItem }
+  | { kind: 'cloze'; id: string; audio: string; missing: string[]; full: string }
+  | { kind: 'correct'; id: string; audio: string; corrected: string; rule: string }
+  | { kind: 'finish' };
+
+const PART_LABEL: Record<string, string> = {
+  A: 'Part A • Short answers',
+  B: 'Part B • Situations',
+  C: 'Part C • Read aloud',
+  D: 'Part D • Repeat',
+  E: 'Part E • Extempore',
+  F: 'Part F • Fill the blank',
+  G: 'Part G • Fix the error',
+  finish: 'Review & finish',
+};
+
+function stepPart(s: Step): string {
+  if (s.kind === 'scenario' || s.kind === 'qa') return s.part;
+  if (s.kind === 'read') return 'C';
+  if (s.kind === 'repeat') return 'D';
+  if (s.kind === 'extempore') return 'E';
+  if (s.kind === 'cloze') return 'F';
+  if (s.kind === 'correct') return 'G';
+  return 'finish';
+}
+
+function buildSteps(): Step[] {
+  const steps: Step[] = [];
+  (['a', 'b'] as const).forEach((ab) => {
+    const part = ab.toUpperCase() as 'A' | 'B';
+    (ab === 'a' ? T.part_a : T.part_b).forEach((s) => {
+      steps.push({ kind: 'scenario', part, sid: s.id, context: s.context });
+      s.questions.forEach((qq, qi) => steps.push({ kind: 'qa', part, sid: s.id, qi, q: qq.q, expected: qq.expected }));
+    });
+  });
+  T.part_c.forEach((r) => steps.push({ kind: 'read', id: r.id, text: r.text, tip: r.tip }));
+  T.part_d.forEach((r) => steps.push({ kind: 'repeat', id: r.id, text: r.text }));
+  T.part_e.forEach((e) => steps.push({ kind: 'extempore', item: e }));
+  T.part_f.forEach((f) => steps.push({ kind: 'cloze', id: f.id, audio: f.audio, missing: f.missing, full: f.full }));
+  T.part_g.forEach((g) => steps.push({ kind: 'correct', id: g.id, audio: g.audio, corrected: g.corrected, rule: g.rule }));
+  steps.push({ kind: 'finish' });
+  return steps;
 }
 
 /* ---------------- Part E: prep then speak ---------------- */
@@ -220,7 +260,7 @@ function Extempore({ item, onDone }: { item: PartEItem; onDone: () => void }) {
   }
 
   return (
-    <div className="svar-card">
+    <div>
       <span className="topic">Topic</span>
       <div className="svar-sentence">“{item.topic}”</div>
       {phase === 'ready' && (
@@ -259,25 +299,23 @@ function untilMidnight(now: number): string {
 export default function Interview() {
   const ask = useConfirm();
   const userId = useSession((s) => s.userId);
-  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [t0] = useState(() => Date.now());
   const [answers, setAnswers] = useState(0);
   const [history, setHistory] = useState<MockSession[]>(() => listMockSessions());
-  const [locked, setLocked] = useState<boolean | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const [playedCtx, setPlayedCtx] = useState<Record<string, boolean>>({});
   const [showKeys, setShowKeys] = useState(false);
+  const [locked, setLocked] = useState<boolean | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [stepIdx, setStepIdx] = useState(0);
+
+  const steps = useMemo(buildSteps, []);
+  const step = steps[stepIdx];
 
   const bump = () => setAnswers((a) => a + 1);
   const heard = (id: string) => setPlayedCtx((p) => ({ ...p, [id]: true }));
 
-  // Daily gate (pro skips it): cloud row is truth, local mirror is instant.
-  // Paid tiers plug in here later.
+  // Daily gate: cloud row is truth, local mirror is instant. Paid tiers plug in here later.
   useEffect(() => {
-    if (tier === 'pro') {
-      setLocked(false);
-      return;
-    }
     let live = true;
     (async () => {
       if (getLastCompletion(userId) === todayKey()) {
@@ -290,7 +328,7 @@ export default function Interview() {
     return () => {
       live = false;
     };
-  }, [userId, tier]);
+  }, [userId]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -320,6 +358,49 @@ export default function Interview() {
     if (ok) setHistory(deleteMockSession(id));
   }
 
+  if (locked === null) {
+    return (
+      <div>
+        <div className="page-hero">
+          <h2>Mock interview</h2>
+          <p>Checking today’s slot…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (locked) {
+    return (
+      <div>
+        <div className="page-hero">
+          <h2>Mock interview</h2>
+          <p>Seven spoken parts, exam rules: scenario audio plays <b>once</b>, every answer on a timer, full sentences only.</p>
+        </div>
+        <div className="card" style={{ textAlign: 'center', marginTop: 6 }}>
+          <h3 style={{ marginTop: 0 }}>Today’s mock is done ✓</h3>
+          <p className="hint">One full interview per day keeps it exam-real. Next unlocks in <b>{untilMidnight(now)}</b>.</p>
+          <p className="hint">Paid plans with extra categories are coming — your streak keeps counting meanwhile.</p>
+        </div>
+        <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
+        {history.length === 0 && <p className="hint">No sessions yet.</p>}
+        {history.map((h) => (
+          <div className="t-row" key={h.id}>
+            <div className="ring" style={{ '--p': Math.min(100, h.answers * 4) } as any}><span>{h.answers}</span></div>
+            <div className="meta">
+              <div style={{ fontWeight: 700 }}>{h.answers} answers • {Math.floor(h.durationSec / 60)}m {h.durationSec % 60}s run</div>
+              <div className="hint">{new Date(h.at).toLocaleString()} • {MOCK_TEST_01.test_id}</div>
+            </div>
+            <div className="btnrow" style={{ marginTop: 0 }}>
+              <button className="btn-ghost" onClick={() => remove(h.id)}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const part = stepPart(step);
+
   return (
     <div>
       <div className="page-hero">
@@ -333,110 +414,119 @@ export default function Interview() {
 
       <TtsGate />
 
-      {locked === null ? (
-        <div className="card">Checking today’s slot…</div>
-      ) : locked ? (
-        <div className="card" style={{ textAlign: 'center', marginTop: 6 }}>
-          <h3 style={{ marginTop: 0 }}>Today’s mock is done ✓</h3>
-          <p className="hint">One full interview per day keeps it exam-real. Next unlocks in <b>{untilMidnight(now)}</b>.</p>
-          <p className="hint">Paid plans with extra categories are coming — your streak keeps counting meanwhile.</p>
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <b>{PART_LABEL[part]} • item {stepIdx + 1} of {steps.length}</b>
+          <span className="hint">{Math.round(((stepIdx + 1) / steps.length) * 100)}%</span>
         </div>
-      ) : (
-      <>
-      <SectionHead n="Part A • Short answers" title="Listen once, answer in ONE sentence" rule="Scenario plays once • 15 seconds per answer • base answers only on what you heard." />
-      {T.part_a.map((s) => (
-        <div className="svar-card" key={s.id}>
-          <span className="topic">Scenario</span>
-          <OnceAudio text={s.context} label="Play scenario" onPlayed={() => heard('a' + s.id)} />
-          {s.questions.map((qq, qi) => (
-            <div key={qi} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
-              <div style={{ fontWeight: 600 }}>Q{qi + 1}. {qq.q}</div>
-              <TimedRecorder seconds={15} armed={!!playedCtx['a' + s.id]} onDone={(u) => u && bump()} />
-            </div>
-          ))}
+        <div style={{ height: 6, borderRadius: 999, background: '#e7ecf5', marginTop: 8, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${((stepIdx + 1) / steps.length) * 100}%`, background: 'linear-gradient(90deg,#4d7cfe,#38bdf8)', borderRadius: 999 }} />
         </div>
-      ))}
-
-      <SectionHead n="Part B • Situations" title="Workplace comprehension, spoken back" rule="Detailed scenario, played once • answer each factual question in a full coherent sentence • 15 seconds each." />
-      {T.part_b.map((s) => (
-        <div className="svar-card" key={s.id}>
-          <span className="topic">Situation</span>
-          <OnceAudio text={s.context} label="Play situation" onPlayed={() => heard('b' + s.id)} />
-          {s.questions.map((qq, qi) => (
-            <div key={qi} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
-              <div style={{ fontWeight: 600 }}>Q{qi + 1}. {qq.q}</div>
-              <TimedRecorder seconds={15} armed={!!playedCtx['b' + s.id]} onDone={(u) => u && bump()} />
-            </div>
-          ))}
+        <div className="btnrow" style={{ marginBottom: 0 }}>
+          <button className="btn-ghost" disabled={stepIdx === 0} onClick={() => setStepIdx((i) => i - 1)}>← Back</button>
+          {step.kind !== 'finish' && (
+            <button className="btn-primary" onClick={() => setStepIdx((i) => Math.min(i + 1, steps.length - 1))}>Next →</button>
+          )}
         </div>
-      ))}
-
-      <SectionHead n="Part C • Read aloud" title="Fluency on screen" rule="Sentences shown one by one • read each aloud clearly and naturally • 12 seconds each." />
-      {T.part_c.map((r) => (
-        <div className="svar-card" key={r.id}>
-          <div className="svar-sentence">“{r.text}”</div>
-          <div className="svar-tip"><b>Coach tip:</b> {r.tip}</div>
-          <TimedRecorder seconds={12} armed onDone={(u) => u && bump()} />
-        </div>
-      ))}
-
-      <SectionHead n="Part D • Repeat" title="Listen once, repeat verbatim" rule="No text on screen • audio plays once • repeat exactly, pronunciation + intonation • 12 seconds." />
-      {T.part_d.map((r) => (
-        <div className="svar-card" key={r.id}>
-          <OnceAudio text={r.text} label="Play sentence" onPlayed={() => heard('d' + r.id)} />
-          <TimedRecorder seconds={12} armed={!!playedCtx['d' + r.id]} onDone={(u) => u && bump()} />
-        </div>
-      ))}
-
-      <SectionHead n="Part E • Extempore" title="Think, then hold the floor" rule="30 seconds to prepare, then 60 seconds of fluent speaking. Opening, two points, closing line." />
-      {T.part_e.map((e) => (
-        <Extempore key={e.id} item={e} onDone={bump} />
-      ))}
-
-      <SectionHead n="Part F • Fill the blank" title="Hear the dash, say the whole line" rule="Audio contains a missing word (“dash”) • identify it, then speak the ENTIRE complete sentence • 15 seconds." />
-      {T.part_f.map((f) => (
-        <div className="svar-card" key={f.id}>
-          <OnceAudio text={f.audio} label="Play sentence" onPlayed={() => heard('f' + f.id)} />
-          <TimedRecorder seconds={15} armed={!!playedCtx['f' + f.id]} onDone={(u) => u && bump()} />
-        </div>
-      ))}
-
-      <SectionHead n="Part G • Fix the error" title="Catch it, correct it, say it" rule="One grammar mistake per sentence • speak the ENTIRE corrected sentence • 15 seconds." />
-      {T.part_g.map((g) => (
-        <div className="svar-card" key={g.id}>
-          <OnceAudio text={g.audio} label="Play sentence" onPlayed={() => heard('g' + g.id)} />
-          <TimedRecorder seconds={15} armed={!!playedCtx['g' + g.id]} onDone={(u) => u && bump()} />
-        </div>
-      ))}
-
-      <div className="card" style={{ marginTop: 18, textAlign: 'center' }}>
-        <div className="btnrow" style={{ justifyContent: 'center' }}>
-          <button className="btn-ghost" onClick={() => setShowKeys((s) => !s)}>
-            {showKeys ? 'Hide answer key' : 'Show answer key'}
-          </button>
-          <button className="btn-big" onClick={saveSession}>Finish & save session ✓</button>
-        </div>
-        {showKeys && (
-          <div style={{ textAlign: 'left', marginTop: 12 }}>
-            {T.part_a.concat(T.part_b).map((s) => (
-              <div key={s.id} style={{ marginBottom: 8 }}>
-                <b className="qnum">{s.id.toUpperCase()}</b>
-                {s.questions.map((qq, i) => (
-                  <div key={i} style={{ fontSize: 13.5 }}><b>Q{i + 1}.</b> {qq.q} → <i>{qq.expected}</i></div>
-                ))}
-              </div>
-            ))}
-            {T.part_f.map((f) => (
-              <div key={f.id} style={{ fontSize: 13.5 }}><b className="qnum">{f.id.toUpperCase()}.</b> missing: <b>{f.missing.join(' / ')}</b> → <i>{f.full}</i></div>
-            ))}
-            {T.part_g.map((g) => (
-              <div key={g.id} style={{ fontSize: 13.5 }}><b className="qnum">{g.id.toUpperCase()}.</b> <i>{g.corrected}</i> — {g.rule}</div>
-            ))}
-          </div>
-        )}
       </div>
 
-      </>)}
+      {step.kind === 'scenario' && (
+        <div className="svar-card">
+          <span className="topic">Scenario — listen once</span>
+          <div style={{ marginTop: 8 }}>
+            <OnceAudio text={step.context} label="Play scenario" onPlayed={() => heard(step.part.toLowerCase() + step.sid)} />
+          </div>
+          <p className="hint">Play it once, hold the details in memory — the questions come next, one screen at a time.</p>
+        </div>
+      )}
+
+      {step.kind === 'qa' && (
+        <div className="svar-card">
+          <span className="topic">{step.part === 'A' ? 'Short answer' : 'Situation'} • one full sentence</span>
+          <div style={{ fontWeight: 700, fontSize: 18, margin: '8px 0 4px' }}>{step.q}</div>
+          <TimedRecorder seconds={15} armed={!!playedCtx[step.part.toLowerCase() + step.sid]} onDone={(u) => u && bump()} />
+        </div>
+      )}
+
+      {step.kind === 'read' && (
+        <div className="svar-card">
+          <span className="topic">Read aloud</span>
+          <div className="svar-sentence">“{step.text}”</div>
+          <div className="svar-tip"><b>Coach tip:</b> {step.tip}</div>
+          <TimedRecorder seconds={12} armed onDone={(u) => u && bump()} />
+        </div>
+      )}
+
+      {step.kind === 'repeat' && (
+        <div className="svar-card">
+          <span className="topic">Listen once, repeat verbatim</span>
+          <div style={{ marginTop: 8 }}>
+            <OnceAudio text={step.text} label="Play sentence" onPlayed={() => heard('d' + step.id)} />
+          </div>
+          <TimedRecorder seconds={12} armed={!!playedCtx['d' + step.id]} onDone={(u) => u && bump()} />
+        </div>
+      )}
+
+      {step.kind === 'extempore' && (
+        <div className="svar-card">
+          <span className="topic">Extempore — 30s think, 60s speak</span>
+          <div style={{ marginTop: 8 }}>
+            <Extempore item={step.item} onDone={bump} />
+          </div>
+        </div>
+      )}
+
+      {step.kind === 'cloze' && (
+        <div className="svar-card">
+          <span className="topic">Fill the blank — say the WHOLE sentence</span>
+          <div style={{ marginTop: 8 }}>
+            <OnceAudio text={step.audio} label="Play sentence" onPlayed={() => heard('f' + step.id)} />
+          </div>
+          <TimedRecorder seconds={15} armed={!!playedCtx['f' + step.id]} onDone={(u) => u && bump()} />
+        </div>
+      )}
+
+      {step.kind === 'correct' && (
+        <div className="svar-card">
+          <span className="topic">Fix the error — say the WHOLE corrected sentence</span>
+          <div style={{ marginTop: 8 }}>
+            <OnceAudio text={step.audio} label="Play sentence" onPlayed={() => heard('g' + step.id)} />
+          </div>
+          <TimedRecorder seconds={15} armed={!!playedCtx['g' + step.id]} onDone={(u) => u && bump()} />
+        </div>
+      )}
+
+      {step.kind === 'finish' && (
+        <div className="card" style={{ textAlign: 'center' }}>
+          <h3 style={{ marginTop: 0 }}>Review & finish</h3>
+          <p className="hint">{answers} answers recorded. Check the key, then save your session (once per day).</p>
+          <div className="btnrow" style={{ justifyContent: 'center' }}>
+            <button className="btn-ghost" onClick={() => setShowKeys((s) => !s)}>
+              {showKeys ? 'Hide answer key' : 'Show answer key'}
+            </button>
+            <button className="btn-big" onClick={saveSession}>Finish & save session ✓</button>
+          </div>
+          {showKeys && (
+            <div style={{ textAlign: 'left', marginTop: 12 }}>
+              {T.part_a.concat(T.part_b).map((s) => (
+                <div key={s.id} style={{ marginBottom: 8 }}>
+                  <b className="qnum">{s.id.toUpperCase()}</b>
+                  {s.questions.map((qq, i) => (
+                    <div key={i} style={{ fontSize: 13.5 }}><b>Q{i + 1}.</b> {qq.q} → <i>{qq.expected}</i></div>
+                  ))}
+                </div>
+              ))}
+              {T.part_f.map((f) => (
+                <div key={f.id} style={{ fontSize: 13.5 }}><b className="qnum">{f.id.toUpperCase()}.</b> missing: <b>{f.missing.join(' / ')}</b> → <i>{f.full}</i></div>
+              ))}
+              {T.part_g.map((g) => (
+                <div key={g.id} style={{ fontSize: 13.5 }}><b className="qnum">{g.id.toUpperCase()}.</b> <i>{g.corrected}</i> — {g.rule}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
       {history.length === 0 && <p className="hint">No sessions yet — finish one above and it lands here.</p>}
       {history.map((h) => (
