@@ -15,12 +15,11 @@ export default function Navbar({ onLogin }: { onLogin: () => void }) {
     <nav className={`nav${sc ? ' scrolled' : ''}`}>
       <div className="nav-inner">
         <button className="brand" onClick={top}>
-          <span className="dot" />Concentrix AMCAT
+          <img src="/logo.jpg" alt="Concentrix AMCAT Practice logo" className="dot" />Concentrix AMCAT
         </button>
         <div className="nav-links">
           <button onClick={go('pattern')}>Pattern</button>
           <button onClick={go('how')}>Method</button>
-          <button onClick={go('typing')}>Typing soon</button>
           
         </div>
         <div className="nav-cta">

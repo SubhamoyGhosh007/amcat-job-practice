@@ -7,7 +7,7 @@ export default function Footer({ onEnter }: { onEnter: () => void }) {
     <footer className="footer-big">
       <div className="footer-grid">
         <div>
-          <div className="footer-brand"><span className="dot" />Concentrix AMCAT</div>
+          <div className="footer-brand"><img src="/logo.jpg" alt="Concentrix AMCAT Practice logo" className="dot" />Concentrix AMCAT</div>
           <p>A practice ground shaped like the real hiring test — timed sets, fresh questions every attempt, and an answer script that teaches.</p>
           <button className="footer-start" onClick={onEnter}>Start free</button>
         </div>

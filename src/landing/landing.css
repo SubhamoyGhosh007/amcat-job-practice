@@ -168,7 +168,7 @@
 .nav-links button:hover { color: #fff; }
 .nav-cta button.nav-login { background: none; border: none; cursor: pointer; font-family: inherit; }
 button.ghost-cta { background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; font-family: inherit; }
-.nav .dot { width: 11px; height: 11px; border-radius: 50%; background: conic-gradient(#38d98a, #4d7cfe, #38d98a); box-shadow: 0 0 12px rgba(77,124,254,.8); }
+.nav .dot { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 12px rgba(77,124,254,.8); }
 .nav-links { display: flex; gap: 22px; margin-left: 12px; }
 .nav-links a { color: #9fb0cc; text-decoration: none; font-size: 14px; font-weight: 600; }
 .nav-links a:hover { color: #fff; }
@@ -297,7 +297,7 @@ button.ghost-cta { background: none; border-top: none; border-left: none; border
 .footer-grid a:hover, .footer-grid button.link:hover { color: #fff; }
 .footer-grid button.link { display: block; color: #9fb0cc; font-size: 14px; margin: 9px 0; background: none; border: none; padding: 0; cursor: pointer; font-family: inherit; text-align: left; }
 .footer-brand { display: flex; align-items: center; gap: 10px; color: #fff; font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px; margin-bottom: 12px; }
-.footer-brand .dot { width: 12px; height: 12px; border-radius: 50%; background: conic-gradient(#38d98a, #4d7cfe, #38d98a); box-shadow: 0 0 12px rgba(77,124,254,.8); }
+.footer-brand .dot { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 12px rgba(77,124,254,.8); }
 .footer-grid p { font-size: 13.5px; line-height: 1.65; margin: 0 0 16px; max-width: 30em; }
 .footer-start { background: #4d7cfe; color: #fff; font-weight: 700; font-size: 14px; border: none; border-radius: 9px; padding: 11px 20px; cursor: pointer; font-family: inherit; }
 .footer-start:hover { background: #3b6bf0; }
