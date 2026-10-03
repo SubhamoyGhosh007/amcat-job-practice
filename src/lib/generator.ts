@@ -152,6 +152,16 @@ function extractResponsesText(data: any): string {
  * - gemini-* families → Google-style GenerateContent (/models/<id>:generateContent)
  * Falls back to OpenAI-compatible chat completions.
  */
+function throwIfZenError(data: any, fallback: string): void {
+  const e = data?.error;
+  if (!e) return;
+  const raw = typeof e === 'string' ? e : e?.message || fallback;
+  const hint = /free.?tier|from within opencode/i.test(raw)
+    ? ' Zen free models only work inside OpenCode itself — use the gemini provider for in-app AI sets.'
+    : '';
+  throw new Error(`Zen refused: ${raw}.${hint}`);
+}
+
 async function callZen(prompt: string): Promise<Question[]> {
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${ZEN_KEY}` };
 
@@ -159,7 +169,9 @@ async function callZen(prompt: string): Promise<Question[]> {
     const url = `https://opencode.ai/zen/v1/models/${encodeURIComponent(ZEN_MODEL)}:generateContent`;
     const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(geminiBody(prompt)) });
     if (!res.ok) throw new Error(`Zen HTTP ${res.status}`);
-    const text = geminiText(await res.json());
+    const gdata = await res.json();
+    throwIfZenError(gdata, `Zen HTTP ${res.status}`);
+    const text = geminiText(gdata);
     if (!text) throw new Error('Empty Zen response');
     return sanitise(extractJson(text));
   }
@@ -176,7 +188,9 @@ async function callZen(prompt: string): Promise<Question[]> {
       }),
     });
     if (!res.ok) throw new Error(`Zen responses HTTP ${res.status}`);
-    const text = extractResponsesText(await res.json());
+    const rdata = await res.json();
+    throwIfZenError(rdata, `Zen responses HTTP ${res.status}`);
+    const text = extractResponsesText(rdata);
     if (!text) throw new Error('Empty Zen response');
     return sanitise(extractJson(text));
   } catch (e) {
@@ -197,6 +211,7 @@ async function callZen(prompt: string): Promise<Question[]> {
     });
     if (!res.ok) throw e;
     const data = await res.json();
+    throwIfZenError(data, 'Zen request refused');
     const text: string = data?.choices?.[0]?.message?.content || '';
     if (!text) throw new Error('Empty Zen response');
     return sanitise(extractJson(text));
