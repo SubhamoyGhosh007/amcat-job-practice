@@ -38,12 +38,6 @@ export default function Instructions() {
   }, [userId]);
 
   async function startGeneration() {
-    // Genuine click gesture: enter fullscreen BEFORE the async generation work.
-    try {
-      await document.documentElement.requestFullscreen();
-    } catch {
-      /* denied/unsupported — the exam shows a one-tap banner instead */
-    }
     setLoading(true);
     setError('');
     try {

@@ -49,29 +49,6 @@ export default function AdaptiveExam() {
 
   const mmss = `${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`;
 
-  const fsSupported = typeof document !== 'undefined' && !!document.documentElement.requestFullscreen;
-  const [fsOn, setFsOn] = useState(!!document.fullscreenElement);
-  const [fsDismissed, setFsDismissed] = useState(false);
-
-  useEffect(() => {
-    const onFs = () => setFsOn(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', onFs);
-    setFsOn(!!document.fullscreenElement);
-    return () => {
-      document.removeEventListener('fullscreenchange', onFs);
-      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    };
-  }, []);
-
-  function goFs() {
-    try {
-      const p = document.documentElement.requestFullscreen() as any;
-      if (p && p.catch) p.catch(() => {});
-    } catch {
-      /* unsupported */
-    }
-  }
-
   function owner() {
     return {
       userId: userId!,
@@ -153,15 +130,6 @@ export default function AdaptiveExam() {
         </div>
         <div className={`timer ${timeLeft < 60 ? 'danger' : ''}`}>⏱ {mmss}</div>
       </div>
-      {fsSupported && !fsOn && !fsDismissed && (
-        <div className="wrap adaptive" style={{ maxWidth: '860px', paddingBottom: 0 }}>
-          <div className="banner warn">
-            Fullscreen gives the real hall feel.{' '}
-            <button onClick={goFs} style={{ background: 'none', border: 'none', color: 'inherit', fontWeight: 800, cursor: 'pointer', padding: 0 }}>Go fullscreen →</button>{' '}
-            <button onClick={() => setFsDismissed(true)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>✕</button>
-          </div>
-        </div>
-      )}
       <div className="wrap adaptive" style={{ maxWidth: '860px' }}>
         <div className="sectabs">
           {grouped.map((g, i) => {
