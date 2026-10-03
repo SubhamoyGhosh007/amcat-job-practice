@@ -12,6 +12,8 @@ export default function Instructions() {
   const difficulty = useExam((s) => s.difficulty);
   const pyq = useExam((s) => s.pyq);
   const setPrefs = useExam((s) => s.setPrefs);
+  const proctored = useExam((s) => s.proctored);
+  const setProctored = useExam((s) => s.setProctored);
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [loading, setLoading] = useState(false);
@@ -104,6 +106,14 @@ export default function Instructions() {
                 <div className={`radio-pill ${pyq ? 'active' : ''}`} onClick={() => setPrefs({ pyq: true })}>📜 PYQ papers</div>
               </div>
               <p className="hint">{pyq ? 'Previous-year AMCAT style, recalled from 2021–2024 papers.' : 'Brand-new questions in the exact AMCAT pattern.'} Served from the shared bank if you haven’t attempted one — otherwise freshly generated and shared for others.</p>
+            </div>
+            <div className="field">
+              <label>Exam environment</label>
+              <div className="radio-row">
+                <div className={`radio-pill ${!proctored ? 'active' : ''}`} onClick={() => setProctored(false)}>📝 Normal</div>
+                <div className={`radio-pill ${proctored ? 'active' : ''}`} onClick={() => setProctored(true)}>🎥 Proctored</div>
+              </div>
+              <p className="hint">{proctored ? 'Camera on, fullscreen locked, tab-switch + face-presence tracking. Flags never affect your score.' : 'Relaxed practice, no monitoring.'}</p>
             </div>
             {error && <div className="err">{error}</div>}
         <div className="btnrow">

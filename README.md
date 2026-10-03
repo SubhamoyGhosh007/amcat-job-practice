@@ -16,6 +16,7 @@ Minimal AMCAT-style practice app for the Concentrix hiring exam. Built for a fri
 - **PDF downloads**: test report card + full Q&A sheet with explanations as notes (jsPDF, generated on-device).
 - **Settings page**: username, avatar, linked logins, erase-local-data, logout.
 - **Health check page**: plain-English status (account, score backup, questions) — no technical details.
+- **Proctored exam mode** (optional toggle): camera PiP, fullscreen lock, tab-switch/focus tracking, clipboard guard, plus on-device face-presence AI (MediaPipe, lazy-loaded, fails soft offline). Flags are practice-integrity only and never touch the score.
 - Login is mandatory for tests — logged-out visitors only see the landing page. Design guidance: `anthropics/skills@frontend-design` (installed under `.agents/skills/`).
 - **App shell**: React Router (`/`, `/login`, `/app`, `/app/instructions`, `/app/exam`, `/app/result`, `/app/sheets`, `/app/settings`) with route guards — refreshing mid-exam safely returns to Practice. Global state in zustand (`session`, `exam`, `ui`); exam timer/answers stay local to the page. Shadcn-style collapsible sidebar (icons on desktop, drawer on mobile), Tailwind utilities available without the global reset.
 

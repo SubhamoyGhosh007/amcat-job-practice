@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { SECTIONS, type Question } from '../types';
 import { saveScoreSheet, sheetFromExam } from '../lib/store';
@@ -11,6 +11,10 @@ export default function Exam() {
   const navigate = useNavigate();
   const activeSet = useExam((s) => s.activeSet);
   const finish = useExam((s) => s.finish);
+  const proctored = useExam((s) => s.proctored);
+  const violations = useExam((s) => s.violations);
+  const logViolation = useExam((s) => s.logViolation);
+  const setProctored = useExam((s) => s.setProctored);
   const userId = useSession((s) => s.userId);
   const email = useSession((s) => s.email);
   const profile = useSession((s) => s.profile);
@@ -47,6 +51,115 @@ export default function Exam() {
 
   const mmss = `${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`;
 
+  const [camError, setCamError] = useState(false);
+  const [noFullscreen, setNoFullscreen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Proctoring: camera PiP + fullscreen lock + focus tracking. All on-device.
+  useEffect(() => {
+    if (!proctored) return;
+    let alive = true;
+    let stream: MediaStream | null = null;
+    (async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 320 } }, audio: false });
+        if (!alive) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        const v = videoRef.current;
+        if (v) {
+          v.srcObject = stream;
+          await v.play().catch(() => {});
+        }
+      } catch {
+        if (alive) setCamError(true);
+      }
+    })();
+    try {
+      const p = document.documentElement.requestFullscreen() as any;
+      if (p && p.catch) p.catch(() => alive && setNoFullscreen(true));
+    } catch {
+      setNoFullscreen(true);
+    }
+    setNoFullscreen(!document.fullscreenElement);
+    const onFs = () => setNoFullscreen(!document.fullscreenElement);
+    const onVis = () => {
+      if (document.hidden) logViolation({ type: 'tab-switch', at: Date.now() });
+    };
+    const onBlur = () => logViolation({ type: 'window-blur', at: Date.now() });
+    document.addEventListener('fullscreenchange', onFs);
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      alive = false;
+      document.removeEventListener('fullscreenchange', onFs);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('blur', onBlur);
+      stream?.getTracks().forEach((t) => t.stop());
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proctored]);
+
+  // Face-presence AI (MediaPipe, on-device, lazy-loaded). Fails soft offline.
+  useEffect(() => {
+    if (!proctored || camError) return;
+    let stop = false;
+    let timer = 0;
+    let detector: any = null;
+    let absent = 0;
+    (async () => {
+      try {
+        const vision = await import('@mediapipe/tasks-vision');
+        const resolver = await vision.FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+        );
+        if (stop) return;
+        detector = await vision.FaceDetector.createFromOptions(resolver, {
+          baseOptions: {
+            modelAssetPath:
+              'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite',
+            delegate: 'CPU',
+          },
+          runningMode: 'IMAGE',
+        });
+        const tick = () => {
+          if (stop) return;
+          try {
+            const v = videoRef.current;
+            if (v && v.readyState >= 2 && v.videoWidth > 0 && detector) {
+              const n = detector.detect(v).detections.length;
+              if (n === 0) {
+                absent += 1;
+                if (absent === 2) logViolation({ type: 'no-face', at: Date.now() });
+              } else {
+                absent = 0;
+                if (n > 1) logViolation({ type: 'multiple-faces', at: Date.now() });
+              }
+            }
+          } catch {
+            /* transient frame — skip */
+          }
+          timer = window.setTimeout(tick, 2500);
+        };
+        tick();
+      } catch {
+        /* offline or blocked CDN — deterministic checks continue without face AI */
+      }
+    })();
+    return () => {
+      stop = true;
+      window.clearTimeout(timer);
+      try {
+        detector?.close();
+      } catch {
+        /* ignore */
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proctored, camError]);
+
   function owner() {
     return {
       userId: userId!,
@@ -72,6 +185,13 @@ export default function Exam() {
     navigate('/app/result');
   }
 
+  async   function blockClipboard(e: React.SyntheticEvent) {
+    e.preventDefault();
+    if (proctored && (e.type === 'paste' || e.type === 'cut')) {
+      logViolation({ type: 'clipboard', at: Date.now() });
+    }
+  }
+
   async function handleSubmitSection(auto = false) {
     if (!auto) {
       const ok = await ask({
@@ -93,11 +213,32 @@ export default function Exam() {
   const answeredCount = sectionQs.filter((q) => answers[q.id] !== undefined).length;
 
   return (
-    <div>
+    <div
+      onCopy={blockClipboard}
+      onCut={blockClipboard}
+      onPaste={blockClipboard}
+      onContextMenu={blockClipboard}
+    >
       <div className="topbar">
-        <div><div className="brand">Concentrix AMCAT • {section.name}</div><div className="sub">Set #{activeSet.id} • {activeSet.source}</div></div>
+        <div><div className="brand">Concentrix AMCAT • {section.name}</div><div className="sub">Set #{activeSet.id} • {activeSet.source}{proctored ? ' • 🎥 proctored' : ''}</div></div>
         <div className={`timer ${timeLeft < 60 ? 'danger' : ''}`}>⏱ {mmss}</div>
+        {proctored && violations.length > 0 && <div className="timer danger">⚠ {violations.length}</div>}
       </div>
+      {proctored && (
+        <>
+          {!camError && <video ref={videoRef} muted playsInline autoPlay className="proc-cam" />}
+          {camError && (
+            <div className="wrap" style={{ maxWidth: '1100px', paddingBottom: 0 }}>
+              <div className="banner warn">Camera blocked — proctoring needs it. Allow camera access, or <button onClick={() => setProctored(false)} style={{ background: 'none', border: 'none', color: 'inherit', fontWeight: 800, cursor: 'pointer', padding: 0 }}>continue without proctoring</button>.</div>
+            </div>
+          )}
+          {noFullscreen && !camError && (
+            <div className="wrap" style={{ maxWidth: '1100px', paddingBottom: 0 }}>
+              <div className="banner warn">Fullscreen is required for proctored mode. <button onClick={() => document.documentElement.requestFullscreen().catch(() => {})} style={{ background: 'none', border: 'none', color: 'inherit', fontWeight: 800, cursor: 'pointer', padding: 0 }}>Go fullscreen →</button></div>
+            </div>
+          )}
+        </>
+      )}
       <div className="wrap" style={{ maxWidth: '1100px' }}>
         <div className="sectabs">
           {SECTIONS.map((s, i) => (

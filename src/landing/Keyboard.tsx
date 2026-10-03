@@ -38,7 +38,7 @@ export default function Keyboard() {
       <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
         <span className="chip">WPM —</span>
         <span className="chip green">ACC —</span>
-        <span className="chip amber">Typing arena — coming soon</span>
+        <span className="chip green">Live now — open it from the app sidebar</span>
       </div>
     </div>
   );

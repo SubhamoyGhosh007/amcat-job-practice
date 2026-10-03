@@ -14,6 +14,7 @@ export default function Result() {
   const start = useExam((s) => s.start);
   const difficulty = useExam((s) => s.difficulty);
   const pyq = useExam((s) => s.pyq);
+  const violations = useExam((s) => s.violations);
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,20 @@ export default function Result() {
         {error && <div className="err" style={{ marginTop: 10 }}>{error}</div>}
         <p className="hint" style={{ marginTop: 10 }}>Score sheet saved to browser + cloud ✓ — find it under My sheets.</p>
       </div>
+      {violations.length > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <b>🎥 Proctoring flags: {violations.length}</b>
+          <p className="hint">Practice integrity only — flags never change your score.</p>
+          <div>
+            {violations.map((v, i) => (
+              <span key={i} className="chip amber">
+                {{ 'tab-switch': 'Left the tab', 'window-blur': 'Window lost focus', 'no-face': 'No face in camera', 'multiple-faces': 'Multiple faces', clipboard: 'Copy/paste blocked' }[v.type] || v.type}
+                {' '}• {new Date(v.at).toLocaleTimeString()}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <h3>Answer script — every question with explanation</h3>
       {set.questions.map((q, i) => {
         const mine = answers[q.id];
