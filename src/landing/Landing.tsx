@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../stores/session';
 import { SECTIONS, totalMinutes, totalQuestions } from '../types';
@@ -101,6 +101,15 @@ export default function Landing() {
   const userId = useSession((s) => s.userId);
   const profile = useSession((s) => s.profile);
   const onEnter = () => navigate(userId ? '/app' : '/login');
+  // Skill texts-reveal: play the hero stagger once on mount.
+  const heroRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el) return;
+    const t = requestAnimationFrame(() => el.classList.add('is-shown'));
+    return () => cancelAnimationFrame(t);
+  }, []);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
   return (
     <div className="landing" id="top">
       <FloatingPointer />
@@ -112,9 +121,9 @@ export default function Landing() {
         <CloudShader className="shader-layer" />
         <RippleCanvas className="shader-layer" />
         <div className="hero-inner">
-          <div>
-            <span className="pill"><span className="livedot" /> Concentrix hiring prep</span>
-            <h1 className="display">
+          <div ref={heroRef} className="t-stagger">
+            <span className="pill t-stagger-line t-stagger-line--1"><span className="livedot" /> Concentrix hiring prep</span>
+            <h1 className="display t-stagger-line t-stagger-line--2">
               Walk into the test hall{' '}
               <span className="squig">already warmed up.<Squiggle className="" /></span>
             </h1>
@@ -122,12 +131,12 @@ export default function Landing() {
               Practice with <Typewriter words={['timed sets.', 'fresh questions.', 'explained answers.', 'zero surprises.']} />
               <span className="type-caret" />
             </div>
-            <p className="lede">
+            <p className="lede t-stagger-line t-stagger-line--3">
               Free Concentrix AMCAT mock test practice shaped exactly like the real hiring test — four timed sections
               (English Ability, Quantitative Ability, Logical Reasoning, Customer Service), a fresh set of questions
               every attempt, and an answer script that teaches you after every test. Move your mouse: the hall reacts.
             </p>
-            <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="t-stagger-line t-stagger-line--4" style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
               <Magnetic>
                 <MovingCta onClick={onEnter}>{userId ? `Continue as @${profile?.username || '…'}` : 'Log in and start Set 1'}</MovingCta>
               </Magnetic>
@@ -269,20 +278,30 @@ export default function Landing() {
               <p className="sub">Straight answers about the pattern, the SVAR round, typing, and what this site is.</p>
             </Reveal>
             <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
-              {FAQS.map((f) => (
-                <details
-                  key={f.q}
-                  style={{
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 12,
-                    padding: '12px 16px',
-                  }}
-                >
-                  <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{f.q}</summary>
-                  <p className="sub" style={{ margin: '8px 0 2px' }}>{f.a}</p>
-                </details>
-              ))}
+              {FAQS.map((f, i) => {
+                const open = openFaq === i;
+                return (
+                  <div key={f.q} className="t-acc faq-item" data-open={String(open)}>
+                    <button
+                      className="t-acc-head faq-head"
+                      aria-expanded={open}
+                      onClick={() => setOpenFaq(open ? null : i)}
+                    >
+                      <span>{f.q}</span>
+                      <span className="t-acc-chevron" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M4 6.5L8 10.5L12 6.5" />
+                        </svg>
+                      </span>
+                    </button>
+                    <div className="t-acc-panel">
+                      <div className="t-acc-panel-inner">
+                        <p className="sub faq-answer" style={{ margin: '8px 0 2px' }}>{f.a}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
