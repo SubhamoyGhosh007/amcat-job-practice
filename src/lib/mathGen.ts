@@ -74,7 +74,7 @@ function sanitiseMath(parsed: any): Question[] {
       trick: String(q.trick || '').slice(0, 300) || undefined,
     });
   }
-  if (out.length < 10) throw new Error('AI returned too few valid questions');
+  if (out.length < 3) throw new Error('AI returned too few valid questions');
   return out;
 }
 
