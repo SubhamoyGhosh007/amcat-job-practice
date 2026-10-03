@@ -25,7 +25,7 @@ Minimal AMCAT-style practice app for the Concentrix hiring exam. Built for a fri
 Copy `.env.example` to `.env` and fill in ONE key (`.env` is gitignored, never committed).
 The app never asks for keys or models in the UI.
 
-- `VITE_AI_PROVIDER=gemini` → Google AI Studio key (`aistudio.google.com`). **Use this for AI sets in the browser.** Model tries `VITE_GEMINI_MODEL` first, then falls back through live models automatically (`gemini-3.5-flash` → `gemini-3-flash` → `gemini-3.6-flash`). Retired 2.x ids are never attempted.
+- `VITE_AI_PROVIDER=gemini` → Google key, preferably via the self-hosted proxy: put `GEMINI_API_KEY` in the voice server's env and the app calls `POST {VITE_TTS_URL}/gemini` (same token gate + rate limits) — the Google key then never ships in JS. Direct browser calls with `VITE_GEMINI_API_KEY` still work as fallback. Model tries `VITE_GEMINI_MODEL` first, then falls back through live models automatically (`gemini-3.5-flash` → `gemini-3-flash` → `gemini-3.6-flash`). Retired 2.x ids are never attempted.
 - `VITE_AI_PROVIDER=zen` → OpenCode Zen key — **server-side only**. Zen's API blocks browser origins (CORS), so in this app it always falls back to the offline bank. Keep it for agents/servers.
 - `VITE_AI_PROVIDER=offline` (or empty key) → 40-question built-in bank, shuffled per set. Works with zero config. If a set ever shows source `offline-bank` unexpectedly, the AI call was blocked — check the provider note above.
 
@@ -383,7 +383,7 @@ npm run build   # outputs dist/
 
 The app speaks through your own VPS — no vendor, no per-word billing:
 
-1. On the VPS, run `rhasspy/wyoming-piper` in Docker for the voice models, plus a tiny FastAPI sidecar (`tts_server.py`) exposing `GET /health`, `GET /voices`, `POST /speak` (WAV bytes, `X-TTS-Token` header, 3000-char cap).
+1. On the VPS, run `rhasspy/wyoming-piper` in Docker for the voice models, plus a tiny FastAPI sidecar (`tts_server.py`) exposing `GET /health`, `GET /voices`, `POST /speak` (WAV bytes, `X-TTS-Token` header, 3000-char cap) and `POST /gemini` (proxied `generateContent` with `GEMINI_API_KEY` from server env, model allowlist, per-IP rate limits + daily caps).
 2. Put Caddy in front for automatic HTTPS (`reverse_proxy tts:8000`), firewall to 80/443, and keep Piper off public ports.
 3. In the app: `VITE_TTS_URL=https://pipertts.yourdomain.com` + `VITE_TTS_TOKEN` (same token as the server). Sentence audio is cached per text, so repeats are instant.
 

@@ -44,8 +44,7 @@ export async function speak(text: string, opts?: { voice?: string }): Promise<st
   return url;
 }
 
-/** Split a passage into speakable chunks (one request per chunk). */
-export function chunkText(text: string, max = 700): string[] {
+/** Split a passage into speakable chunks (one request per chunk). */export function chunkText(text: string, max = 700): string[] {
   const parts = text.replace(/\s+/g, ' ').match(/[^.!?]+[.!?]+["']?|\S[^.!?]*$/g) || [text];
   const out: string[] = [];
   let cur = '';
@@ -59,4 +58,23 @@ export function chunkText(text: string, max = 700): string[] {
   }
   if (cur.trim()) out.push(cur.trim());
   return out;
+}
+
+/**
+ * AI generation through the self-hosted proxy (same VPS box as TTS).
+ * The Google key lives only in the server's env — the browser sends just
+ * the model + contents + the shared token. Returns Gemini-shaped JSON.
+ */
+export async function geminiViaProxy(model: string, contents: unknown, generationConfig?: unknown): Promise<any> {
+  const res = await fetch(`${TTS_URL}/gemini`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(TTS_TOKEN ? { 'X-TTS-Token': TTS_TOKEN } : {}),
+    },
+    body: JSON.stringify({ model, contents, generationConfig }),
+  });
+  if (res.status === 429) throw new Error('AI is busy — too many requests, try again in a minute.');
+  if (!res.ok) throw new Error(`AI proxy HTTP ${res.status}`);
+  return res.json();
 }

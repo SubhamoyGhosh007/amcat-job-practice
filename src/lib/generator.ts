@@ -1,6 +1,7 @@
 import { BANK } from '../data/bank';
 import { SECTIONS, type ExamSet, type Question, type SectionId } from '../types';
 import { fetchUnattempted, publishSet, type BankSource, type Difficulty } from './bank';
+import { geminiViaProxy, ttsConfigured } from './tts';
 import { useSession } from '../stores/session';
 
 // Config comes ONLY from build-time env (.env file / deploy dashboard).
@@ -107,8 +108,25 @@ const GEMINI_FALLBACKS = ['gemini-3.5-flash', 'gemini-3-flash', 'gemini-3.6-flas
 /** Direct Google Gemini API. Falls back through live models if the configured id is unknown. */
 async function callGemini(prompt: string): Promise<Question[]> {
   const models = [GEMINI_MODEL, ...GEMINI_FALLBACKS.filter((m) => m !== GEMINI_MODEL)];
+  const viaProxy = ttsConfigured();
   let lastErr = '';
   for (const m of models) {
+    // Prefer the self-hosted proxy (key never touches the browser).
+    if (viaProxy) {
+      try {
+        const body = geminiBody(prompt);
+        const text = geminiText(await geminiViaProxy(m, body.contents, body.generationConfig));
+        if (!text) throw new Error('Empty Gemini response');
+        return sanitise(extractJson(text));
+      } catch (e: any) {
+        lastErr = `Gemini proxy (${m}): ${e?.message || e}`;
+        continue;
+      }
+    }
+    if (!GEMINI_KEY) {
+      lastErr = 'No Gemini key and no proxy configured';
+      continue;
+    }
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`;
     const res = await fetch(url, {
       method: 'POST',
