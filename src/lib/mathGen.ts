@@ -123,27 +123,6 @@ export const MATH_PAGE_SLICES: SliceSpec[] = MATH_TOPICS.map((t) => [{ topic: t.
 
 export const MATH_TOTAL_PAGES = MATH_PAGE_SLICES.length;
 
-/** Keyless fallback: Pollinations.ai. Slower and simpler, but free forever. */
-async function callFreeMath(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
-  const res = await fetch('https://text.pollinations.ai/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'openai',
-      private: true,
-      messages: [
-        { role: 'system', content: 'You are an AMCAT exam setter. Always reply with valid JSON only.' },
-        { role: 'user', content: mathPrompt(spec, seed, avoid) + '\n\nReply with valid JSON only.' },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`Free AI HTTP ${res.status}`);
-  const text = await res.text();
-  if (!text) throw new Error('Empty free-AI response');
-  const start = text.search(/[{[]/);
-  return sanitiseMath(JSON.parse(text.slice(start, Math.max(text.lastIndexOf('}'), text.lastIndexOf(']')) + 1)));
-}
-
 async function callMathRetried(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
   try {
     return await callMath(spec, seed, avoid);
@@ -156,23 +135,12 @@ async function callMathRetried(spec: SliceSpec, seed: number, avoid: string[]): 
   }
 }
 
-/** Generate one page (4 questions). Gemini first, keyless free AI next. */
+/** Generate one page (4 questions). Throws with a friendly message on failure. */
 export async function generateMathPage(page: number): Promise<Question[]> {
   const spec = MATH_PAGE_SLICES[page];
   if (!spec) throw new Error('No such maths page.');
   const seed = Math.floor(Math.random() * 1_000_000);
-  const avoid = recentAvoid();
-  let questions: Question[];
-  try {
-    questions = await callMathRetried(spec, seed, avoid);
-  } catch (e) {
-    // Gemini down or quota out — the free provider keeps maths alive.
-    try {
-      questions = await callFreeMath(spec, seed + 5000, avoid);
-    } catch {
-      throw e;
-    }
-  }
+  const questions = await callMathRetried(spec, seed, recentAvoid());
   const capped = new Map<string, Question[]>();
   for (const q of questions) {
     const want = spec.find((s) => s.topic === q.topic)?.count ?? 0;

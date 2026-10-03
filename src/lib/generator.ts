@@ -193,30 +193,6 @@ function throwIfZenError(data: any, fallback: string): void {
   throw new Error(`Zen refused: ${raw}.${hint}`);
 }
 
-/**
- * Pollinations.ai — free, keyless, no signup. Plain HTTPS, CORS-open, so the
- * browser calls it directly. Quality is a notch below Gemini, but it never
- * asks for a key or a quota. Last resort before the offline bank.
- */
-async function callFree(prompt: string, adaptive = false): Promise<Question[]> {
-  const res = await fetch('https://text.pollinations.ai/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'openai',
-      private: true,
-      messages: [
-        { role: 'system', content: 'You are an AMCAT exam setter. Always reply with valid JSON only.' },
-        { role: 'user', content: prompt + '\n\nReply with valid JSON only.' },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`Free AI HTTP ${res.status}`);
-  const text = await res.text();
-  if (!text) throw new Error('Empty free-AI response');
-  return sanitise(extractJson(text), !adaptive);
-}
-
 async function callZen(prompt: string, adaptive = false): Promise<Question[]> {
   const maxTokens = adaptive ? 9000 : 6000;
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${ZEN_KEY}` };
@@ -332,8 +308,7 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
   // 2. make a new one with AI and share it with the pool.
   // Providers fall back to each other (a CORS-blocked Zen yields to Gemini
   // when its key exists) before the offline bank — order still honors config.
-  // The keyless free provider always runs last: slower, but quota-free.
-  const order = PROVIDER === 'gemini' ? (['gemini', 'zen', 'free'] as const) : (['zen', 'gemini', 'free'] as const);
+  const order = PROVIDER === 'gemini' ? (['gemini', 'zen'] as const) : (['zen', 'gemini'] as const);
   for (const p of order) {
     try {
       // Gemini works keyless through the self-hosted proxy — only skip it when
@@ -348,13 +323,6 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
       if (p === 'zen' && ZEN_KEY) {
         const qs = await callZen(prompt, adaptive);
         const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-zen', difficulty, origin: source, adaptive, questions: qs };
-        rememberAvoid(qs);
-        await publishSet(set, userId, difficulty, source);
-        return set;
-      }
-      if (p === 'free') {
-        const qs = await callFree(prompt, adaptive);
-        const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-free', difficulty, origin: source, adaptive, questions: qs };
         rememberAvoid(qs);
         await publishSet(set, userId, difficulty, source);
         return set;
