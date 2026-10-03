@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { MouseEvent, ReactNode } from 'react';
 import {
@@ -101,8 +101,12 @@ function GuardedLink({
     else return;
     if (await askLeave(ask)) navigate(to);
   }
+  const cls =
+    typeof className === 'function'
+      ? (p: { isActive: boolean }) => `${className(p)} t-tt-trigger`
+      : `${className} t-tt-trigger`;
   return (
-    <NavLink to={to} end={end} className={className} title={title} onClick={onClick}>
+    <NavLink to={to} end={end} className={cls} data-tooltip={title} onClick={onClick}>
       {children}
     </NavLink>
   );
@@ -138,6 +142,77 @@ export default function AppShell() {
     return () => window.removeEventListener('beforeunload', fn);
   }, []);
 
+  // Skill tooltip orchestration: one bubble shared by every nav trigger.
+  // Hovering writes the bubble's x/y + width for that trigger; when already
+  // showing it tweens (travels), when hidden the geometry snaps and only the
+  // appear plays. Collapsed sidebar + hover-capable pointers only.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const group = navRef.current;
+    if (!group) return;
+    const tip = group.querySelector('.t-tt') as HTMLElement | null;
+    const text = tip?.querySelector('.t-tt-text') as HTMLElement | null;
+    if (!tip || !text) return;
+    const triggers = [...group.querySelectorAll('.t-tt-trigger')] as HTMLElement[];
+    const fine = () => window.matchMedia('(hover: hover)').matches;
+    const aside = () => group.closest('aside');
+
+    function hide() {
+      tip!.setAttribute('data-show', 'false');
+      tip!.setAttribute('aria-hidden', 'true');
+    }
+
+    function place(trigger: HTMLElement) {
+      if (!fine() || !aside()?.classList.contains('collapsed')) {
+        hide();
+        return;
+      }
+      const showing = tip!.getAttribute('data-show') === 'true';
+      text!.textContent = trigger.getAttribute('data-tooltip') || '';
+      const cs = getComputedStyle(tip!);
+      const width = Math.ceil(text!.scrollWidth + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight));
+      const g = group!.getBoundingClientRect();
+      const r = trigger.getBoundingClientRect();
+      const x = r.right - g.left + 10;
+      const y = r.top - g.top + r.height / 2 - 18;
+      if (!showing) {
+        // Snap the geometry while hidden so only the appear plays.
+        tip!.style.transition = 'none';
+        tip!.style.width = `${width}px`;
+        tip!.style.setProperty('--tt-x', `${x}px`);
+        tip!.style.setProperty('--tt-y', `${y}px`);
+        void tip!.offsetWidth;
+        tip!.style.transition = '';
+      } else {
+        tip!.style.width = `${width}px`;
+        tip!.style.setProperty('--tt-x', `${x}px`);
+        tip!.style.setProperty('--tt-y', `${y}px`);
+      }
+      tip!.setAttribute('data-show', 'true');
+      tip!.setAttribute('aria-hidden', 'false');
+    }
+
+    const onEnter = (t: HTMLElement) => () => place(t);
+    const cleanups: (() => void)[] = [];
+    triggers.forEach((t) => {
+      const enter = onEnter(t);
+      const focus = onEnter(t);
+      t.addEventListener('pointerenter', enter);
+      t.addEventListener('focus', focus);
+      t.addEventListener('blur', hide);
+      cleanups.push(() => {
+        t.removeEventListener('pointerenter', enter);
+        t.removeEventListener('focus', focus);
+        t.removeEventListener('blur', hide);
+      });
+    });
+    group.addEventListener('pointerleave', hide);
+    return () => {
+      cleanups.forEach((fn) => fn());
+      group.removeEventListener('pointerleave', hide);
+    };
+  }, []);
+
   async function doLogout() {
     if (!(await askLeave(ask))) return;
     await logout().catch(() => {});
@@ -152,10 +227,17 @@ export default function AppShell() {
           <span className="sb-logo" />
           <span className="sb-name">Concentrix AMCAT<small>practice ground</small></span>
           <button className="sb-collapse" onClick={toggleCollapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+            <span className="t-icon-swap" data-state={collapsed ? 'b' : 'a'}>
+              <span className="t-icon" data-icon="a">
+                <PanelLeftClose size={17} />
+              </span>
+              <span className="t-icon" data-icon="b">
+                <PanelLeftOpen size={17} />
+              </span>
+            </span>
           </button>
         </div>
-        <nav className="sb-nav">
+        <nav className="sb-nav t-tt-group" ref={navRef}>
           <div className="sb-label">Menu</div>
           {NAV.map(({ to, end, label, Icon }) => (
             <GuardedLink key={to} to={to} end={end} className={({ isActive }) => `sb-link${isActive ? ' active' : ''}`} title={label} onNav={() => setMobileOpen(false)}>
@@ -168,6 +250,9 @@ export default function AppShell() {
             <Plus size={19} />
             <span>New set</span>
           </GuardedLink>
+          <span className="t-tt" data-show="false" aria-hidden="true" role="tooltip">
+            <span className="t-tt-text" />
+          </span>
         </nav>
         <div className="sb-foot">
           <AvatarFace id={profile?.avatarId ?? 0} size={34} />

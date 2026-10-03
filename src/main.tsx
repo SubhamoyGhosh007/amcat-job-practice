@@ -6,6 +6,7 @@ import './amcat.css';
 import './landing/landing.css';
 import './modern.css';
 import './ui/shadcn.css';
+import './ui/motion.css';
 import './ui/tailwind.css';
 import './mobile.css';
 
