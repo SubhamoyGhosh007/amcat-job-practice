@@ -14,6 +14,7 @@ import Settings from '../pages/Settings';
 import Typing from '../pages/Typing';
 import Svar from '../pages/Svar';
 import Interview from '../pages/Interview';
+import MathPractice from '../pages/MathPractice';
 import Health from '../pages/Health';
 import SessionSync from '../auth/SessionSync';
 import { PageSkeleton } from '../ui/page-skeleton';
@@ -60,6 +61,7 @@ export default function AppRouter() {
           <Route path="typing" element={<Typing />} />
           <Route path="speaking" element={<Svar />} />
           <Route path="interview" element={<Interview />} />
+          <Route path="maths" element={<MathPractice />} />
           <Route path="settings" element={<Settings />} />
           <Route path="health" element={<Health />} />
         </Route>

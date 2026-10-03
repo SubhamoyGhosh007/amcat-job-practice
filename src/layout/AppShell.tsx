@@ -3,6 +3,7 @@ import type { MouseEvent, ReactNode } from 'react';
 import {
   Activity,
   Briefcase,
+  Calculator,
   ClipboardList,
   Keyboard,
   LayoutDashboard,
@@ -30,6 +31,7 @@ const TITLES: Record<string, string> = {
   '/app/typing': 'Typing arena',
   '/app/speaking': 'Speaking lab',
   '/app/interview': 'Mock interview',
+  '/app/maths': 'Maths practice',
   '/app/health': 'Health check',
 };
 
@@ -39,6 +41,7 @@ const NAV = [
   { to: '/app/typing', end: false, label: 'Typing arena', Icon: Keyboard },
   { to: '/app/speaking', end: false, label: 'Speaking lab', Icon: Mic },
   { to: '/app/interview', end: false, label: 'Mock interview', Icon: Briefcase },
+  { to: '/app/maths', end: false, label: 'Maths practice', Icon: Calculator },
   { to: '/app/settings', end: false, label: 'Settings', Icon: SettingsIcon },
   { to: '/app/health', end: false, label: 'Health check', Icon: Activity },
 ];

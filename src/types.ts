@@ -8,6 +8,8 @@ export interface Question {
   options: [string, string, string, string];
   answerIndex: number; // 0-3
   explanation: string;
+  /** Speed trick for maths sets; missing = none. Shown on the sheet + PDF. */
+  trick?: string;
   /** Difficulty label for adaptive mode; missing = medium. */
   difficulty?: 'easy' | 'medium' | 'hard';
 }

@@ -140,6 +140,26 @@ alter table mock_runs enable row level security;
 drop policy if exists "own_mock_runs" on mock_runs;
 create policy "own_mock_runs" on mock_runs for all to authenticated
   using ((auth.jwt() ->> 'sub') = user_id) with check ((auth.jwt() ->> 'sub') = user_id);
+create table if not exists math_sessions (
+  id text primary key,
+  user_id text not null,
+  username text not null default '',
+  created_at timestamptz not null default now(),
+  correct int not null, total int not null, pct int not null,
+  answers jsonb not null default '{}',
+  questions jsonb not null default '[]'
+);
+create index if not exists math_user_idx on math_sessions(user_id);
+alter table math_sessions enable row level security;
+drop policy if exists "own_math_read" on math_sessions;
+drop policy if exists "own_math_write" on math_sessions;
+drop policy if exists "own_math_delete" on math_sessions;
+create policy "own_math_read" on math_sessions for select to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id);
+create policy "own_math_write" on math_sessions for insert to authenticated
+  with check ((auth.jwt() ->> 'sub') = user_id);
+create policy "own_math_delete" on math_sessions for delete to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id);
 ```
 
 ### Backup codes + daily quotas (2FA recovery, free-tier limits)
@@ -355,7 +375,7 @@ Notes: difficulty (easy/medium/hard) only reshapes the AI prompt mix; **PYQ mode
 
 ### Pro tier (granting unlimited access)
 
-Free limits live in `FREE_QUOTAS` (`src/lib/usage.ts`): 5 sets, 5 voice sessions, 10 typing tests, 1 mock/day. Pro bypasses every daily gate. Granting it is one DB flag — no code, no deploy, no payment provider needed yet:
+Free limits live in `FREE_QUOTAS` (`src/lib/usage.ts`): 5 sets, 5 voice sessions, 10 typing tests, 1 mock/day. Maths practice (`src/lib/mathQuota.ts`): pro unlimited, free 1 session per 4 hours (cloud `math_sessions` truth, local mirror). Pro bypasses every daily gate. Granting it is one DB flag — no code, no deploy, no payment provider needed yet:
 
 ```sql
 alter table profiles add column if not exists tier text not null default 'free';

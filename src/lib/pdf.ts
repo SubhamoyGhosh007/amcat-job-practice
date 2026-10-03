@@ -1,6 +1,8 @@
 import { jsPDF } from 'jspdf';
 import { SECTIONS } from '../types';
+import { MATH_TOPICS, mathTopicName } from '../data/mathTopics';
 import type { ScoreSheet } from './store';
+import type { MathSession } from './mathStore';
 
 type RGB = [number, number, number];
 
@@ -288,4 +290,82 @@ function questionCard(doc: jsPDF, q: any, qi: number, mine: number | undefined, 
   doc.text(whyLines, PM + pad + 3, cy + 5 + 5.5, { lineHeightFactor: 1.4 } as any);
 
   return top + total;
+}
+
+/** Maths practice sheet: score hero, your-answer-vs-actual cards, speed tricks. */
+export function downloadMathSheet(s: MathSession) {
+  const doc = new jsPDF();
+  paintPage(doc);
+  let y = header(doc, 'Maths Practice — Answer Sheet', `${s.username} • ${new Date(s.at).toLocaleString()} • 40 questions • 10 AMCAT topics`);
+
+  // hero
+  const heroH = 26;
+  y = ensureSpace(doc, y, heroH + 4);
+  doc.setDrawColor(...BORDER);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(PM, y, PW, heroH, 3, 3, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(24);
+  doc.setTextColor(...INK);
+  doc.text(`${s.pct}%`, PM + 6, y + 16);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED);
+  doc.text(`${s.correct} correct out of ${s.total}`, PM + 30, y + 11);
+  doc.setFontSize(9);
+  doc.text('green = correct   •   red = your wrong pick', PM + 30, y + 17.5);
+  y += heroH + 6;
+
+  // questions grouped by topic
+  const indexed = s.questions.map((q, i) => ({ q: { ...q, topic: mathTopicName(q.topic) }, i }));
+  for (const t of MATH_TOPICS) {
+    const group = indexed.filter(({ q }) => q.section === 'quant' && s.questions.find((o) => o.id === (q as any).id && o.topic === t.id));
+    if (!group.length) continue;
+    const correct = group.filter(({ q }) => s.answers[(q as any).id] === (q as any).answerIndex).length;
+    const pct = group.length ? Math.round((correct / group.length) * 100) : 0;
+    const bandH = 11;
+    y = ensureSpace(doc, y, bandH + 4);
+    doc.setFillColor(...BLUE);
+    doc.roundedRect(PM, y, PW, bandH, 2.5, 2.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(t.name, PM + 5, y + 7.4);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    const right = `${correct}/${group.length} • ${pct}%`;
+    doc.text(right, PM + PW - 5 - doc.getTextWidth(right), y + 7.4);
+    y += bandH + 4;
+    for (const { q, i } of group) {
+      y = questionCard(doc, q, i, s.answers[(q as any).id], y);
+    }
+  }
+
+  // speed tricks
+  const present = MATH_TOPICS.filter((t) => s.questions.some((q) => q.topic === t.id));
+  if (present.length) {
+    const rows = present.flatMap((t) => [
+      doc.splitTextToSize(`${t.name}: ${t.trick}`, PW - 10) as string[],
+    ]);
+    const need = 12 + rows.reduce((a, r) => a + r.length * 5, 0) + 8;
+    y = ensureSpace(doc, y, Math.min(need, 120));
+    doc.setFillColor(...BLUE);
+    doc.roundedRect(PM, y, PW, 11, 2.5, 2.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Speed tricks to keep', PM + 5, y + 7.4);
+    y += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...DARK);
+    for (const lines of rows) {
+      y = ensureSpace(doc, y, lines.length * 5 + 4);
+      doc.text(lines, PM + 5, y);
+      y += lines.length * 5 + 3;
+    }
+  }
+
+  footer(doc);
+  doc.save(`amcat-maths-${new Date(s.at).toISOString().slice(0, 10)}.pdf`);
 }
