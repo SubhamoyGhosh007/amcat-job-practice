@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { SECTIONS } from '../types';
 import { generateSet } from '../lib/generator';
 import { bumpQuota, quotaStatus } from '../lib/usage';
+import { useConfirm } from '../ui/alert-dialog';
 import { useExam } from '../stores/exam';
 import { useSession } from '../stores/session';
 
@@ -17,6 +18,7 @@ export default function Result() {
   const violations = useExam((s) => s.violations);
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
+  const ask = useConfirm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,7 +35,19 @@ export default function Result() {
   const sheet = lastSheet;
 
   async function dlPdf(kind: 'report' | 'answers') {
-    const m = await import('../lib/pdf');
+    let m;
+    try {
+      m = await import('../lib/pdf');
+    } catch {
+      // Stale tab from before a redeploy: its chunk hashes no longer exist.
+      const ok = await ask({
+        title: 'Update available',
+        description: 'This tab was opened before the latest release, so the PDF engine failed to load. Reload to update?',
+        actionLabel: 'Reload now',
+      });
+      if (ok) location.reload();
+      return;
+    }
     if (kind === 'report') m.downloadReport(sheet);
     else m.downloadAnswerSheet(sheet);
   }

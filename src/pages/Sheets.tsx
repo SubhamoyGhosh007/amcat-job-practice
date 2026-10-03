@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteScoreSheet, listScoreSheets, type ScoreSheet } from '../lib/store';
+import { useConfirm } from '../ui/alert-dialog';
 import { PageSkeleton } from '../ui/page-skeleton';
 import { useConfirm } from '../ui/alert-dialog';
 import { useExam } from '../stores/exam';
@@ -12,6 +13,7 @@ export default function Sheets() {
   const email = useSession((s) => s.email);
   const profile = useSession((s) => s.profile);
   const review = useExam((s) => s.review);
+  const ask = useConfirm();
   const ask = useConfirm();
   const [sheets, setSheets] = useState<ScoreSheet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +35,19 @@ export default function Sheets() {
   }, [userId]);
 
   async function dl(kind: 'report' | 'answers', s: ScoreSheet) {
-    const m = await import('../lib/pdf');
+    let m;
+    try {
+      m = await import('../lib/pdf');
+    } catch {
+      // Stale tab from before a redeploy: its chunk hashes no longer exist.
+      const ok = await ask({
+        title: 'Update available',
+        description: 'This tab was opened before the latest release, so the PDF engine failed to load. Reload to update?',
+        actionLabel: 'Reload now',
+      });
+      if (ok) location.reload();
+      return;
+    }
     if (kind === 'report') m.downloadReport(s);
     else m.downloadAnswerSheet(s);
   }
