@@ -25,7 +25,7 @@ Minimal AMCAT-style practice app for the Concentrix hiring exam. Built for a fri
 Copy `.env.example` to `.env` and fill in ONE key (`.env` is gitignored, never committed).
 The app never asks for keys or models in the UI.
 
-- `VITE_AI_PROVIDER=gemini` → Google AI Studio key (`aistudio.google.com`). **Use this for AI sets in the browser.** Model tries `VITE_GEMINI_MODEL` first, then falls back to `gemini-2.0-flash` automatically.
+- `VITE_AI_PROVIDER=gemini` → Google AI Studio key (`aistudio.google.com`). **Use this for AI sets in the browser.** Model tries `VITE_GEMINI_MODEL` first, then falls back through live models automatically (`gemini-3.5-flash` → `gemini-3-flash` → `gemini-3.6-flash`). Retired 2.x ids are never attempted.
 - `VITE_AI_PROVIDER=zen` → OpenCode Zen key — **server-side only**. Zen's API blocks browser origins (CORS), so in this app it always falls back to the offline bank. Keep it for agents/servers.
 - `VITE_AI_PROVIDER=offline` (or empty key) → 40-question built-in bank, shuffled per set. Works with zero config. If a set ever shows source `offline-bank` unexpectedly, the AI call was blocked — check the provider note above.
 

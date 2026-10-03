@@ -31,7 +31,10 @@ export default function Exam() {
     if (!activeSet) return [];
     return activeSet.questions.filter((q) => q.section === section.id);
   }, [activeSet, section]);
-  const currentQ = sectionQs[qPos];
+  // Clamp: a longer previous section (e.g. 8Q Quant) must never strand the
+  // position past the end of a shorter next section (e.g. 7Q Logical).
+  const safePos = sectionQs.length ? Math.min(qPos, sectionQs.length - 1) : 0;
+  const currentQ = sectionQs[safePos];
 
   useEffect(() => {
     setTimeLeft(section.minutes * 60);
@@ -202,6 +205,7 @@ export default function Exam() {
       if (!ok) return;
     }
     if (sectionIdx < SECTIONS.length - 1) {
+      setQPos(0);
       setSectionIdx((i) => i + 1);
     } else {
       finishExam();
@@ -247,7 +251,7 @@ export default function Exam() {
         </div>
         <div className="examgrid">
           <div className="card">
-            <div className="qnum">Question {qPos + 1} of {sectionQs.length} • Section {sectionIdx + 1}/{SECTIONS.length} • Answered {answeredCount}/{sectionQs.length}</div>
+            <div className="qnum">Question {safePos + 1} of {sectionQs.length} • Section {sectionIdx + 1}/{SECTIONS.length} • Answered {answeredCount}/{sectionQs.length}</div>
             <span className="topic">{currentQ.topic}</span>
             <div className="qprompt">{currentQ.prompt}</div>
             {currentQ.options.map((op, i) => (
@@ -258,12 +262,12 @@ export default function Exam() {
               </label>
             ))}
             <div className="btnrow">
-              <button className="btn-ghost" disabled={qPos === 0} onClick={() => setQPos((p) => p - 1)}>← Previous</button>
+              <button className="btn-ghost" disabled={safePos === 0} onClick={() => setQPos((p) => p - 1)}>← Previous</button>
               <button className="btn-ghost" onClick={() => setAnswers((a) => { const n = { ...a }; delete n[currentQ.id]; return n; })}>Clear</button>
               <button className="btn-ghost" onClick={() => setMarked((m) => ({ ...m, [currentQ.id]: !m[currentQ.id] }))}>
                 {marked[currentQ.id] ? 'Unmark' : 'Mark for review'}
               </button>
-              {qPos < sectionQs.length - 1
+                {safePos < sectionQs.length - 1
                 ? <button className="btn-primary" onClick={() => setQPos((p) => p + 1)}>Save & Next →</button>
                 : <button className="btn-primary" onClick={() => handleSubmitSection(false)}>
                   {sectionIdx < SECTIONS.length - 1 ? 'Submit section →' : 'Finish exam ✓'}
@@ -275,7 +279,7 @@ export default function Exam() {
             <div className="palette">
               {sectionQs.map((q, i) => {
                 const cls = ['pal'];
-                if (i === qPos) cls.push('current');
+                if (i === safePos) cls.push('current');
                 if (answers[q.id] !== undefined) cls.push('answered');
                 else if (marked[q.id]) cls.push('marked');
                 return <button key={q.id} className={cls.join(' ')} onClick={() => setQPos(i)}>{i + 1}</button>;

@@ -101,9 +101,12 @@ function geminiText(data: any): string {
   return data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
 }
 
-/** Direct Google Gemini API. Falls back to gemini-2.0-flash if the configured model id is unknown. */
+/** Live models, most capable first. 2.x is shut down (2026 retirements) — never list it. */
+const GEMINI_FALLBACKS = ['gemini-3.5-flash', 'gemini-3-flash', 'gemini-3.6-flash'];
+
+/** Direct Google Gemini API. Falls back through live models if the configured id is unknown. */
 async function callGemini(prompt: string): Promise<Question[]> {
-  const models = GEMINI_MODEL === 'gemini-2.0-flash' ? [GEMINI_MODEL] : [GEMINI_MODEL, 'gemini-2.0-flash'];
+  const models = [GEMINI_MODEL, ...GEMINI_FALLBACKS.filter((m) => m !== GEMINI_MODEL)];
   let lastErr = '';
   for (const m of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`;
