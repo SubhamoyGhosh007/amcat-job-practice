@@ -296,10 +296,33 @@ function untilMidnight(now: number): string {
   return `${h}h ${m}m ${s}s`;
 }
 
+function HistoryList({ history, remove }: { history: MockSession[]; remove: (id: string) => void }) {
+  if (!history.length) return <p className="hint">No sessions yet — finish one above and it lands here.</p>;
+  return (
+    <>
+      {history.map((h) => (
+        <div className="t-row" key={h.id}>
+          <div className="ring" style={{ '--p': Math.min(100, h.answers * 4) } as any}><span>{h.answers}</span></div>
+          <div className="meta">
+            <div style={{ fontWeight: 700 }}>{h.answers} answers • {Math.floor(h.durationSec / 60)}m {h.durationSec % 60}s run</div>
+            <div className="hint">
+              {new Date(h.at).toLocaleString()} • {MOCK_TEST_01.test_id}
+              {typeof h.flags === 'number' && h.flags > 0 && <> • ⚠ {h.flags} tab {h.flags === 1 ? 'switch' : 'switches'}</>}
+            </div>
+          </div>
+          <div className="btnrow" style={{ marginTop: 0 }}>
+            <button className="btn-ghost" onClick={() => remove(h.id)}>Delete</button>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function Interview() {
   const ask = useConfirm();
   const userId = useSession((s) => s.userId);
-  const [t0] = useState(() => Date.now());
+  const [t0, setT0] = useState(() => Date.now());
   const [answers, setAnswers] = useState(0);
   const [history, setHistory] = useState<MockSession[]>(() => listMockSessions());
   const [playedCtx, setPlayedCtx] = useState<Record<string, boolean>>({});
@@ -307,6 +330,11 @@ export default function Interview() {
   const [locked, setLocked] = useState<boolean | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [stepIdx, setStepIdx] = useState(0);
+  const [phase, setPhase] = useState<'idle' | 'running'>('idle');
+  const [cam, setCam] = useState<'checking' | 'ok' | 'missing'>('checking');
+  const [camTick, setCamTick] = useState(0);
+  const flagsRef = useRef(0);
+  const dialogOpen = useRef(false);
 
   const steps = useMemo(buildSteps, []);
   const step = steps[stepIdx];
@@ -335,6 +363,82 @@ export default function Interview() {
     return () => window.clearInterval(t);
   }, []);
 
+  // Camera presence check while waiting to start (labels need no permission).
+  useEffect(() => {
+    if (phase !== 'idle' || locked) return;
+    let live = true;
+    setCam('checking');
+    (async () => {
+      try {
+        if (!navigator.mediaDevices?.enumerateDevices) {
+          if (live) setCam('missing');
+          return;
+        }
+        const devs = await navigator.mediaDevices.enumerateDevices();
+        if (live) setCam(devs.some((d) => d.kind === 'videoinput') ? 'ok' : 'missing');
+      } catch {
+        if (live) setCam('missing');
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [phase, locked, camTick]);
+
+  // Monitoring: tab switch + fullscreen exit while running.
+  useEffect(() => {
+    if (phase !== 'running') return;
+    const onVis = () => {
+      if (document.hidden) void handleViolationLeave('tab');
+    };
+    const onFs = () => {
+      if (!document.fullscreenElement) void handleViolationLeave('fullscreen');
+    };
+    document.addEventListener('visibilitychange', onVis);
+    document.addEventListener('fullscreenchange', onFs);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      document.removeEventListener('fullscreenchange', onFs);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  async function startInterview() {
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      /* unsupported/denied — the run still starts monitored */
+    }
+    flagsRef.current = 0;
+    setT0(Date.now());
+    setStepIdx(0);
+    setAnswers(0);
+    setPlayedCtx({});
+    setPhase('running');
+  }
+
+  async function handleViolationLeave(kind: 'tab' | 'fullscreen') {
+    if (dialogOpen.current || phase !== 'running') return;
+    dialogOpen.current = true;
+    flagsRef.current += 1;
+    const ok = await ask({
+      title: kind === 'tab' ? 'You left the interview tab' : 'Fullscreen was exited',
+      description: 'The screen is monitored during the mock. Cancel this mock test, or resume where you left off? Leaving is recorded on your session.',
+      actionLabel: 'Cancel mock test',
+      danger: true,
+    });
+    dialogOpen.current = false;
+    if (ok) cancelAttempt();
+  }
+
+  function cancelAttempt() {
+    setPhase('idle');
+    setStepIdx(0);
+    setAnswers(0);
+    setPlayedCtx({});
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+
   function saveSession() {
     const durationSec = Math.round((Date.now() - t0) / 1000);
     const s: MockSession = {
@@ -342,10 +446,13 @@ export default function Interview() {
       at: Date.now(),
       answers,
       durationSec,
+      flags: flagsRef.current,
     };
     setHistory(saveMockSession(s));
     recordRun(userId, answers, durationSec).catch(() => {});
     setLocked(true);
+    setPhase('idle');
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }
 
   async function remove(id: string) {
@@ -382,19 +489,7 @@ export default function Interview() {
           <p className="hint">Paid plans with extra categories are coming — your streak keeps counting meanwhile.</p>
         </div>
         <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
-        {history.length === 0 && <p className="hint">No sessions yet.</p>}
-        {history.map((h) => (
-          <div className="t-row" key={h.id}>
-            <div className="ring" style={{ '--p': Math.min(100, h.answers * 4) } as any}><span>{h.answers}</span></div>
-            <div className="meta">
-              <div style={{ fontWeight: 700 }}>{h.answers} answers • {Math.floor(h.durationSec / 60)}m {h.durationSec % 60}s run</div>
-              <div className="hint">{new Date(h.at).toLocaleString()} • {MOCK_TEST_01.test_id}</div>
-            </div>
-            <div className="btnrow" style={{ marginTop: 0 }}>
-              <button className="btn-ghost" onClick={() => remove(h.id)}>Delete</button>
-            </div>
-          </div>
-        ))}
+        <HistoryList history={history} remove={remove} />
       </div>
     );
   }
@@ -414,133 +509,152 @@ export default function Interview() {
 
       <TtsGate />
 
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <b>{PART_LABEL[part]} • item {stepIdx + 1} of {steps.length}</b>
-          <span className="hint">{Math.round(((stepIdx + 1) / steps.length) * 100)}%</span>
-        </div>
-        <div style={{ height: 6, borderRadius: 999, background: '#e7ecf5', marginTop: 8, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${((stepIdx + 1) / steps.length) * 100}%`, background: 'linear-gradient(90deg,#4d7cfe,#38bdf8)', borderRadius: 999 }} />
-        </div>
-        <div className="btnrow" style={{ marginBottom: 0 }}>
-          <button className="btn-ghost" disabled={stepIdx === 0} onClick={() => setStepIdx((i) => i - 1)}>← Back</button>
-          {step.kind !== 'finish' && (
-            <button className="btn-primary" onClick={() => setStepIdx((i) => Math.min(i + 1, steps.length - 1))}>Next →</button>
+      {phase === 'idle' ? (
+        <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+          <div style={{ fontSize: 44 }}>🎙️</div>
+          <h2 style={{ margin: '12px 0 6px' }}>Ready for your mock interview?</h2>
+          <p className="hint">42 screens • all 7 parts • one item at a time • Back works, audio plays once</p>
+          <div className="banner warn" style={{ textAlign: 'left', maxWidth: 540, margin: '16px auto' }}>
+            <b>⚠ Monitored conditions —</b> your camera must stay connected, this tab stays in focus,
+            and the test runs fullscreen. Leaving the tab or exiting fullscreen pauses with a warning:
+            cancel the mock, or resume where you left off (leaves are counted on your session).
+          </div>
+          <div style={{ margin: '12px 0' }}>
+            {cam === 'checking' && <span className="hint">Checking camera…</span>}
+            {cam === 'ok' && <span className="chip green">📷 Camera connected</span>}
+            {cam === 'missing' && (
+              <>
+                <span className="chip red">📷 No camera found</span>{' '}
+                <button className="btn-ghost" onClick={() => setCamTick((t) => t + 1)}>Retry</button>
+              </>
+            )}
+          </div>
+          <button className="btn-big" disabled={cam !== 'ok'} onClick={startInterview}>
+            Start mock interview →
+          </button>
+          {cam !== 'ok' && cam !== 'checking' && (
+            <p className="hint">Start unlocks once a camera is detected.</p>
           )}
         </div>
-      </div>
-
-      {step.kind === 'scenario' && (
-        <div className="svar-card">
-          <span className="topic">Scenario — listen once</span>
-          <div style={{ marginTop: 8 }}>
-            <OnceAudio text={step.context} label="Play scenario" onPlayed={() => heard(step.part.toLowerCase() + step.sid)} />
+      ) : (
+        <>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+              <b>{PART_LABEL[part]} • item {stepIdx + 1} of {steps.length}</b>
+              <span className="hint">{Math.round(((stepIdx + 1) / steps.length) * 100)}%</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: '#e7ecf5', marginTop: 8, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${((stepIdx + 1) / steps.length) * 100}%`, background: 'linear-gradient(90deg,#4d7cfe,#38bdf8)', borderRadius: 999 }} />
+            </div>
+            <div className="btnrow" style={{ marginBottom: 0 }}>
+              <button className="btn-ghost" disabled={stepIdx === 0} onClick={() => setStepIdx((i) => i - 1)}>← Back</button>
+              {step.kind !== 'finish' && (
+                <button className="btn-primary" onClick={() => setStepIdx((i) => Math.min(i + 1, steps.length - 1))}>Next →</button>
+              )}
+            </div>
           </div>
-          <p className="hint">Play it once, hold the details in memory — the questions come next, one screen at a time.</p>
-        </div>
-      )}
 
-      {step.kind === 'qa' && (
-        <div className="svar-card">
-          <span className="topic">{step.part === 'A' ? 'Short answer' : 'Situation'} • one full sentence</span>
-          <div style={{ fontWeight: 700, fontSize: 18, margin: '8px 0 4px' }}>{step.q}</div>
-          <TimedRecorder seconds={15} armed={!!playedCtx[step.part.toLowerCase() + step.sid]} onDone={(u) => u && bump()} />
-        </div>
-      )}
-
-      {step.kind === 'read' && (
-        <div className="svar-card">
-          <span className="topic">Read aloud</span>
-          <div className="svar-sentence">“{step.text}”</div>
-          <div className="svar-tip"><b>Coach tip:</b> {step.tip}</div>
-          <TimedRecorder seconds={12} armed onDone={(u) => u && bump()} />
-        </div>
-      )}
-
-      {step.kind === 'repeat' && (
-        <div className="svar-card">
-          <span className="topic">Listen once, repeat verbatim</span>
-          <div style={{ marginTop: 8 }}>
-            <OnceAudio text={step.text} label="Play sentence" onPlayed={() => heard('d' + step.id)} />
-          </div>
-          <TimedRecorder seconds={12} armed={!!playedCtx['d' + step.id]} onDone={(u) => u && bump()} />
-        </div>
-      )}
-
-      {step.kind === 'extempore' && (
-        <div className="svar-card">
-          <span className="topic">Extempore — 30s think, 60s speak</span>
-          <div style={{ marginTop: 8 }}>
-            <Extempore item={step.item} onDone={bump} />
-          </div>
-        </div>
-      )}
-
-      {step.kind === 'cloze' && (
-        <div className="svar-card">
-          <span className="topic">Fill the blank — say the WHOLE sentence</span>
-          <div style={{ marginTop: 8 }}>
-            <OnceAudio text={step.audio} label="Play sentence" onPlayed={() => heard('f' + step.id)} />
-          </div>
-          <TimedRecorder seconds={15} armed={!!playedCtx['f' + step.id]} onDone={(u) => u && bump()} />
-        </div>
-      )}
-
-      {step.kind === 'correct' && (
-        <div className="svar-card">
-          <span className="topic">Fix the error — say the WHOLE corrected sentence</span>
-          <div style={{ marginTop: 8 }}>
-            <OnceAudio text={step.audio} label="Play sentence" onPlayed={() => heard('g' + step.id)} />
-          </div>
-          <TimedRecorder seconds={15} armed={!!playedCtx['g' + step.id]} onDone={(u) => u && bump()} />
-        </div>
-      )}
-
-      {step.kind === 'finish' && (
-        <div className="card" style={{ textAlign: 'center' }}>
-          <h3 style={{ marginTop: 0 }}>Review & finish</h3>
-          <p className="hint">{answers} answers recorded. Check the key, then save your session (once per day).</p>
-          <div className="btnrow" style={{ justifyContent: 'center' }}>
-            <button className="btn-ghost" onClick={() => setShowKeys((s) => !s)}>
-              {showKeys ? 'Hide answer key' : 'Show answer key'}
-            </button>
-            <button className="btn-big" onClick={saveSession}>Finish & save session ✓</button>
-          </div>
-          {showKeys && (
-            <div style={{ textAlign: 'left', marginTop: 12 }}>
-              {T.part_a.concat(T.part_b).map((s) => (
-                <div key={s.id} style={{ marginBottom: 8 }}>
-                  <b className="qnum">{s.id.toUpperCase()}</b>
-                  {s.questions.map((qq, i) => (
-                    <div key={i} style={{ fontSize: 13.5 }}><b>Q{i + 1}.</b> {qq.q} → <i>{qq.expected}</i></div>
-                  ))}
-                </div>
-              ))}
-              {T.part_f.map((f) => (
-                <div key={f.id} style={{ fontSize: 13.5 }}><b className="qnum">{f.id.toUpperCase()}.</b> missing: <b>{f.missing.join(' / ')}</b> → <i>{f.full}</i></div>
-              ))}
-              {T.part_g.map((g) => (
-                <div key={g.id} style={{ fontSize: 13.5 }}><b className="qnum">{g.id.toUpperCase()}.</b> <i>{g.corrected}</i> — {g.rule}</div>
-              ))}
+          {step.kind === 'scenario' && (
+            <div className="svar-card">
+              <span className="topic">Scenario — listen once</span>
+              <div style={{ marginTop: 8 }}>
+                <OnceAudio text={step.context} label="Play scenario" onPlayed={() => heard(step.part.toLowerCase() + step.sid)} />
+              </div>
+              <p className="hint">Play it once, hold the details in memory — the questions come next, one screen at a time.</p>
             </div>
           )}
-        </div>
+
+          {step.kind === 'qa' && (
+            <div className="svar-card">
+              <span className="topic">{step.part === 'A' ? 'Short answer' : 'Situation'} • one full sentence</span>
+              <div style={{ fontWeight: 700, fontSize: 18, margin: '8px 0 4px' }}>{step.q}</div>
+              <TimedRecorder seconds={15} armed={!!playedCtx[step.part.toLowerCase() + step.sid]} onDone={(u) => u && bump()} />
+            </div>
+          )}
+
+          {step.kind === 'read' && (
+            <div className="svar-card">
+              <span className="topic">Read aloud</span>
+              <div className="svar-sentence">“{step.text}”</div>
+              <div className="svar-tip"><b>Coach tip:</b> {step.tip}</div>
+              <TimedRecorder seconds={12} armed onDone={(u) => u && bump()} />
+            </div>
+          )}
+
+          {step.kind === 'repeat' && (
+            <div className="svar-card">
+              <span className="topic">Listen once, repeat verbatim</span>
+              <div style={{ marginTop: 8 }}>
+                <OnceAudio text={step.text} label="Play sentence" onPlayed={() => heard('d' + step.id)} />
+              </div>
+              <TimedRecorder seconds={12} armed={!!playedCtx['d' + step.id]} onDone={(u) => u && bump()} />
+            </div>
+          )}
+
+          {step.kind === 'extempore' && (
+            <div className="svar-card">
+              <span className="topic">Extempore — 30s think, 60s speak</span>
+              <div style={{ marginTop: 8 }}>
+                <Extempore item={step.item} onDone={bump} />
+              </div>
+            </div>
+          )}
+
+          {step.kind === 'cloze' && (
+            <div className="svar-card">
+              <span className="topic">Fill the blank — say the WHOLE sentence</span>
+              <div style={{ marginTop: 8 }}>
+                <OnceAudio text={step.audio} label="Play sentence" onPlayed={() => heard('f' + step.id)} />
+              </div>
+              <TimedRecorder seconds={15} armed={!!playedCtx['f' + step.id]} onDone={(u) => u && bump()} />
+            </div>
+          )}
+
+          {step.kind === 'correct' && (
+            <div className="svar-card">
+              <span className="topic">Fix the error — say the WHOLE corrected sentence</span>
+              <div style={{ marginTop: 8 }}>
+                <OnceAudio text={step.audio} label="Play sentence" onPlayed={() => heard('g' + step.id)} />
+              </div>
+              <TimedRecorder seconds={15} armed={!!playedCtx['g' + step.id]} onDone={(u) => u && bump()} />
+            </div>
+          )}
+
+          {step.kind === 'finish' && (
+            <div className="card" style={{ textAlign: 'center' }}>
+              <h3 style={{ marginTop: 0 }}>Review & finish</h3>
+              <p className="hint">{answers} answers recorded. Check the key, then save your session (once per day).</p>
+              <div className="btnrow" style={{ justifyContent: 'center' }}>
+                <button className="btn-ghost" onClick={() => setShowKeys((s) => !s)}>
+                  {showKeys ? 'Hide answer key' : 'Show answer key'}
+                </button>
+                <button className="btn-big" onClick={saveSession}>Finish & save session ✓</button>
+              </div>
+              {showKeys && (
+                <div style={{ textAlign: 'left', marginTop: 12 }}>
+                  {T.part_a.concat(T.part_b).map((s) => (
+                    <div key={s.id} style={{ marginBottom: 8 }}>
+                      <b className="qnum">{s.id.toUpperCase()}</b>
+                      {s.questions.map((qq, i) => (
+                        <div key={i} style={{ fontSize: 13.5 }}><b>Q{i + 1}.</b> {qq.q} → <i>{qq.expected}</i></div>
+                      ))}
+                    </div>
+                  ))}
+                  {T.part_f.map((f) => (
+                    <div key={f.id} style={{ fontSize: 13.5 }}><b className="qnum">{f.id.toUpperCase()}.</b> missing: <b>{f.missing.join(' / ')}</b> → <i>{f.full}</i></div>
+                  ))}
+                  {T.part_g.map((g) => (
+                    <div key={g.id} style={{ fontSize: 13.5 }}><b className="qnum">{g.id.toUpperCase()}.</b> <i>{g.corrected}</i> — {g.rule}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
-      {history.length === 0 && <p className="hint">No sessions yet — finish one above and it lands here.</p>}
-      {history.map((h) => (
-        <div className="t-row" key={h.id}>
-          <div className="ring" style={{ '--p': Math.min(100, h.answers * 4) } as any}><span>{h.answers}</span></div>
-          <div className="meta">
-            <div style={{ fontWeight: 700 }}>{h.answers} answers • {Math.floor(h.durationSec / 60)}m {h.durationSec % 60}s run</div>
-            <div className="hint">{new Date(h.at).toLocaleString()} • {MOCK_TEST_01.test_id}</div>
-          </div>
-          <div className="btnrow" style={{ marginTop: 0 }}>
-            <button className="btn-ghost" onClick={() => remove(h.id)}>Delete</button>
-          </div>
-        </div>
-      ))}
+      <HistoryList history={history} remove={remove} />
     </div>
   );
 }

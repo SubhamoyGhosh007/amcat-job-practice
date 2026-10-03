@@ -56,6 +56,8 @@ export interface MockSession {
   at: number;
   answers: number;
   durationSec: number;
+  /** Tab/fullscreen violations during the attempt. */
+  flags?: number;
 }
 
 export const MOCK_TEST_01: MockTest = {
