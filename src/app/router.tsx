@@ -1,5 +1,4 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { AuthenticateWithRedirectCallback } from '@clerk/clerk-react';
 import Landing from '../landing/Landing';
 import Privacy from '../pages/Privacy';
 import Terms from '../pages/Terms';
@@ -19,10 +18,6 @@ import SessionSync from '../auth/SessionSync';
 import { useSession } from '../stores/session';
 
 function Root() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('auth') === 'callback') {
-    return <AuthenticateWithRedirectCallback signInFallbackRedirectUrl="/app" signUpFallbackRedirectUrl="/app" />;
-  }
   return <Landing />;
 }
 

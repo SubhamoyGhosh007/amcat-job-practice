@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useUser } from '@clerk/clerk-react';
+import { authClient } from '../lib/supabase';
+import type { Identity } from '../auth/actions';
 import { useNavigate } from 'react-router-dom';
 import { useAuthActions } from '../auth/actions';
 import { AvatarFace, AvatarGrid } from '../components/AuthWidgets';
@@ -9,7 +10,6 @@ import { useSession } from '../stores/session';
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user } = useUser();
   const { logout } = useAuthActions();
   const userId = useSession((s) => s.userId);
   const email = useSession((s) => s.email);
@@ -22,19 +22,22 @@ export default function Settings() {
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
+  const [identities, setIdentities] = useState<Identity[]>([]);
+
+  useEffect(() => {
+    authClient()?.auth.getUser().then(({ data }) => {
+      const ids = (data.user?.identities || []).map((i: any) => ({
+        provider: String(i.provider || 'email'),
+        email: String(i.identity_data?.email || email),
+      }));
+      setIdentities(ids.length ? ids : email ? [{ provider: 'email + password', email }] : []);
+    });
+  }, [userId, email]);
 
   useEffect(() => {
     setName(profile?.username || '');
     setAvatar(profile?.avatarId ?? 0);
   }, [profile?.userId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const identities = [
-    ...((user?.externalAccounts || []).map((a: any) => ({
-      provider: String(a.provider || '').replace('oauth_', ''),
-      email: String(a.emailAddress || ''),
-    })) as { provider: string; email: string }[]),
-    ...(user?.passwordEnabled ? [{ provider: 'email + password', email }] : []),
-  ];
 
   async function save() {
     setMsg('');
@@ -102,7 +105,7 @@ export default function Settings() {
       ) : (
         <p className="hint">No linked-provider details available.</p>
       )}
-      <p className="hint">Clerk merges Google/GitHub logins that share a verified email into one account automatically — one history everywhere.</p>
+      <p className="hint">Google/GitHub logins sharing a verified email stay on one account — one history everywhere.</p>
 
       <h4>Account</h4>
       <div className="btnrow">

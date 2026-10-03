@@ -1,41 +1,41 @@
-import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { setTokenProvider } from '../lib/store';
-import { getSupabaseToken } from '../lib/token';
+import { authClient } from '../lib/supabase';
 import { useSession } from '../stores/session';
 
-/** Bridges Clerk hooks into the zustand session store. Render once at app root. */
+/** Bridges Supabase Auth into the zustand session store. Render once at app root. */
 export default function SessionSync() {
-  const { user, isLoaded } = useUser();
-  const { getToken } = useClerkAuth();
   const sync = useSession((s) => s.sync);
-  const setHasCloudToken = useSession((s) => s.setHasCloudToken);
-  const probed = useRef<string | null>(null);
 
   useEffect(() => {
-    setTokenProvider(() => getSupabaseToken(getToken));
-  }, [getToken]);
-
-  useEffect(() => {
-    if (isLoaded) {
-      sync(user?.id ?? null, user?.primaryEmailAddress?.emailAddress ?? '');
-    }
-  }, [isLoaded, user, sync]);
-
-  // Resolve once per login whether we hold a token Supabase will accept, so
-  // the Health page can report paused-vs-backing-up honestly.
-  useEffect(() => {
-    if (!isLoaded || probed.current === (user?.id ?? null)) return;
-    probed.current = user?.id ?? null;
-    if (!user?.id) {
-      setHasCloudToken(null);
+    const client = authClient();
+    if (!client) {
+      sync(null, '');
       return;
     }
-    getSupabaseToken(getToken).then(
-      (t) => setHasCloudToken(t !== null),
-      () => setHasCloudToken(false)
-    );
-  }, [isLoaded, user, getToken, setHasCloudToken]);
+    client.auth.getSession().then(({ data }) => {
+      const u = data.session?.user ?? null;
+      sync(u?.id ?? null, u?.email ?? '');
+      useSession.getState().setHasCloudToken(data.session ? true : null);
+    });
+    const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null;
+      sync(u?.id ?? null, u?.email ?? '');
+      useSession.getState().setHasCloudToken(session ? true : null);
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, [sync]);
+
+  useEffect(() => {
+    setTokenProvider(async () => {
+      const c = authClient();
+      if (!c) return null;
+      const { data } = await c.auth.getSession();
+      return data.session?.access_token ?? null;
+    });
+  }, []);
 
   return null;
 }

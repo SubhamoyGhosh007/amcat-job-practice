@@ -12,8 +12,8 @@ export function isDbConfigured(): boolean {
 
 /**
  * Browser-safe client. The anon key is public by design; row access is
- * enforced by Postgres RLS policies that read the Clerk user id out of the
- * validated session JWT (Supabase ↔ Clerk third-party-auth integration).
+ * enforced by Postgres RLS policies that read the Supabase user id out of the
+ * validated session JWT (native Supabase Auth — no third-party handshake).
  */
 export function sb(token?: string | null): SupabaseClient | null {
   if (!isDbConfigured()) return null;
@@ -24,6 +24,15 @@ export function sb(token?: string | null): SupabaseClient | null {
   );
 }
 
+let _auth: SupabaseClient | null = null;
+
+/** Singleton for auth ops (sign-in/out, session, subscription). One client only. */
+export function authClient(): SupabaseClient | null {
+  if (!isDbConfigured()) return null;
+  if (!_auth) _auth = createClient(URL, ANON);
+  return _auth;
+}
+
 export interface DbDiagnosis {
   ok: boolean;
   title: string;
@@ -32,10 +41,10 @@ export interface DbDiagnosis {
 
 /**
  * Pinpoints the broken link without ever exposing keys: step 1 checks the
- * anon/publishable key alone, step 2 checks the Clerk login handshake, and
+ * anon/publishable key alone, step 2 checks the login session, and
  * a 404 at either step means the tables were never created.
  */
-export async function diagnoseDb(clerkToken: string | null): Promise<DbDiagnosis> {
+export async function diagnoseDb(sessionToken: string | null): Promise<DbDiagnosis> {
   if (!isDbConfigured()) {
     return { ok: false, title: 'Database not configured', detail: 'VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are empty. Add them to .env and restart the dev server.' };
   }
@@ -52,17 +61,17 @@ export async function diagnoseDb(clerkToken: string | null): Promise<DbDiagnosis
   if (anonRes.status === 404) {
     return { ok: false, title: 'Tables not found (404)', detail: 'The key works, but the profiles table does not exist. Run the README SQL snippet once in the Supabase SQL editor.' };
   }
-  if (!clerkToken) {
-    return { ok: false, title: 'Key OK, login unchecked', detail: 'API key works. Stay logged in and test again to verify the Clerk handshake.' };
+  if (!sessionToken) {
+    return { ok: false, title: 'Key OK, login unchecked', detail: 'API key works. Stay logged in and test again to verify the session.' };
   }
   let authRes: Response;
   try {
-    authRes = await fetch(probe, { headers: { apikey: ANON, Authorization: `Bearer ${clerkToken}` } });
+    authRes = await fetch(probe, { headers: { apikey: ANON, Authorization: `Bearer ${sessionToken}` } });
   } catch {
     return { ok: false, title: 'Cannot reach Supabase', detail: 'Network error on the authenticated check. Retry in a moment.' };
   }
   if (authRes.status === 401) {
-    return { ok: false, title: 'Login token rejected (401)', detail: 'API key is fine, but Supabase does not trust Clerk logins yet. In Supabase: Authentication → third-party auth → add your Clerk JWKS URL (https://<your-clerk-domain>/.well-known/jwks.json, on Clerk\u2019s API keys page).' };
+    return { ok: false, title: 'Login token rejected (401)', detail: 'API key is fine, but the login session was rejected. Sign out and back in, then test again.' };
   }
   if (authRes.status === 404) {
     return { ok: false, title: 'Tables not found (404)', detail: 'Key and login both work, but the tables are missing. Run the README SQL snippet once in the Supabase SQL editor.' };

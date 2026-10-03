@@ -32,12 +32,12 @@ export interface Owner {
   username: string;
 }
 
-// Clerk session JWT supplier, wired up by AuthContext (getToken()).
+// Supabase session JWT supplier, wired up by SessionSync (getSession()).
 let tokenProvider: () => Promise<string | null> = async () => null;
 export function setTokenProvider(fn: () => Promise<string | null>) {
   tokenProvider = fn;
 }
-/** Current Clerk session token (null when logged out). Shared by all cloud stores. */
+/** Current Supabase session token (null when logged out). Shared by all cloud stores. */
 export async function apiToken(): Promise<string | null> {
   try {
     return await tokenProvider();
@@ -137,7 +137,7 @@ function localSheets(): ScoreSheet[] {
 }
 
 /**
-  * Clerk already merges Google/GitHub logins that share a verified
+  * Supabase links Google/GitHub logins that share a verified
   * email into ONE user id, so history is keyed on user_id alone.
  */
 export async function saveScoreSheet(s: ScoreSheet): Promise<void> {

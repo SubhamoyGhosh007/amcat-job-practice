@@ -1,79 +1,57 @@
 import { useCallback } from 'react';
-import { useClerk, useSignIn, useSignUp } from '@clerk/clerk-react';
+import { authClient } from '../lib/supabase';
 import { useSession } from '../stores/session';
 
-export type OAuthProvider = 'google' | 'github' | 'facebook' | 'linkedin';
+export type OAuthProvider = 'google' | 'github';
 
-const STRATEGY: Record<OAuthProvider, string> = {
-  google: 'oauth_google',
-  github: 'oauth_github',
-  facebook: 'oauth_facebook',
-  linkedin: 'oauth_linkedin_oidc',
-};
+export interface Identity {
+  provider: string;
+  email: string;
+}
 
-// Google + GitHub are offered in the UI; the rest stay wired but unlisted.
+function needClient() {
+  const c = authClient();
+  if (!c) throw new Error('Database is not configured yet — add the Supabase URL + key to .env (see README).');
+  return c;
+}
 
 export function useAuthActions() {
-  const { signIn } = useSignIn();
-  const { signUp, setActive: suActive } = useSignUp();
-  const { setActive: siActive, signOut } = useClerk();
+  const login = useCallback(async (p: OAuthProvider) => {
+    const c = needClient();
+    const { error } = await c.auth.signInWithOAuth({
+      provider: p,
+      options: { redirectTo: `${window.location.origin}/app` },
+    });
+    if (error) throw error;
+  }, []);
 
-  const login = useCallback(
-    async (p: OAuthProvider) => {
-      if (!signIn) throw new Error('Sign-in is still loading — try again in a second.');
-      await signIn.authenticateWithRedirect({
-        strategy: STRATEGY[p] as any,
-        redirectUrl: `${window.location.origin}/?auth=callback`,
-        redirectUrlComplete: '/app',
-      });
-    },
-    [signIn]
-  );
+  const loginEmail = useCallback(async (em: string, pw: string) => {
+    const c = needClient();
+    const { error } = await c.auth.signInWithPassword({ email: em, password: pw });
+    if (error) throw error;
+  }, []);
 
-  const loginEmail = useCallback(
-    async (em: string, pw: string) => {
-      if (!signIn) throw new Error('Sign-in is still loading — try again in a second.');
-      const r = await signIn.create({ identifier: em, password: pw });
-      if (r.status === 'complete') {
-        await siActive({ session: r.createdSessionId });
-      } else {
-        throw new Error('This account needs another verification step — use an OAuth button instead.');
-      }
-    },
-    [signIn, siActive]
-  );
+  const registerEmail = useCallback(async (_name: string, em: string, pw: string): Promise<'done' | 'confirm'> => {
+    const c = needClient();
+    const { data, error } = await c.auth.signUp({ email: em, password: pw });
+    if (error) throw error;
+    return data.session ? 'done' : 'confirm';
+  }, []);
 
-  const registerEmail = useCallback(
-    async (name: string, em: string, pw: string): Promise<'done' | 'verify'> => {
-      if (!signUp) throw new Error('Sign-up is still loading — try again in a second.');
-      const r = await signUp.create({ emailAddress: em, password: pw, firstName: name || undefined });
-      if (r.status === 'complete') {
-        await suActive({ session: r.createdSessionId });
-        return 'done';
-      }
-      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
-      return 'verify';
-    },
-    [signUp, suActive]
-  );
-
-  const verifyEmailCode = useCallback(
-    async (code: string) => {
-      if (!signUp) throw new Error('Sign-up expired — start over.');
-      const r = await signUp.attemptEmailAddressVerification({ code });
-      if (r.status === 'complete') {
-        await suActive({ session: r.createdSessionId });
-      } else {
-        throw new Error('Code not accepted — check it and retry.');
-      }
-    },
-    [signUp, suActive]
-  );
+  const resendConfirm = useCallback(async (em: string) => {
+    const c = needClient();
+    const { error } = await c.auth.resend({ type: 'signup', email: em });
+    if (error) throw error;
+  }, []);
 
   const logout = useCallback(async () => {
-    await signOut();
+    try {
+      await needClient().auth.signOut();
+    } catch {
+      /* ignore */
+    }
     useSession.getState().reset();
-  }, [signOut]);
+  }, []);
 
-  return { login, loginEmail, registerEmail, verifyEmailCode, logout };
+  return { login, loginEmail, registerEmail, resendConfirm, logout };
 }

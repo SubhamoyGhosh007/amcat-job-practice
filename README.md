@@ -11,7 +11,7 @@ Minimal AMCAT-style practice app for the Concentrix hiring exam. Built for a fri
 - **Speaking & listening lab** (`/app/speaking`): SVAR-style — listen & answer with transcripts revealed, read-aloud with mic recording, repeat-after-me side-by-side. Runs on your self-hosted Piper TTS voice server (`VITE_TTS_URL` + `VITE_TTS_TOKEN`); read-aloud works without it. See "Voice server" below.
 - **Mock interview** (`/app/interview`): full 7-part spoken exam — short answers, situations, read-aloud, repeat, 30s+60s extempore, spoken cloze, grammar correction. Once-only audio, per-answer timers, session history.
 - **Landing page (Aceternity-style)**: dark spotlight hero with a playable demo question, exact-pattern cards, syllabus marquee, 3-step flow, answer-script preview, login band. No test without login.
-- **Accounts (required, Clerk)**: login with Google, GitHub or email; unique username + 1 of 16 avatars. Clerk merges same-email logins into one account, so history follows the person everywhere.
+- **Accounts (Supabase Auth)**: login with Google, GitHub or email; unique username + 1 of 16 avatars. Same verified email across providers stays on one account, so history follows the person everywhere.
 - **Score sheets**: every attempt auto-saves (browser always, cloud when logged in). **My sheets** page shows attempts/best/average trend, review, delete.
 - **PDF downloads**: test report card + full Q&A sheet with explanations as notes (jsPDF, generated on-device).
 - **Settings page**: username, avatar, linked logins, erase-local-data, logout.
@@ -30,9 +30,9 @@ The app never asks for keys or models in the UI.
 
 Heads-up: Vite bakes `VITE_*` values into the browser bundle at build time, so treat the key as public — set a spend limit (Zen) / referrer restriction (Gemini).
 
-## Backend setup: Clerk (auth) + Supabase (Postgres)
+## Backend setup: Supabase (auth + Postgres)
 
-The app is 100% static — no server. Clerk owns identity (its publishable key is public by design); Supabase owns data (anon key is public; row access is enforced by RLS policies reading your Clerk user id out of the validated session JWT).
+The app is 100% static — no server. Supabase handles both identity and data: the publishable key is public by design, and row access is enforced by RLS policies reading your user id out of the validated session JWT. No other backend exists.
 
 ### All tables in one go (copy-paste into Supabase → SQL editor → Run)
 
@@ -136,10 +136,10 @@ alter table sheets add column if not exists origin text not null default 'offlin
 
 (The per-feature breakdowns further below document what each table is for.)
 
-**1. Clerk** (clerk.com → create application):
-- API keys → copy the **publishable key** → `VITE_CLERK_PUBLISHABLE_KEY`.
-- User & authentication → Email: on. Social connections: enable Google and GitHub (paste each provider's OAuth client ID/secret — create those in Google Cloud / GitHub consoles).
-- Paths/redirects: add `http://localhost:5173` and your antideploy URL as allowed origins/redirects.
+**1. Supabase Auth** (supabase.com → your project → Authentication):
+- Providers → Email: on. Turn **Confirm email OFF** while friend-testing so register logs straight in (turn it back on for strangers).
+- Providers → Google and GitHub: on (paste each OAuth client ID/secret — create those in Google Cloud / GitHub consoles, with redirect URL `https://zyvwfskdqzodfvbekeit.supabase.co/auth/v1/callback`).
+- URL Configuration → Site URL: your antideploy URL; add `http://localhost:5173` and the live URL to Redirect URLs.
 
 **2. Supabase** (supabase.com → create project):
 - Project Settings → API → copy **Project URL** (`VITE_SUPABASE_URL`) and the **publishable key** (`sb_publishable_...`, into `VITE_SUPABASE_ANON_KEY`). Legacy anon keys die end of 2026 — use publishable now. The **secret** key (`sb_secret_...`) must never enter the app.
@@ -248,7 +248,7 @@ create policy "own_attempts" on set_attempts for all to authenticated
 
 Notes: difficulty (easy/medium/hard) only reshapes the AI prompt mix; **PYQ mode serves recalled previous-year questions** (models can't browse from a static page — a live-search upgrade would need a search-API key later). Downloads (report + Q&A PDFs with explanations) work for every mode and stamp difficulty + origin.
 
-- Supabase → Authentication → Third-Party Auth → **Add new Clerk connection** with your Clerk domain (`https://<...>.clerk.accounts.dev` from Clerk's API keys page), then complete Clerk's **Connect with Supabase** page (it adds the claim Supabase validates to your session tokens). No extra code or token template is needed — the app uses the standard login token.
+- No third-party auth setup needed: the app signs in directly against Supabase, so session tokens validate natively and RLS just works.
 - Rebuild + redeploy with the three `VITE_*` values set.
 
 ## Run locally

@@ -6,24 +6,23 @@ import { LoginButtons } from '../components/AuthWidgets';
 import '../landing/landing.css';
 
 function friendly(e: any): string {
-  const m = String(e?.errors?.[0]?.longMessage || e?.message || 'Something went wrong. Try again.');
-  if (/already exists|already registered|identifier.*taken|taken/i.test(m)) return 'This email is already registered — log in instead.';
-  if (/breach|pwned|common|unsafe|weak/i.test(m)) return 'That password is too common — choose a stronger one.';
-  if (/incorrect|wrong|invalid.*password|Password is incorrect/i.test(m)) return 'Wrong email or password. Try again.';
-  if (/couldn't find|not found/i.test(m)) return 'No account with this email — register first.';
+  const m = String(e?.message || 'Something went wrong. Try again.');
+  if (/already registered|already exists|duplicate/i.test(m)) return 'This email is already registered — log in instead.';
+  if (/invalid login|invalid credentials|wrong|incorrect/i.test(m)) return 'Wrong email or password. Try again.';
+  if (/not confirmed|confirm.*email|verify.*email/i.test(m)) return 'Email not confirmed yet — check your inbox for the link.';
+  if (/breach|pwned|common|unsafe|weak|short/i.test(m)) return 'That password is too weak — choose a longer one.';
   if (/rate limit|too many/i.test(m)) return 'Too many attempts — wait a minute and retry.';
   return m.length > 220 ? m.slice(0, 220) + '…' : m;
 }
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { loginEmail, registerEmail, verifyEmailCode } = useAuthActions();
+  const { loginEmail, registerEmail, resendConfirm } = useAuthActions();
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [stage, setStage] = useState<'form' | 'code'>('form');
+  const [stage, setStage] = useState<'form' | 'confirm'>('form');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
-  const [code, setCode] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -33,28 +32,12 @@ export default function AuthPage() {
 
   async function submit() {
     setMsg('');
-    if (stage === 'code') {
-      if (code.trim().length < 4) {
-        setMsg('Enter the code from your email.');
-        return;
-      }
-      setBusy(true);
-      try {
-        await verifyEmailCode(code.trim());
-        goApp();
-      } catch (e) {
-        setMsg(friendly(e));
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       setMsg('Enter a valid email address.');
       return;
     }
-    if (pw.length < 8) {
-      setMsg('Password must be at least 8 characters.');
+    if (pw.length < 6) {
+      setMsg('Password must be at least 6 characters.');
       return;
     }
     setBusy(true);
@@ -64,13 +47,25 @@ export default function AuthPage() {
         goApp();
       } else {
         const st = await registerEmail(name.trim(), email.trim(), pw);
-        if (st === 'verify') {
-          setStage('code');
-          setMsg('We emailed you a verification code — enter it below.');
+        if (st === 'confirm') {
+          setStage('confirm');
+          setMsg(`We emailed a confirmation link to ${email.trim()} — click it, then log in.`);
         } else {
           goApp();
         }
       }
+    } catch (e) {
+      setMsg(friendly(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    setBusy(true);
+    try {
+      await resendConfirm(email.trim());
+      setMsg('Confirmation email re-sent — check your inbox (and spam).');
     } catch (e) {
       setMsg(friendly(e));
     } finally {
@@ -96,12 +91,6 @@ export default function AuthPage() {
             transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
           />
           <motion.div
-            className="orb"
-            style={{ left: '38%', bottom: '-200px', width: 520, height: 520, background: 'rgba(30,158,98,.12)' }}
-            animate={{ x: [0, 40, 0] }}
-            transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
             style={{ position: 'relative', zIndex: 2, maxWidth: 480, margin: '0 auto', padding: '56px 18px' }}
             initial={{ opacity: 0, y: 32, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -119,11 +108,11 @@ export default function AuthPage() {
                 transition={{ duration: 0.25 }}
               >
                 <h1 className="display" style={{ fontSize: 32, margin: '14px 0 6px' }}>
-                  {stage === 'code' ? 'Check your email' : mode === 'login' ? 'Welcome back' : 'Create your account'}
+                  {stage === 'confirm' ? 'Check your email' : mode === 'login' ? 'Welcome back' : 'Create your account'}
                 </h1>
                 <p style={{ color: '#9fb0cc', fontSize: 14.5, margin: '0 0 20px', lineHeight: 1.6 }}>
-                  {stage === 'code'
-                    ? `A verification code is on its way to ${email.trim()}.`
+                  {stage === 'confirm'
+                    ? 'One click in that email activates your account.'
                     : mode === 'login'
                       ? 'Log in to continue your sets, sheets and PDFs.'
                       : 'One account holds every score sheet, on every device.'}
@@ -137,27 +126,18 @@ export default function AuthPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12, type: 'spring', stiffness: 110, damping: 17 }}
             >
-              {stage === 'code' ? (
+              {stage === 'confirm' ? (
                 <>
-                  <div className="field">
-                    <label>Verification code</label>
-                    <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" inputMode="numeric"
-                      onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
-                  </div>
-                  <AnimatePresence>{msg && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                      <div className="err">{msg}</div>
-                    </motion.div>
-                  )}</AnimatePresence>
+                  {msg && <div className="err">{msg}</div>}
                   <div className="btnrow">
-                    <motion.button className="btn-primary" style={{ flex: 1 }} disabled={busy} onClick={submit} whileTap={{ scale: 0.98 }}>
-                      {busy ? 'Verifying…' : 'Verify & continue'}
-                    </motion.button>
+                    <button className="btn-primary" style={{ flex: 1 }} disabled={busy} onClick={resend}>
+                      {busy ? 'Sending…' : 'Resend confirmation email'}
+                    </button>
                   </div>
                   <p className="hint" style={{ marginBottom: 0 }}>
-                    Wrong address?{' '}
-                    <button onClick={() => { setStage('form'); setCode(''); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
-                      Go back
+                    Confirmed already?{' '}
+                    <button onClick={() => { setStage('form'); setMode('login'); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                      Log in
                     </button>
                   </p>
                 </>
@@ -206,7 +186,7 @@ export default function AuthPage() {
                       </div>
                       <div className="field">
                         <label>Password</label>
-                        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Minimum 8 characters"
+                        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Minimum 6 characters"
                           onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
                       </div>
                     </motion.div>
