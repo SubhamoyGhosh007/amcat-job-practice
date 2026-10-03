@@ -37,11 +37,13 @@ export default function Health() {
       <Card style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <AvatarFace id={profile?.avatarId ?? 0} size={48} />
-          <div style={{ flex: 1 }}>
-            <CardTitle>@{profile?.username || '…'}</CardTitle>
-            <CardDesc>{email}</CardDesc>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <CardTitle style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{profile?.username || '…'}</CardTitle>
+            <CardDesc style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</CardDesc>
           </div>
-          <Badge tone="success">Signed in</Badge>
+          <span style={{ flexShrink: 0 }}>
+            <Badge tone="success">Signed in</Badge>
+          </span>
         </div>
         <div style={{ marginTop: 12 }}>
           <Button size="sm" variant="outline" onClick={() => navigate('/app/settings')}>

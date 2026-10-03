@@ -165,10 +165,10 @@ export default function Settings() {
       <h3 style={{ marginTop: 0 }}>Settings</h3>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8 }}>
         <AvatarFace id={profile?.avatarId ?? 0} size={56} />
-        <div>
-          <b style={{ fontSize: 17 }}>@{profile?.username || '…'}</b>
-          <div className="hint">{email}</div>
-        </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <b style={{ fontSize: 17, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{profile?.username || '…'}</b>
+            <div className="hint" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
+          </div>
       </div>
       <div className="field">
         <label>Username (unique across all users)</label>
