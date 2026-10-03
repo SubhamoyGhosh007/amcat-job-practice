@@ -100,6 +100,21 @@ async function callMath(topics: typeof MATH_TOPICS, seed: number, avoid: string[
   return sanitiseMath(JSON.parse(text.slice(start, Math.max(text.lastIndexOf('}'), text.lastIndexOf(']')) + 1)));
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * One retry after a short pause: the proxy returns 502 when Google itself
+ * flakes on a heavy parallel generation, and the immediate retry succeeds.
+ */
+async function callMathRetried(topics: typeof MATH_TOPICS, seed: number, avoid: string[]): Promise<Question[]> {
+  try {
+    return await callMath(topics, seed, avoid);
+  } catch (e) {
+    await sleep(2500);
+    return callMath(topics, seed + 999, avoid);
+  }
+}
+
 /**
  * 40 fresh maths questions, 4 per AMCAT topic. Two parallel half-calls keep each
  * response under token caps; topics are topped up if a half comes back short.
@@ -108,7 +123,7 @@ export async function generateMathSet(): Promise<Question[]> {
   const seed = Math.floor(Math.random() * 1_000_000);
   const avoid = recentAvoid();
   const halves = [MATH_TOPICS.slice(0, 5), MATH_TOPICS.slice(5)];
-  const [a, b] = await Promise.all(halves.map((h, i) => callMath(h, seed + i, avoid)));
+  const [a, b] = await Promise.all(halves.map((h, i) => callMathRetried(h, seed + i, avoid)));
   const byTopic = new Map<string, Question[]>();
   for (const q of [...a, ...b]) {
     const arr = byTopic.get(q.topic) || [];
