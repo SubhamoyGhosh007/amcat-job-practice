@@ -13,6 +13,7 @@ export default function Instructions() {
   const pyq = useExam((s) => s.pyq);
   const setPrefs = useExam((s) => s.setPrefs);
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [left, setLeft] = useState<number | null>(null);
@@ -23,7 +24,7 @@ export default function Instructions() {
       return;
     }
     try {
-      const q = await quotaStatus('sets', userId);
+      const q = await quotaStatus('sets', userId, tier);
       setLeft(q.offline ? null : q.remaining);
     } catch {
       setLeft(null);
@@ -40,7 +41,7 @@ export default function Instructions() {
     setError('');
     try {
       if (userId) {
-        const q = await quotaStatus('sets', userId);
+        const q = await quotaStatus('sets', userId, tier);
         if (!q.allowed && !q.offline) {
           setError(`Free plan: ${q.limit} new sets per day — back tomorrow. Your history and PDFs stay available.`);
           setLoading(false);
@@ -111,7 +112,7 @@ export default function Instructions() {
             {loading ? <><span className="spinner" />Generating fresh set…</> : 'Generate set & start'}
           </button>
         </div>
-            <p className="hint">Source: {describeSource()}. If AI fails, the offline bank is used automatically.{left !== null && <> Free plan: <b>{left} of 5</b> new sets left today.</>}</p>
+            <p className="hint">Source: {describeSource()}. If AI fails, the offline bank is used automatically.{left !== null && (tier === 'pro' ? 'Pro plan: unlimited sets.' : <> Free plan: <b>{left} of 5</b> new sets left today.</>)}</p>
       </div>
     </div>
   );

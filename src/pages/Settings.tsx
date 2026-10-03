@@ -235,6 +235,7 @@ export default function Settings() {
         <AvatarFace id={profile?.avatarId ?? 0} size={56} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <b style={{ fontSize: 17, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{profile?.username || '…'}</b>
+            {profile?.tier === 'pro' ? <span className="chip green">PRO • unlimited</span> : <span className="chip">Free plan</span>}
             <div className="hint" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email}</div>
           </div>
       </div>

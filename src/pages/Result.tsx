@@ -15,6 +15,7 @@ export default function Result() {
   const difficulty = useExam((s) => s.difficulty);
   const pyq = useExam((s) => s.pyq);
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,7 +42,7 @@ export default function Result() {
     setError('');
     try {
       if (userId) {
-        const q = await quotaStatus('sets', userId);
+        const q = await quotaStatus('sets', userId, tier);
         if (!q.allowed && !q.offline) {
           setError(`Free plan: ${q.limit} new sets per day — back tomorrow.`);
           setLoading(false);

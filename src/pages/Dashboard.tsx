@@ -7,6 +7,7 @@ import { useSession } from '../stores/session';
 export default function Dashboard() {
   const navigate = useNavigate();
   const profile = useSession((s) => s.profile);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const syncNote = useSession((s) => s.syncNote);
   const dismissSyncNote = useSession((s) => s.dismissSyncNote);
   const [history] = useState<number[]>(() => {
@@ -37,8 +38,9 @@ export default function Dashboard() {
             ? `${history.length} sets taken • best ${best}% • average ${avg}% — each new set is freshly generated, never repeated.`
             : 'Your first set is freshly generated — 30 questions, 4 timed sections, every answer explained.'}
         </p>
-        <div className="hero-cta">
-          <button className="btn-big" onClick={() => navigate('/app/instructions')}>Start a new set →</button>
+          <div className="hero-cta">
+              <button className="btn-big" onClick={() => navigate('/app/instructions')}>Start a new set →</button>
+              {tier === 'pro' ? <span className="chip green">PRO • unlimited</span> : null}
           <span className="hint">{totalQuestions} Q • {totalMinutes} min • {describeSource()}</span>
         </div>
       </div>

@@ -141,6 +141,7 @@ function TtsGate() {
 /* ---------------- tab 1: listen & answer ---------------- */
 function ListenTab({ refresh }: { refresh: () => void }) {
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [plays, setPlays] = useState<Record<string, number>>({});
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [done, setDone] = useState(false);
@@ -158,7 +159,7 @@ function ListenTab({ refresh }: { refresh: () => void }) {
     void (async () => {
       if (userId) {
         try {
-          const q = await quotaStatus('speaking', userId);
+          const q = await quotaStatus('speaking', userId, tier);
           if (!q.allowed && !q.offline) {
             setSubErr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
             return;
@@ -237,6 +238,7 @@ function ListenTab({ refresh }: { refresh: () => void }) {
 /* ---------------- tab 2: read aloud ---------------- */
 function ReadTab({ refresh }: { refresh: () => void }) {
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [doneIds, setDoneIds] = useState<Record<string, boolean>>({});
   const [qerr, setQerr] = useState('');
 
@@ -251,7 +253,7 @@ function ReadTab({ refresh }: { refresh: () => void }) {
     void (async () => {
       if (userId) {
         try {
-          const q = await quotaStatus('speaking', userId);
+          const q = await quotaStatus('speaking', userId, tier);
           if (!q.allowed && !q.offline) {
             setQerr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
             return;
@@ -290,6 +292,7 @@ function ReadTab({ refresh }: { refresh: () => void }) {
 /* ---------------- tab 3: repeat after me ---------------- */
 function RepeatTab({ refresh }: { refresh: () => void }) {
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [doneIds, setDoneIds] = useState<Record<string, boolean>>({});
   const [qerr, setQerr] = useState('');
 
@@ -308,7 +311,7 @@ function RepeatTab({ refresh }: { refresh: () => void }) {
     void (async () => {
       if (userId) {
         try {
-          const q = await quotaStatus('speaking', userId);
+          const q = await quotaStatus('speaking', userId, tier);
           if (!q.allowed && !q.offline) {
             setQerr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
             return;
@@ -355,6 +358,7 @@ function RepeatTab({ refresh }: { refresh: () => void }) {
 
 export default function Svar() {
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [tab, setTab] = useState<Tab>('listen');
   const [stats, setStats] = useState<SvarStats>(() => readStats());
   const [leftS, setLeftS] = useState<number | null>(null);
@@ -365,7 +369,7 @@ export default function Svar() {
       return;
     }
     try {
-      const q = await quotaStatus('speaking', userId);
+      const q = await quotaStatus('speaking', userId, tier);
       setLeftS(q.offline ? null : q.remaining);
     } catch {
       setLeftS(null);
@@ -392,7 +396,7 @@ export default function Svar() {
           <span className="chip ghost">🎙 {stats.records} recordings</span>{' '}
           <span className="chip ghost">✅ {stats.done} marked done</span>
         </div>
-        {leftS !== null && <p className="hint" style={{ marginTop: 8 }}>Free plan: <b>{leftS} of 5</b> voice sessions left today.</p>}
+        {leftS !== null && <p className="hint" style={{ marginTop: 8 }}>{tier === 'pro' ? 'Pro plan: unlimited voice sessions.' : <>Free plan: <b>{leftS} of 5</b> voice sessions left today.</>}</p>}
       </div>
       <div className="svar-tabs">
         {(['listen', 'read', 'repeat'] as Tab[]).map((t) => (

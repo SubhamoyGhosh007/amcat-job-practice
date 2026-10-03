@@ -1,10 +1,21 @@
 import { apiToken } from './store';
 import { sb } from './supabase';
 
-// Free-tier daily quotas. PAYWALL HOOK: swap this table for per-tier limits
-// later (e.g. { free: {...}, pro: {...} }) — every check site reads from here.
+// Free-tier daily quotas. PAYWALL HOOK: TIERS is the single source of truth —
+// a pricing page later just moves users between keys here.
+// Pro = effectively unlimited (Number.MAX_SAFE_INTEGER reads as "Unlimited" in UI).
 export const FREE_QUOTAS = { sets: 5, speaking: 5, typing: 10 } as const;
+const PRO_QUOTAS = {
+  sets: Number.MAX_SAFE_INTEGER,
+  speaking: Number.MAX_SAFE_INTEGER,
+  typing: Number.MAX_SAFE_INTEGER,
+} as const;
 export type QuotaKind = keyof typeof FREE_QUOTAS;
+export type Tier = 'free' | 'pro';
+
+export function quotasFor(tier: Tier | undefined): Record<QuotaKind, number> {
+  return tier === 'pro' ? { ...PRO_QUOTAS } : { ...FREE_QUOTAS };
+}
 
 export interface QuotaStatus {
   allowed: boolean;
@@ -19,8 +30,11 @@ function todayKey(d = new Date()): string {
 }
 
 /** Cloud counts are truth when reachable; offline we allow with grace. */
-export async function quotaStatus(kind: QuotaKind, userId: string | null): Promise<QuotaStatus> {
-  const limit = FREE_QUOTAS[kind];
+export async function quotaStatus(kind: QuotaKind, userId: string | null, tier: Tier = 'free'): Promise<QuotaStatus> {
+  const limit = quotasFor(tier)[kind];
+  if (limit === Number.MAX_SAFE_INTEGER) {
+    return { allowed: true, remaining: Number.MAX_SAFE_INTEGER, limit, offline: false };
+  }
   try {
     if (!userId) return { allowed: true, remaining: limit, limit, offline: true };
     const token = await apiToken();

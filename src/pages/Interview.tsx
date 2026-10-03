@@ -259,6 +259,7 @@ function untilMidnight(now: number): string {
 export default function Interview() {
   const ask = useConfirm();
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [t0] = useState(() => Date.now());
   const [answers, setAnswers] = useState(0);
   const [history, setHistory] = useState<MockSession[]>(() => listMockSessions());
@@ -270,8 +271,13 @@ export default function Interview() {
   const bump = () => setAnswers((a) => a + 1);
   const heard = (id: string) => setPlayedCtx((p) => ({ ...p, [id]: true }));
 
-  // Daily gate: cloud row is truth, local mirror is instant. Paid tiers plug in here later.
+  // Daily gate (pro skips it): cloud row is truth, local mirror is instant.
+  // Paid tiers plug in here later.
   useEffect(() => {
+    if (tier === 'pro') {
+      setLocked(false);
+      return;
+    }
     let live = true;
     (async () => {
       if (getLastCompletion(userId) === todayKey()) {
@@ -284,7 +290,7 @@ export default function Interview() {
     return () => {
       live = false;
     };
-  }, [userId]);
+  }, [userId, tier]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);

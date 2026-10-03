@@ -6,6 +6,8 @@ export interface Profile {
   email: string;
   username: string;
   avatarId: number;
+  /** 'free' by default; set to 'pro' in the DB to grant unlimited access. */
+  tier: 'free' | 'pro';
 }
 
 export interface ScoreSheet {
@@ -51,7 +53,9 @@ export async function apiToken(): Promise<string | null> {
 const localProfile = (userId: string): Profile | null => {
   try {
     const raw = localStorage.getItem(`amcat_profile_${userId}`);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return { ...p, tier: p.tier === 'pro' ? 'pro' : 'free' };
   } catch {
     return null;
   }
@@ -63,7 +67,7 @@ export async function getProfile(userId: string): Promise<Profile | null> {
   if (db && token) {
     const { data, error } = await db.from('profiles').select('*').eq('id', userId).maybeSingle();
     if (!error && data) {
-      const p: Profile = { userId, email: data.email, username: data.username, avatarId: data.avatar_id ?? 0 };
+      const p: Profile = { userId, email: data.email, username: data.username, avatarId: data.avatar_id ?? 0, tier: data.tier === 'pro' ? 'pro' : 'free' };
       localStorage.setItem(`amcat_profile_${userId}`, JSON.stringify(p));
       return p;
     }

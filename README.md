@@ -351,6 +351,20 @@ Notes: difficulty (easy/medium/hard) only reshapes the AI prompt mix; **PYQ mode
 - No third-party auth setup needed: the app signs in directly against Supabase, so session tokens validate natively and RLS just works.
 - Rebuild + redeploy with the three `VITE_*` values set.
 
+### Pro tier (granting unlimited access)
+
+Free limits live in `FREE_QUOTAS` (`src/lib/usage.ts`): 5 sets, 5 voice sessions, 10 typing tests, 1 mock/day. Pro bypasses every daily gate. Granting it is one DB flag — no code, no deploy, no payment provider needed yet:
+
+```sql
+alter table profiles add column if not exists tier text not null default 'free';
+-- grant:
+update profiles set tier = 'pro' where username_lower = 'their_username';
+-- revoke:
+update profiles set tier = 'free' where username_lower = 'their_username';
+```
+
+(Easiest without SQL: Supabase dashboard → Table Editor → `profiles` → find the user → set `tier` to `pro`.) The app reads the flag at login and shows a PRO badge in Practice + Settings; mock lock and all quotas lift automatically. Rows without the column read as `free`, so nothing breaks before/after the migration. A real paywall later just moves users between tiers — the checks already read from one place.
+
 ## Run locally
 
 ```bash

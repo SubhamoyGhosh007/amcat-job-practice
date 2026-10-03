@@ -24,6 +24,7 @@ type Phase = 'idle' | 'running' | 'done';
 
 export default function Typing() {
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const email = useSession((s) => s.email);
   const profile = useSession((s) => s.profile);
   const ask = useConfirm();
@@ -64,7 +65,7 @@ export default function Typing() {
       return true;
     }
     try {
-      const q = await quotaStatus('typing', userId);
+      const q = await quotaStatus('typing', userId, tier);
       setLeftT(q.offline ? null : q.remaining);
       if (!q.allowed && !q.offline) {
         setBlocked(`Free plan: ${q.limit} typing tests per day — back tomorrow. Your history stays available.`);
@@ -290,7 +291,7 @@ export default function Typing() {
         ))}
         <span className="sep" />
         <button className="radio-pill" onClick={() => restart()}>↻ restart (tab)</button>
-        {leftT !== null && <span className="hint">{leftT} of 10 tests left today</span>}
+        {leftT !== null && <span className="hint">{tier === 'pro' ? 'Pro plan: unlimited tests.' : `${leftT} of 10 tests left today`}</span>}
       </div>
       {blocked && <div className="err" style={{ marginBottom: 10 }}>{blocked}</div>}
 

@@ -44,9 +44,11 @@ export const useSession = create<SessionState>()((set, get) => ({
   // Optimistic: the profile (avatar/username) applies instantly even if the
   // cloud is unreachable — the error no longer blocks the change.
   applyProfile: async (username, avatarId) => {
-    const { userId, email } = get();
+    const { userId, email, profile } = get();
     if (!userId) throw new Error('Not logged in');
-    const p: Profile = { userId, email, username: username.trim(), avatarId };
+    // Tier lives in the DB only — never written from the client, so a profile
+    // save can neither grant nor revoke pro.
+    const p: Profile = { userId, email, username: username.trim(), avatarId, tier: profile?.tier ?? 'free' };
     const res = await saveProfile(p);
     set({
       profile: p,
