@@ -64,18 +64,26 @@ export async function speak(text: string, opts?: { voice?: string }): Promise<st
  * AI generation through the self-hosted proxy (same VPS box as TTS).
  * The Google key lives only in the server's env — the browser sends just
  * the model + contents + the shared token. Returns Gemini-shaped JSON.
+ *
+ * Google answers heavy generations with transient 502/503s when overloaded;
+ * those retry with backoff. 400s (bad model/shape) and 429s (quota) fail
+ * fast — retrying those only burns quota or loops forever.
  */
 export async function geminiViaProxy(model: string, contents: unknown, generationConfig?: unknown): Promise<any> {
-  const res = await fetch(`${TTS_URL}/gemini`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(TTS_TOKEN ? { 'X-TTS-Token': TTS_TOKEN } : {}),
-    },
-    body: JSON.stringify({ model, contents, generationConfig }),
-  });
-  if (res.status === 429) throw new Error('AI is busy — too many requests, try again in a minute.');
-  if (!res.ok) {
+  const delays = [0, 4000, 10000];
+  let lastErr = '';
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, delays[attempt]));
+    const res = await fetch(`${TTS_URL}/gemini`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(TTS_TOKEN ? { 'X-TTS-Token': TTS_TOKEN } : {}),
+      },
+      body: JSON.stringify({ model, contents, generationConfig }),
+    });
+    if (res.status === 429) throw new Error('AI is busy — too many requests, try again in a minute.');
+    if (res.ok) return res.json();
     // The sidecar names the real cause in the body ("AI upstream 429" etc.) —
     // surface it so the console says WHY, not just 502.
     let detail = '';
@@ -84,7 +92,9 @@ export async function geminiViaProxy(model: string, contents: unknown, generatio
     } catch {
       /* ignore */
     }
-    throw new Error(`AI proxy HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+    lastErr = `AI proxy HTTP ${res.status}${detail ? `: ${detail}` : ''}`;
+    if (res.status === 502 || res.status === 503) continue;
+    throw new Error(lastErr);
   }
-  return res.json();
+  throw new Error(lastErr);
 }
