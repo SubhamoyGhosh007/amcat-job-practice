@@ -141,7 +141,6 @@ export const MOCK_TEST_01: MockTest = {
 };
 
 const MKEY = 'amcat_mock';
-
 export function listMockSessions(): MockSession[] {
   try {
     return JSON.parse(localStorage.getItem(MKEY) || '[]');
@@ -168,4 +167,69 @@ export function deleteMockSession(id: string): MockSession[] {
     /* ignore */
   }
   return arr;
+}
+
+// ---------- one-interview-per-day lock (PAYWALL HOOK: swap this gate for tier checks later) ----------
+// Free tier: 1 completion per user per day. Cloud row is the source of truth
+// (survives devices); localStorage mirror covers offline + instant checks.
+
+import { apiToken } from '../lib/store';
+import { sb } from '../lib/supabase';
+
+export function todayKey(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const LKEY = 'amcat_mock_done';
+
+export function getLastCompletion(userId: string | null): string {
+  try {
+    const o = JSON.parse(localStorage.getItem(LKEY) || '{}');
+    return (userId && o[userId]) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setLastCompletion(userId: string | null) {
+  if (!userId) return;
+  try {
+    const o = JSON.parse(localStorage.getItem(LKEY) || '{}');
+    o[userId] = todayKey();
+    localStorage.setItem(LKEY, JSON.stringify(o));
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function fetchTodayRun(userId: string | null): Promise<boolean> {
+  try {
+    if (!userId) return false;
+    const token = await apiToken();
+    const db = sb(token);
+    if (!db || !token) return false;
+    const { data } = await db.from('mock_runs').select('id').eq('user_id', userId).eq('day', todayKey()).limit(1);
+    return !!data?.length;
+  } catch {
+    return false;
+  }
+}
+
+export async function recordRun(userId: string | null, answers: number, durationSec: number): Promise<void> {
+  setLastCompletion(userId);
+  try {
+    if (!userId) return;
+    const token = await apiToken();
+    const db = sb(token);
+    if (!db || !token) return;
+    await db.from('mock_runs').insert({
+      id: `${userId.slice(-6)}-${Date.now().toString(36)}`,
+      user_id: userId,
+      day: todayKey(),
+      answers,
+      duration_sec: durationSec,
+    });
+  } catch {
+    /* duplicate or offline — the local lock still holds */
+  }
 }

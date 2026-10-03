@@ -5,11 +5,16 @@ import { speak, ttsConfigured } from '../lib/tts';
 import {
   MOCK_TEST_01,
   deleteMockSession,
+  fetchTodayRun,
+  getLastCompletion,
   listMockSessions,
+  recordRun,
   saveMockSession,
+  todayKey,
   type MockSession,
   type PartEItem,
 } from '../data/mockInterview';
+import { useSession } from '../stores/session';
 import '../svar.css';
 
 const T = MOCK_TEST_01.sections;
@@ -236,25 +241,62 @@ function Extempore({ item, onDone }: { item: PartEItem; onDone: () => void }) {
   );
 }
 
+function untilMidnight(now: number): string {
+  const end = new Date();
+  end.setHours(24, 0, 0, 0);
+  const ms = Math.max(0, end.getTime() - now);
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return `${h}h ${m}m ${s}s`;
+}
+
 export default function Interview() {
   const ask = useConfirm();
+  const userId = useSession((s) => s.userId);
   const [t0] = useState(() => Date.now());
   const [answers, setAnswers] = useState(0);
   const [history, setHistory] = useState<MockSession[]>(() => listMockSessions());
+  const [locked, setLocked] = useState<boolean | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [playedCtx, setPlayedCtx] = useState<Record<string, boolean>>({});
   const [showKeys, setShowKeys] = useState(false);
 
   const bump = () => setAnswers((a) => a + 1);
   const heard = (id: string) => setPlayedCtx((p) => ({ ...p, [id]: true }));
 
+  // Daily gate: cloud row is truth, local mirror is instant. Paid tiers plug in here later.
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      if (getLastCompletion(userId) === todayKey()) {
+        if (live) setLocked(true);
+        return;
+      }
+      const cloud = await fetchTodayRun(userId);
+      if (live) setLocked(cloud);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+
   function saveSession() {
+    const durationSec = Math.round((Date.now() - t0) / 1000);
     const s: MockSession = {
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
       at: Date.now(),
       answers,
-      durationSec: Math.round((Date.now() - t0) / 1000),
+      durationSec,
     };
     setHistory(saveMockSession(s));
+    recordRun(userId, answers, durationSec).catch(() => {});
+    setLocked(true);
   }
 
   async function remove(id: string) {
@@ -280,6 +322,16 @@ export default function Interview() {
 
       <TtsGate />
 
+      {locked === null ? (
+        <div className="card">Checking today’s slot…</div>
+      ) : locked ? (
+        <div className="card" style={{ textAlign: 'center', marginTop: 6 }}>
+          <h3 style={{ marginTop: 0 }}>Today’s mock is done ✓</h3>
+          <p className="hint">One full interview per day keeps it exam-real. Next unlocks in <b>{untilMidnight(now)}</b>.</p>
+          <p className="hint">Paid plans with extra categories are coming — your streak keeps counting meanwhile.</p>
+        </div>
+      ) : (
+      <>
       <SectionHead n="Part A • Short answers" title="Listen once, answer in ONE sentence" rule="Scenario plays once • 15 seconds per answer • base answers only on what you heard." />
       {T.part_a.map((s) => (
         <div className="svar-card" key={s.id}>
@@ -373,6 +425,7 @@ export default function Interview() {
         )}
       </div>
 
+      </>)}
       <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
       {history.length === 0 && <p className="hint">No sessions yet — finish one above and it lands here.</p>}
       {history.map((h) => (

@@ -125,9 +125,20 @@ alter table set_attempts enable row level security;
 drop policy if exists "own_attempts" on set_attempts;
 create policy "own_attempts" on set_attempts for all to authenticated
   using ((auth.jwt() ->> 'sub') = user_id) with check ((auth.jwt() ->> 'sub') = user_id);
-```
-
-If your `sheets` table predates the difficulty columns, run these two lines as well:
+create table if not exists mock_runs (
+  id text primary key,
+  user_id text not null,
+  day text not null,
+  created_at timestamptz not null default now(),
+  answers int not null default 0,
+  duration_sec int not null default 0,
+  unique(user_id, day)
+);
+alter table mock_runs enable row level security;
+drop policy if exists "own_mock_runs" on mock_runs;
+create policy "own_mock_runs" on mock_runs for all to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id) with check ((auth.jwt() ->> 'sub') = user_id);
+``` the difficulty columns, run these two lines as well:
 
 ```sql
 alter table sheets add column if not exists difficulty text not null default 'medium';
