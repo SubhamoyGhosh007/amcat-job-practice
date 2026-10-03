@@ -120,6 +120,7 @@ async function callGemini(prompt: string): Promise<Question[]> {
         return sanitise(extractJson(text));
       } catch (e: any) {
         lastErr = `Gemini proxy (${m}): ${e?.message || e}`;
+        if (/429/.test(lastErr)) break; // throttled — retrying siblings would 429 too
         continue;
       }
     }
