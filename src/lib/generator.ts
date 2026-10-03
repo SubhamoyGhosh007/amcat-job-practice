@@ -242,27 +242,30 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
     return shared;
   }
 
-  // 2. make a new one with AI and share it with the pool
-  try {
-    if (PROVIDER === 'gemini' && GEMINI_KEY) {
-      const qs = await callGemini(prompt);
-      const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-gemini', difficulty, origin: source, questions: qs };
-      rememberAvoid(qs);
-      await publishSet(set, userId, difficulty, source);
-      return set;
+  // 2. make a new one with AI and share it with the pool.
+  // Providers fall back to each other (a CORS-blocked Zen yields to Gemini
+  // when its key exists) before the offline bank — order still honors config.
+  const order = PROVIDER === 'gemini' ? (['gemini', 'zen'] as const) : (['zen', 'gemini'] as const);
+  for (const p of order) {
+    try {
+      if (p === 'gemini' && GEMINI_KEY) {
+        const qs = await callGemini(prompt);
+        const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-gemini', difficulty, origin: source, questions: qs };
+        rememberAvoid(qs);
+        await publishSet(set, userId, difficulty, source);
+        return set;
+      }
+      if (p === 'zen' && ZEN_KEY) {
+        const qs = await callZen(prompt);
+        const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-zen', difficulty, origin: source, questions: qs };
+        rememberAvoid(qs);
+        await publishSet(set, userId, difficulty, source);
+        return set;
+      }
+    } catch (e) {
+      if (e instanceof TypeError) console.info(`AI provider ${p} unreachable from browser — trying next.`);
+      else console.warn(`AI provider ${p} failed, trying next:`, e);
     }
-    if (PROVIDER === 'zen' && ZEN_KEY) {
-      const qs = await callZen(prompt);
-      const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-zen', difficulty, origin: source, questions: qs };
-      rememberAvoid(qs);
-      await publishSet(set, userId, difficulty, source);
-      return set;
-    }
-  } catch (e) {
-    // TypeError = network/CORS block. Zen rejects browser origins entirely,
-    // so this is expected on the zen provider — fall back quietly.
-    if (e instanceof TypeError) console.info('AI unreachable from browser (CORS) — using offline bank. Use the gemini provider for AI sets.');
-    else console.warn('AI generation failed, using offline bank:', e);
   }
   const set = offlineSet(difficulty);
   rememberAvoid(set.questions);
