@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { deleteScoreSheet, listScoreSheets, type ScoreSheet } from '../lib/store';
 import { useConfirm } from '../ui/alert-dialog';
 import { PageSkeleton } from '../ui/page-skeleton';
-import { useConfirm } from '../ui/alert-dialog';
 import { useExam } from '../stores/exam';
 import { useSession } from '../stores/session';
 
@@ -13,7 +12,6 @@ export default function Sheets() {
   const email = useSession((s) => s.email);
   const profile = useSession((s) => s.profile);
   const review = useExam((s) => s.review);
-  const ask = useConfirm();
   const ask = useConfirm();
   const [sheets, setSheets] = useState<ScoreSheet[]>([]);
   const [loading, setLoading] = useState(true);
