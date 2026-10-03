@@ -102,7 +102,7 @@ export default function AppShell() {
           <span className="sb-title">{TITLES[location.pathname] || 'Practice'}</span>
           <span className="spacer" />
           <AvatarFace id={profile?.avatarId ?? 0} size={30} />
-          <b style={{ fontSize: 13 }}>@{profile?.username || '…'}</b>
+          <b className="sb-topuser" style={{ fontSize: 13 }}>@{profile?.username || '…'}</b>
           <button className="sb-iconbtn" onClick={doLogout} title="Log out" style={{ color: '#1b4fa0' }}>
             <LogOut size={17} />
           </button>

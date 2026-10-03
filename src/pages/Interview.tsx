@@ -111,6 +111,11 @@ function TimedRecorder({ seconds, armed, hint, onDone }: { seconds: number; arme
   async function start() {
     setError('');
     try {
+      if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
+        setError('Recording isn’t supported in this browser — try Chrome on Android or desktop.');
+        finish(null);
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
       const chunks: Blob[] = [];

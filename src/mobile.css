@@ -1,0 +1,64 @@
+/* Mobile-first hardening: overflow, tap, zoom, small screens.
+   Loaded last so these rules win. Nothing here touches desktop layout. */
+
+html, body {
+  overflow-x: clip;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS Safari auto-zooms on focus when inputs are <16px — keep them at 16 */
+.field input,
+.field select,
+.sinput {
+  font-size: 16px;
+}
+
+/* full-viewport hero without the mobile-chrome jump */
+.landing .hero {
+  min-height: 100svh;
+}
+
+/* avatar picker: 8 across on desktop, 4 on phones */
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .sb-topuser {
+    display: none;
+  }
+  .wrap {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .page-hero {
+    padding: 24px 20px;
+  }
+  .demo-card {
+    padding: 18px 16px;
+  }
+  .avatar-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .t-words {
+    font-size: 19px;
+  }
+  .kbd-key {
+    font-size: 13px;
+  }
+  .btnrow .btn-primary,
+  .btnrow .btn-big {
+    flex: 1 1 100%;
+  }
+  .opt {
+    font-size: 15px;
+  }
+  .t-live .v {
+    font-size: 24px;
+  }
+}

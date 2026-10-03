@@ -46,6 +46,10 @@ function useRecorder() {
   async function start(maxSec = 90) {
     setError('');
     try {
+      if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) {
+        setError('Recording isn’t supported in this browser — try Chrome on Android or desktop.');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
       const chunks: Blob[] = [];

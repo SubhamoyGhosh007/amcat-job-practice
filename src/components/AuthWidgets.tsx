@@ -115,7 +115,7 @@ export function UsernameModal() {
 
 export function AvatarGrid({ value, onPick }: { value: number; onPick: (id: number) => void }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 8 }}>
+    <div className="avatar-grid">
       {AVATARS.map((a) => (
         <button
           key={a.id}

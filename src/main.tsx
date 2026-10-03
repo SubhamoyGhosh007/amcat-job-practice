@@ -7,6 +7,7 @@ import './landing/landing.css';
 import './modern.css';
 import './ui/shadcn.css';
 import './ui/tailwind.css';
+import './mobile.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
