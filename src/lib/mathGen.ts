@@ -33,11 +33,16 @@ function rememberAvoid(qs: Question[]) {
   }
 }
 
-function mathPrompt(topics: typeof MATH_TOPICS, seed: number, avoid: string[]): string {
-  const spec = topics.map((t) => `- ${t.id} (${t.name}: ${t.what}) — exactly 4 questions`).join('\n');
+function mathPrompt(spec: SliceSpec, seed: number, avoid: string[]): string {
+  const lines = spec.map(({ topic, count }) => {
+    const t = MATH_TOPICS.find((x) => x.id === topic)!;
+    return `- ${t.id} (${t.name}: ${t.what}) — exactly ${count} questions`;
+  });
+  const total = spec.reduce((a, s) => a + s.count, 0);
+  const ids = spec.map((s) => s.topic).join(', ');
   return `You generate Concentrix AMCAT quantitative-ability practice questions. Fresh seed ${seed}.
-Topics, exactly 4 questions EACH (total ${topics.length * 4}):
-${spec}
+Topics, exact counts (total ${total}):
+${lines.join('\n')}
 Avoid repeating these recent questions: ${avoid.slice(0, 20).join(' | ') || 'none'}.
 Rules:
 - Multiple choice, exactly 4 options each, exactly 1 correct.
@@ -45,8 +50,8 @@ Rules:
 - Quant: use NEW numbers every time, never textbook clichés.
 - explanation: 2-4 lines showing the WORKING step by step (the "how to solve").
 - trick: one short line naming the shortcut used (e.g. "x% of y = y% of x").
-Return ONLY a JSON object: {"questions":[{"section":"quant","topic":"<one of: ${topics.map((t) => t.id).join(', ')}>","prompt":"...","options":["a","b","c","d"],"answerIndex":0,"explanation":"...","trick":"..."}]}
-No markdown fences, no extra text. Total questions must be ${topics.length * 4}.`;
+Return ONLY a JSON object: {"questions":[{"section":"quant","topic":"<one of: ${ids}>","prompt":"...","options":["a","b","c","d"],"answerIndex":0,"explanation":"...","trick":"..."}]}
+No markdown fences, no extra text. Total questions must be ${total}.`;
 }
 
 function sanitiseMath(parsed: any): Question[] {
@@ -73,11 +78,11 @@ function sanitiseMath(parsed: any): Question[] {
   return out;
 }
 
-async function callMath(topics: typeof MATH_TOPICS, seed: number, avoid: string[]): Promise<Question[]> {
-  const prompt = mathPrompt(topics, seed, avoid);
+async function callMath(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
+  const prompt = mathPrompt(spec, seed, avoid);
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.9, maxOutputTokens: 9000, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0.9, maxOutputTokens: 5000, responseMimeType: 'application/json' },
   };
   // Prefer the self-hosted proxy (key never touches the browser).
   if (ttsConfigured()) {
@@ -103,37 +108,68 @@ async function callMath(topics: typeof MATH_TOPICS, seed: number, avoid: string[
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * One retry after a short pause: the proxy returns 502 when Google itself
- * flakes on a heavy parallel generation, and the immediate retry succeeds.
+ * One answer-sheet page = one small generation (10 questions). Small calls
+ * finish in seconds, never near proxy timeouts, and cost fewer tokens.
+ * The four slices below cover every topic exactly 4 times (40 total).
  */
-async function callMathRetried(topics: typeof MATH_TOPICS, seed: number, avoid: string[]): Promise<Question[]> {
+export interface MathSliceItem {
+  topic: string;
+  count: number;
+}
+
+export type SliceSpec = MathSliceItem[];
+
+export const MATH_PAGE_SLICES: SliceSpec[] = [
+  [
+    { topic: 'percent', count: 4 },
+    { topic: 'profit', count: 4 },
+    { topic: 'interest', count: 2 },
+  ],
+  [
+    { topic: 'interest', count: 2 },
+    { topic: 'average', count: 4 },
+    { topic: 'ratio', count: 4 },
+  ],
+  [
+    { topic: 'tsd', count: 4 },
+    { topic: 'work', count: 4 },
+    { topic: 'number', count: 2 },
+  ],
+  [
+    { topic: 'number', count: 2 },
+    { topic: 'ages', count: 4 },
+    { topic: 'alligation', count: 4 },
+  ],
+];
+
+export const MATH_TOTAL_PAGES = MATH_PAGE_SLICES.length;
+
+async function callMathRetried(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
   try {
-    return await callMath(topics, seed, avoid);
+    return await callMath(spec, seed, avoid);
   } catch (e) {
     await sleep(2500);
-    return callMath(topics, seed + 999, avoid);
+    return callMath(spec, seed + 999, avoid);
   }
 }
 
-/**
- * 40 fresh maths questions, 4 per AMCAT topic. Two parallel half-calls keep each
- * response under token caps; topics are topped up if a half comes back short.
- */
-export async function generateMathSet(): Promise<Question[]> {
+/** Generate one page (10 questions). Throws with a friendly message on failure. */
+export async function generateMathPage(page: number): Promise<Question[]> {
+  const spec = MATH_PAGE_SLICES[page];
+  if (!spec) throw new Error('No such maths page.');
   const seed = Math.floor(Math.random() * 1_000_000);
-  const avoid = recentAvoid();
-  const halves = [MATH_TOPICS.slice(0, 5), MATH_TOPICS.slice(5)];
-  const [a, b] = await Promise.all(halves.map((h, i) => callMathRetried(h, seed + i, avoid)));
-  const byTopic = new Map<string, Question[]>();
-  for (const q of [...a, ...b]) {
-    const arr = byTopic.get(q.topic) || [];
-    if (arr.length < 4) {
+  const questions = await callMathRetried(spec, seed, recentAvoid());
+  const capped = new Map<string, Question[]>();
+  for (const q of questions) {
+    const want = spec.find((s) => s.topic === q.topic)?.count ?? 0;
+    const arr = capped.get(q.topic) || [];
+    if (arr.length < want) {
       arr.push(q);
-      byTopic.set(q.topic, arr);
+      capped.set(q.topic, arr);
     }
   }
-  const questions = MATH_TOPICS.flatMap((t) => byTopic.get(t.id) || []);
-  if (questions.length < 30) throw new Error('AI returned an incomplete maths set — retry once.');
-  rememberAvoid(questions);
-  return shuffle(questions);
+  const out = spec.flatMap((s) => capped.get(s.topic) || []);
+  if (out.length < 8) throw new Error('AI returned an incomplete maths page — retry once.');
+  rememberAvoid(out);
+  return shuffle(out);
 }
