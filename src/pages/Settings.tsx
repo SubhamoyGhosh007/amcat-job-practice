@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { authClient } from '../lib/supabase';
 import type { Identity } from '../auth/actions';
 import { confirmEnroll, enrollTotp, listVerifiedTotp, removeTotp, type TotpEnrollment } from '../lib/mfa';
+import { genBackupCodes, listBackupCodes, replaceBackupCodes, revokeAllBackupCodes } from '../lib/backupCodes';
 import { Badge, Button, Card, CardDesc, CardTitle, Field, Input, Skeleton } from '../ui/primitives';
 import { useNavigate } from 'react-router-dom';
 import { useAuthActions } from '../auth/actions';
@@ -32,6 +33,73 @@ export default function Settings() {
   const [mfaMsg, setMfaMsg] = useState('');
   const [mfaBusy, setMfaBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [rcodes, setRcodes] = useState<{ id: string; used: boolean; createdAt: number }[]>([]);
+  const [fresh, setFresh] = useState<string[] | null>(null);
+  const [savedAck, setSavedAck] = useState(false);
+  const [rcBusy, setRcBusy] = useState(false);
+  const [rcMsg, setRcMsg] = useState('');
+  const [rcCopied, setRcCopied] = useState(false);
+
+  async function loadCodes() {
+    try {
+      if (userId) setRcodes(await listBackupCodes(userId));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  useEffect(() => {
+    loadCodes();
+  }, [userId]);
+
+  async function generateCodes() {
+    if (!userId) return;
+    setRcMsg('');
+    setRcBusy(true);
+    try {
+      const c = genBackupCodes(8);
+      await replaceBackupCodes(userId, c);
+      setFresh(c);
+      setSavedAck(false);
+      setRcodes(await listBackupCodes(userId));
+    } catch (e: any) {
+      setRcMsg(e?.message || 'Could not generate. Try again.');
+    } finally {
+      setRcBusy(false);
+    }
+  }
+
+  async function revokeCodes() {
+    if (!userId) return;
+    const ok = await ask({
+      title: 'Revoke all backup codes?',
+      description: 'Every unused code stops working immediately. Generate a new set right after if you still need a way back in.',
+      actionLabel: 'Revoke all',
+      danger: true,
+    });
+    if (!ok) return;
+    setRcBusy(true);
+    try {
+      await revokeAllBackupCodes(userId);
+      setFresh(null);
+      setRcodes([]);
+    } catch (e: any) {
+      setRcMsg(e?.message || 'Could not revoke. Try again.');
+    } finally {
+      setRcBusy(false);
+    }
+  }
+
+  function copyAllCodes() {
+    if (!fresh) return;
+    try {
+      navigator.clipboard?.writeText(fresh.join('\n'));
+      setRcCopied(true);
+      window.setTimeout(() => setRcCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
 
   async function loadFactors() {
     try {
@@ -260,6 +328,46 @@ export default function Settings() {
         {mfaMsg && <div className="err" style={{ marginTop: 12 }}>{mfaMsg}</div>}
       </Card>
       <p className="hint">Keep the authenticator app — there are no recovery codes in this version, so losing it means an account reset.</p>
+
+      <h4>Backup codes</h4>
+      <Card>
+        <CardTitle>Lost authenticator? These get you back in</CardTitle>
+        <CardDesc>8 single-use codes. Each one buys an emailed login link, then burns forever. Generating a new set kills the old one. Only salted hashes are stored — never the codes themselves.</CardDesc>
+        {fresh ? (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 12 }}>
+            <div className="banner warn">Write these down NOW — they will never be shown again.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, margin: '12px 0', fontFamily: 'monospace', fontSize: 16, fontWeight: 700 }}>
+              {fresh.map((c) => (
+                <div key={c} style={{ background: '#f6f8fc', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>{c}</div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Button variant="outline" size="sm" onClick={copyAllCodes}>{rcCopied ? 'Copied ✓' : 'Copy all'}</Button>
+              <label style={{ fontSize: 13, display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+                <input type="checkbox" checked={savedAck} onChange={(e) => setSavedAck(e.target.checked)} /> I saved them somewhere safe
+              </label>
+              <Button size="sm" disabled={!savedAck} onClick={() => { setFresh(null); setSavedAck(false); }}>Done</Button>
+            </div>
+          </motion.div>
+        ) : (
+          <>
+            {rcodes.length > 0 && (
+              <div style={{ margin: '10px 0' }}>
+                {rcodes.map((r) => (
+                  <span key={r.id} className="chip" style={r.used ? { opacity: 0.55 } : undefined}>
+                    {r.used ? '✓ used' : '○ live'} · {new Date(r.createdAt).toLocaleDateString()}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <Button disabled={rcBusy} onClick={generateCodes}>{rcBusy ? 'Working…' : rcodes.length ? 'Generate new set (revokes old)' : 'Generate backup codes'}</Button>
+              {rcodes.length > 0 && <Button variant="ghost" onClick={revokeCodes}>Revoke all</Button>}
+            </div>
+          </>
+        )}
+        {rcMsg && <div className="err" style={{ marginTop: 12 }}>{rcMsg}</div>}
+      </Card>
 
       <h4>Account</h4>
       <div className="btnrow">

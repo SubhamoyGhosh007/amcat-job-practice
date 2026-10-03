@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SECTIONS, totalMinutes, totalQuestions } from '../types';
 import { describeSource, generateSet } from '../lib/generator';
+import { bumpQuota, quotaStatus } from '../lib/usage';
 import { useExam } from '../stores/exam';
+import { useSession } from '../stores/session';
 
 export default function Instructions() {
   const navigate = useNavigate();
@@ -10,15 +12,47 @@ export default function Instructions() {
   const difficulty = useExam((s) => s.difficulty);
   const pyq = useExam((s) => s.pyq);
   const setPrefs = useExam((s) => s.setPrefs);
+  const userId = useSession((s) => s.userId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [left, setLeft] = useState<number | null>(null);
+
+  async function refreshQuota() {
+    if (!userId) {
+      setLeft(null);
+      return;
+    }
+    try {
+      const q = await quotaStatus('sets', userId);
+      setLeft(q.offline ? null : q.remaining);
+    } catch {
+      setLeft(null);
+    }
+  }
+
+  useEffect(() => {
+    refreshQuota();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   async function startGeneration() {
     setLoading(true);
     setError('');
     try {
+      if (userId) {
+        const q = await quotaStatus('sets', userId);
+        if (!q.allowed && !q.offline) {
+          setError(`Free plan: ${q.limit} new sets per day — back tomorrow. Your history and PDFs stay available.`);
+          setLoading(false);
+          return;
+        }
+      }
       const s = await generateSet({ difficulty, pyq });
       start(s);
+      if (userId) {
+        await bumpQuota('sets', userId);
+        refreshQuota();
+      }
       navigate('/app/exam');
     } catch (e: any) {
       setError(e?.message || 'Failed to generate set. Try again.');
@@ -77,7 +111,7 @@ export default function Instructions() {
             {loading ? <><span className="spinner" />Generating fresh set…</> : 'Generate set & start'}
           </button>
         </div>
-        <p className="hint">Source: {describeSource()}. If AI fails, the offline bank is used automatically.</p>
+            <p className="hint">Source: {describeSource()}. If AI fails, the offline bank is used automatically.{left !== null && <> Free plan: <b>{left} of 5</b> new sets left today.</>}</p>
       </div>
     </div>
   );

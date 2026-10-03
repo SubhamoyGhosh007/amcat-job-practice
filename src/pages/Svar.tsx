@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { LISTEN_BANK, READ_BANK, REPEAT_BANK } from '../data/svar';
 import { speak, ttsConfigured } from '../lib/tts';
+import { bumpQuota, quotaStatus } from '../lib/usage';
+import { useSession } from '../stores/session';
 import { TTSVoicePlayer as PlayButton, VoicePlayer } from '../components/VoicePlayer';
 import '../svar.css';
 
@@ -138,9 +140,11 @@ function TtsGate() {
 
 /* ---------------- tab 1: listen & answer ---------------- */
 function ListenTab({ refresh }: { refresh: () => void }) {
+  const userId = useSession((s) => s.userId);
   const [plays, setPlays] = useState<Record<string, number>>({});
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [done, setDone] = useState(false);
+  const [subErr, setSubErr] = useState('');
 
   function played(id: string) {
     setPlays((p) => ({ ...p, [id]: (p[id] || 0) + 1 }));
@@ -150,9 +154,24 @@ function ListenTab({ refresh }: { refresh: () => void }) {
   const score = LISTEN_BANK.filter((q) => picked[q.id] === q.answerIndex).length;
 
   function submit() {
-    setDone(true);
-    bump({ done: readStats().done + 1 });
-    refresh();
+    setSubErr('');
+    void (async () => {
+      if (userId) {
+        try {
+          const q = await quotaStatus('speaking', userId);
+          if (!q.allowed && !q.offline) {
+            setSubErr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
+            return;
+          }
+        } catch {
+          /* grace */
+        }
+      }
+      setDone(true);
+      bump({ done: readStats().done + 1 });
+      if (userId) bumpQuota('speaking', userId).catch(() => {});
+      refresh();
+    })();
   }
 
   return (
@@ -188,9 +207,12 @@ function ListenTab({ refresh }: { refresh: () => void }) {
         );
       })}
       {!done ? (
-        <div className="btnrow">
+        <>
+          {subErr && <div className="err" style={{ marginBottom: 10 }}>{subErr}</div>}
+          <div className="btnrow">
           <button className="btn-big" onClick={submit}>Check answers ✓</button>
         </div>
+        </>
       ) : (
         <div className="card" style={{ textAlign: 'center' }}>
           <b style={{ fontSize: 20 }}>You scored {score}/{LISTEN_BANK.length}</b>
@@ -214,7 +236,9 @@ function ListenTab({ refresh }: { refresh: () => void }) {
 
 /* ---------------- tab 2: read aloud ---------------- */
 function ReadTab({ refresh }: { refresh: () => void }) {
+  const userId = useSession((s) => s.userId);
   const [doneIds, setDoneIds] = useState<Record<string, boolean>>({});
+  const [qerr, setQerr] = useState('');
 
   function recorded() {
     bump({ records: readStats().records + 1 });
@@ -223,13 +247,29 @@ function ReadTab({ refresh }: { refresh: () => void }) {
 
   function markDone(id: string) {
     if (doneIds[id]) return;
-    setDoneIds((d) => ({ ...d, [id]: true }));
-    bump({ done: readStats().done + 1 });
-    refresh();
+    setQerr('');
+    void (async () => {
+      if (userId) {
+        try {
+          const q = await quotaStatus('speaking', userId);
+          if (!q.allowed && !q.offline) {
+            setQerr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
+            return;
+          }
+        } catch {
+          /* grace */
+        }
+      }
+      setDoneIds((d) => ({ ...d, [id]: true }));
+      bump({ done: readStats().done + 1 });
+      if (userId) bumpQuota('speaking', userId).catch(() => {});
+      refresh();
+    })();
   }
 
   return (
     <div>
+      {qerr && <div className="err" style={{ marginBottom: 10 }}>{qerr}</div>}
       {READ_BANK.map((r) => (
         <div className="svar-card" key={r.id}>
           <span className="topic">Read aloud {doneIds[r.id] ? '• ✅ practised' : ''}</span>
@@ -249,7 +289,9 @@ function ReadTab({ refresh }: { refresh: () => void }) {
 
 /* ---------------- tab 3: repeat after me ---------------- */
 function RepeatTab({ refresh }: { refresh: () => void }) {
+  const userId = useSession((s) => s.userId);
   const [doneIds, setDoneIds] = useState<Record<string, boolean>>({});
+  const [qerr, setQerr] = useState('');
 
   function played() {
     bump({ plays: readStats().plays + 1 });
@@ -262,14 +304,30 @@ function RepeatTab({ refresh }: { refresh: () => void }) {
 
   function markDone(id: string) {
     if (doneIds[id]) return;
-    setDoneIds((d) => ({ ...d, [id]: true }));
-    bump({ done: readStats().done + 1 });
-    refresh();
+    setQerr('');
+    void (async () => {
+      if (userId) {
+        try {
+          const q = await quotaStatus('speaking', userId);
+          if (!q.allowed && !q.offline) {
+            setQerr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
+            return;
+          }
+        } catch {
+          /* grace */
+        }
+      }
+      setDoneIds((d) => ({ ...d, [id]: true }));
+      bump({ done: readStats().done + 1 });
+      if (userId) bumpQuota('speaking', userId).catch(() => {});
+      refresh();
+    })();
   }
 
   return (
     <div>
       <TtsGate />
+      {qerr && <div className="err" style={{ marginBottom: 10 }}>{qerr}</div>}
       {REPEAT_BANK.map((r) => (
         <div className="svar-card" key={r.id}>
           <span className="topic">Repeat after me {doneIds[r.id] ? '• ✅ practised' : ''}</span>
@@ -296,9 +354,33 @@ function RepeatTab({ refresh }: { refresh: () => void }) {
 }
 
 export default function Svar() {
+  const userId = useSession((s) => s.userId);
   const [tab, setTab] = useState<Tab>('listen');
   const [stats, setStats] = useState<SvarStats>(() => readStats());
-  const refresh = () => setStats(readStats());
+  const [leftS, setLeftS] = useState<number | null>(null);
+
+  async function refreshQuota() {
+    if (!userId) {
+      setLeftS(null);
+      return;
+    }
+    try {
+      const q = await quotaStatus('speaking', userId);
+      setLeftS(q.offline ? null : q.remaining);
+    } catch {
+      setLeftS(null);
+    }
+  }
+
+  const refresh = () => {
+    setStats(readStats());
+    refreshQuota();
+  };
+
+  useEffect(() => {
+    refreshQuota();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   return (
     <div>
@@ -310,6 +392,7 @@ export default function Svar() {
           <span className="chip ghost">🎙 {stats.records} recordings</span>{' '}
           <span className="chip ghost">✅ {stats.done} marked done</span>
         </div>
+        {leftS !== null && <p className="hint" style={{ marginTop: 8 }}>Free plan: <b>{leftS} of 5</b> voice sessions left today.</p>}
       </div>
       <div className="svar-tabs">
         {(['listen', 'read', 'repeat'] as Tab[]).map((t) => (

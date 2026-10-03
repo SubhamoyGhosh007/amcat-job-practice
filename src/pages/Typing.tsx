@@ -14,6 +14,7 @@ import {
 } from '../lib/typing';
 import { useSession } from '../stores/session';
 import { useConfirm } from '../ui/alert-dialog';
+import { bumpQuota, quotaStatus } from '../lib/usage';
 import '../typing.css';
 
 const TIME_OPTS = [15, 30, 60];
@@ -39,6 +40,8 @@ export default function Typing() {
   const [history, setHistory] = useState<TypingTest[]>([]);
   const [focused, setFocused] = useState(true);
   const [cloudOk, setCloudOk] = useState<boolean | null>(null);
+  const [blocked, setBlocked] = useState('');
+  const [leftT, setLeftT] = useState<number | null>(null);
 
   const boxRef = useRef<HTMLDivElement>(null);
   const startRef = useRef(0);
@@ -53,9 +56,32 @@ export default function Typing() {
     listTypingTests(userId).then(setHistory);
   }, [userId]);
 
+  /** Free-tier gate: checked before effort starts, never after. */
+  async function refreshTypingQuota(): Promise<boolean> {
+    if (!userId) {
+      setBlocked('');
+      setLeftT(null);
+      return true;
+    }
+    try {
+      const q = await quotaStatus('typing', userId);
+      setLeftT(q.offline ? null : q.remaining);
+      if (!q.allowed && !q.offline) {
+        setBlocked(`Free plan: ${q.limit} typing tests per day — back tomorrow. Your history stays available.`);
+        return false;
+      }
+      setBlocked('');
+      return true;
+    } catch {
+      return true;
+    }
+  }
+
   useEffect(() => {
     load();
+    refreshTypingQuota();
     typingCloudStatus().then(setCloudOk);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   const counts = useMemo(
@@ -98,6 +124,11 @@ export default function Typing() {
       if (!savedRef.current) {
         savedRef.current = true;
         saveTypingTest(t).then(load).catch(() => load());
+        if (userId) {
+          bumpQuota('typing', userId)
+            .then(() => refreshTypingQuota())
+            .catch(() => {});
+        }
       }
     },
     [words, submitted, wordIdx, current, mode, amount, owner, load]
@@ -122,7 +153,8 @@ export default function Typing() {
     boxRef.current?.querySelector(`[data-w="${wordIdx}"]`)?.scrollIntoView({ block: 'nearest' });
   }, [wordIdx]);
 
-  function restart(nextMode: TypingMode = mode, nextAmount: number = amount) {
+  async function restart(nextMode: TypingMode = mode, nextAmount: number = amount) {
+    if (!(await refreshTypingQuota())) return;
     setMode(nextMode);
     setAmount(nextAmount);
     setWords(genWords(nextMode, nextAmount));
@@ -141,8 +173,11 @@ export default function Typing() {
 
   function begin() {
     if (phase !== 'idle') return;
-    startRef.current = Date.now();
-    setPhase('running');
+    void refreshTypingQuota().then((ok) => {
+      if (!ok || phase !== 'idle') return;
+      startRef.current = Date.now();
+      setPhase('running');
+    });
   }
 
   function onKey(e: React.KeyboardEvent) {
@@ -151,6 +186,7 @@ export default function Typing() {
       restart();
       return;
     }
+    if (blocked) return;
     if (phase === 'done') return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
@@ -254,7 +290,9 @@ export default function Typing() {
         ))}
         <span className="sep" />
         <button className="radio-pill" onClick={() => restart()}>↻ restart (tab)</button>
+        {leftT !== null && <span className="hint">{leftT} of 10 tests left today</span>}
       </div>
+      {blocked && <div className="err" style={{ marginBottom: 10 }}>{blocked}</div>}
 
       {phase !== 'done' ? (
         <>

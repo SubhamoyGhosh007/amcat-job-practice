@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { SECTIONS } from '../types';
 import { generateSet } from '../lib/generator';
+import { bumpQuota, quotaStatus } from '../lib/usage';
 import { useExam } from '../stores/exam';
+import { useSession } from '../stores/session';
 
 export default function Result() {
   const navigate = useNavigate();
@@ -12,6 +14,7 @@ export default function Result() {
   const start = useExam((s) => s.start);
   const difficulty = useExam((s) => s.difficulty);
   const pyq = useExam((s) => s.pyq);
+  const userId = useSession((s) => s.userId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,8 +40,17 @@ export default function Result() {
     setLoading(true);
     setError('');
     try {
+      if (userId) {
+        const q = await quotaStatus('sets', userId);
+        if (!q.allowed && !q.offline) {
+          setError(`Free plan: ${q.limit} new sets per day — back tomorrow.`);
+          setLoading(false);
+          return;
+        }
+      }
       const s = await generateSet({ difficulty, pyq });
       start(s);
+      if (userId) await bumpQuota('sets', userId);
       navigate('/app/exam');
     } catch (e: any) {
       setError(e?.message || 'Failed to generate set. Try again.');

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { useAuthActions } from '../auth/actions';
+import { redeemBackupCode, sendRecoveryLink } from '../lib/backupCodes';
 import { LoginButtons } from '../components/AuthWidgets';
 import '../landing/landing.css';
 
@@ -24,6 +25,8 @@ export default function AuthPage() {
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [code, setCode] = useState('');
+  const [recMode, setRecMode] = useState(false);
+  const [recCode, setRecCode] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -95,6 +98,32 @@ export default function AuthPage() {
     }
   }
 
+  async function submitRecovery() {
+    setMsg('');
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setMsg('Enter your account email first.');
+      return;
+    }
+    if (recCode.replace(/[^A-Za-z0-9]/g, '').length < 8) {
+      setMsg('Enter the full backup code (like AB12-CD34).');
+      return;
+    }
+    setBusy(true);
+    try {
+      const ok = await redeemBackupCode(email.trim(), recCode);
+      if (!ok) {
+        setMsg('Invalid or already-used code. Each code works once — check for typos.');
+        return;
+      }
+      await sendRecoveryLink(email.trim());
+      setMsg('Code accepted — login link sent. Check your inbox (and spam), it expires soon.');
+    } catch (e) {
+      setMsg(friendly(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <MotionConfig reducedMotion="user">
       <div className="landing">
@@ -151,6 +180,35 @@ export default function AuthPage() {
               transition={{ delay: 0.12, type: 'spring', stiffness: 110, damping: 17 }}
             >
               {stage === 'mfa' ? (
+                recMode ? (
+                  <>
+                    <div className="field">
+                      <label>Account email</label>
+                      <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" inputMode="email" />
+                    </div>
+                    <div className="field">
+                      <label>Backup code (single use)</label>
+                      <input value={recCode} onChange={(e) => setRecCode(e.target.value.toUpperCase().slice(0, 9))} placeholder="AB12-CD34" inputMode="text"
+                        onKeyDown={(e) => { if (e.key === 'Enter') submitRecovery(); }} />
+                    </div>
+                    <AnimatePresence>{msg && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                        <div className="err">{msg}</div>
+                      </motion.div>
+                    )}</AnimatePresence>
+                    <div className="btnrow">
+                      <motion.button className="btn-primary" style={{ flex: 1 }} disabled={busy} onClick={submitRecovery} whileTap={{ scale: 0.98 }}>
+                        {busy ? 'Checking…' : 'Send me a login link'}
+                      </motion.button>
+                    </div>
+                    <p className="hint" style={{ marginBottom: 0 }}>
+                      Found your authenticator?{' '}
+                      <button onClick={() => { setRecMode(false); setRecCode(''); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                        Use a 6-digit code
+                      </button>
+                    </p>
+                  </>
+                ) : (
                 <>
                   <div className="field">
                     <label>6-digit code</label>
@@ -169,11 +227,16 @@ export default function AuthPage() {
                   </div>
                   <p className="hint" style={{ marginBottom: 0 }}>
                     Lost your authenticator?{' '}
+                    <button onClick={() => { setRecMode(true); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                      Use a backup code
+                    </button>
+                    {' '}•{' '}
                     <button onClick={() => { setStage('form'); setCode(''); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
                       Back to log in
                     </button>
                   </p>
                 </>
+                )
               ) : stage === 'confirm' ? (
                 <>
                   {msg && <div className="err">{msg}</div>}

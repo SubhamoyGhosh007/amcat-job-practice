@@ -138,7 +138,96 @@ alter table mock_runs enable row level security;
 drop policy if exists "own_mock_runs" on mock_runs;
 create policy "own_mock_runs" on mock_runs for all to authenticated
   using ((auth.jwt() ->> 'sub') = user_id) with check ((auth.jwt() ->> 'sub') = user_id);
-``` the difficulty columns, run these two lines as well:
+```
+
+### Backup codes + daily quotas (2FA recovery, free-tier limits)
+
+Needs `pgcrypto` for salted hashes. Clients can insert/delete their own code rows
+but can NEVER update them — burns happen only inside the function, and wrong
+guesses are throttled per email:
+
+```sql
+create extension if not exists pgcrypto;
+create table if not exists mfa_recovery_codes (
+  id text primary key,
+  user_id text not null,
+  salt text not null,
+  code_hash text not null,
+  used boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists mfa_codes_user_idx on mfa_recovery_codes(user_id);
+alter table mfa_recovery_codes enable row level security;
+drop policy if exists "own_codes_read" on mfa_recovery_codes;
+drop policy if exists "own_codes_write" on mfa_recovery_codes;
+drop policy if exists "own_codes_delete" on mfa_recovery_codes;
+create policy "own_codes_read" on mfa_recovery_codes for select to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id);
+create policy "own_codes_write" on mfa_recovery_codes for insert to authenticated
+  with check ((auth.jwt() ->> 'sub') = user_id);
+create policy "own_codes_delete" on mfa_recovery_codes for delete to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id);
+create table if not exists recovery_attempts (
+  email text primary key,
+  fails int not null default 0,
+  window_start timestamptz not null default now()
+);
+alter table recovery_attempts enable row level security;
+create or replace function redeem_recovery_code(p_email text, p_code text)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare
+  v_uid text;
+  v_code text := upper(regexp_replace(p_code, '[^A-Za-z0-9]', '', 'g'));
+  r record;
+  v_fails int := 0;
+begin
+  select fails into v_fails from recovery_attempts
+    where email = lower(p_email) and window_start > now() - interval '1 hour';
+  if coalesce(v_fails, 0) >= 20 then return false; end if;
+
+  select id::text into v_uid from auth.users where lower(email) = lower(p_email) limit 1;
+  if v_uid is null then
+    insert into recovery_attempts(email, fails, window_start) values (lower(p_email), 1, now())
+    on conflict (email) do update set fails = recovery_attempts.fails + 1,
+      window_start = case when recovery_attempts.window_start < now() - interval '1 hour'
+        then now() else recovery_attempts.window_start end;
+    return false;
+  end if;
+
+  for r in select id, salt, code_hash from mfa_recovery_codes
+    where user_id = v_uid and used = false loop
+    if r.code_hash = encode(digest(r.salt || ':' || v_code, 'sha256'), 'hex') then
+      update mfa_recovery_codes set used = true where id = r.id;
+      delete from recovery_attempts where email = lower(p_email);
+      return true;
+    end if;
+  end loop;
+
+  insert into recovery_attempts(email, fails, window_start) values (lower(p_email), 1, now())
+  on conflict (email) do update set fails = recovery_attempts.fails + 1,
+    window_start = case when recovery_attempts.window_start < now() - interval '1 hour'
+      then now() else recovery_attempts.window_start end;
+  return false;
+end; $$;
+grant execute on function redeem_recovery_code(text, text) to anon, authenticated;
+
+create table if not exists daily_usage (
+  user_id text not null,
+  day text not null,
+  sets int not null default 0,
+  speaking int not null default 0,
+  typing int not null default 0,
+  primary key (user_id, day)
+);
+alter table daily_usage enable row level security;
+drop policy if exists "own_usage" on daily_usage;
+create policy "own_usage" on daily_usage for all to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id) with check ((auth.jwt() ->> 'sub') = user_id);
+```
+
+Free-tier quotas live in `FREE_QUOTAS` (`src/lib/usage.ts`): 5 sets, 5 speaking sessions,
+10 typing tests per day, 1 mock interview (via `mock_runs`). Checks run *before*
+effort starts; offline mode is grace mode. The paywall later swaps these per tier. the difficulty columns, run these two lines as well:
 
 ```sql
 alter table sheets add column if not exists difficulty text not null default 'medium';
