@@ -82,7 +82,7 @@ async function callMath(spec: SliceSpec, seed: number, avoid: string[]): Promise
   const prompt = mathPrompt(spec, seed, avoid);
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.9, maxOutputTokens: 5000, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0.9, maxOutputTokens: 8000, responseMimeType: 'application/json' },
   };
   // Prefer the self-hosted proxy (key never touches the browser).
   if (ttsConfigured()) {
