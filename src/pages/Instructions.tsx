@@ -12,8 +12,6 @@ export default function Instructions() {
   const difficulty = useExam((s) => s.difficulty);
   const pyq = useExam((s) => s.pyq);
   const setPrefs = useExam((s) => s.setPrefs);
-  const examStyle = useExam((s) => s.examStyle);
-  const setExamStyle = useExam((s) => s.setExamStyle);
   const proctored = useExam((s) => s.proctored);
   const setProctored = useExam((s) => s.setProctored);
   const userId = useSession((s) => s.userId);
@@ -41,6 +39,12 @@ export default function Instructions() {
   }, [userId]);
 
   async function startGeneration() {
+    // Genuine click gesture: enter fullscreen BEFORE the async generation work.
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      /* denied/unsupported — the exam shows a one-tap banner instead */
+    }
     setLoading(true);
     setError('');
     try {
@@ -52,7 +56,7 @@ export default function Instructions() {
           return;
         }
       }
-      const s = await generateSet({ difficulty, pyq, adaptive: examStyle === 'adaptive' });
+      const s = await generateSet({ difficulty, pyq, adaptive: true });
       start(s);
       if (userId) {
         await bumpQuota('sets', userId);
@@ -102,28 +106,12 @@ export default function Instructions() {
               </div>
             </div>
             <div className="field">
-              <label>Question bank</label>
-              <div className="radio-row">
-                <div className={`radio-pill ${!pyq ? 'active' : ''}`} onClick={() => setPrefs({ pyq: false })}>✨ Fresh AI</div>
-                <div className={`radio-pill ${pyq ? 'active' : ''}`} onClick={() => setPrefs({ pyq: true })}>📜 PYQ papers</div>
-              </div>
-              <p className="hint">{pyq ? 'Previous-year AMCAT style, recalled from 2021–2024 papers.' : 'Brand-new questions in the exact AMCAT pattern.'} Served from the shared bank if you haven’t attempted one — otherwise freshly generated and shared for others.</p>
-            </div>
-            <div className="field">
               <label>Exam environment</label>
               <div className="radio-row">
                 <div className={`radio-pill ${!proctored ? 'active' : ''}`} onClick={() => setProctored(false)}>📝 Normal</div>
                 <div className={`radio-pill ${proctored ? 'active' : ''}`} onClick={() => setProctored(true)}>🎥 Proctored</div>
               </div>
               <p className="hint">{proctored ? 'Camera on, fullscreen locked, tab-switch + face-presence tracking. Flags never affect your score.' : 'Relaxed practice, no monitoring.'}</p>
-            </div>
-            <div className="field">
-              <label>Exam style</label>
-              <div className="radio-row">
-                <div className={`radio-pill ${examStyle === 'adaptive' ? 'active' : ''}`} onClick={() => setExamStyle('adaptive')}>🎯 Adaptive (real AMCAT)</div>
-                <div className={`radio-pill ${examStyle === 'classic' ? 'active' : ''}`} onClick={() => setExamStyle('classic')}>📝 Classic</div>
-              </div>
-              <p className="hint">{examStyle === 'adaptive' ? 'One big question per screen — answer right and the next gets harder, wrong and it gets easier. No going back, just like the hall.' : 'All questions with palette navigation, mark-for-review and back button.'}</p>
             </div>
             {error && <div className="err">{error}</div>}
         <div className="btnrow">

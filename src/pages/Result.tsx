@@ -18,7 +18,6 @@ export default function Result() {
   const violations = useExam((s) => s.violations);
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
-  const examStyle = useExam((s) => s.examStyle);
   const ask = useConfirm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,6 +53,12 @@ export default function Result() {
   }
 
   async function startGeneration() {
+    // Genuine click gesture: enter fullscreen BEFORE the async generation work.
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      /* denied/unsupported — the exam shows a one-tap banner instead */
+    }
     setLoading(true);
     setError('');
     try {
@@ -65,7 +70,7 @@ export default function Result() {
           return;
         }
       }
-      const s = await generateSet({ difficulty, pyq, adaptive: examStyle === 'adaptive' });
+      const s = await generateSet({ difficulty, pyq, adaptive: true });
       start(s);
       if (userId) await bumpQuota('sets', userId);
       navigate('/app/exam');

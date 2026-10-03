@@ -6,9 +6,7 @@ import AuthPage from '../pages/AuthPage';
 import AppShell from '../layout/AppShell';
 import Dashboard from '../pages/Dashboard';
 import Instructions from '../pages/Instructions';
-import Exam from '../pages/Exam';
 import AdaptiveExam from '../pages/AdaptiveExam';
-import { useExam } from '../stores/exam';
 import Result from '../pages/Result';
 import Sheets from '../pages/Sheets';
 import Settings from '../pages/Settings';
@@ -32,11 +30,6 @@ function LoginRoute() {
   return <AuthPage />;
 }
 
-function ExamSwitch() {
-  const style = useExam((s) => s.examStyle);
-  return style === 'adaptive' ? <AdaptiveExam /> : <Exam />;
-}
-
 function RequireAuth() {
   const ready = useSession((s) => s.ready);
   const userId = useSession((s) => s.userId);
@@ -57,7 +50,7 @@ export default function AppRouter() {
         <Route path="/app" element={<RequireAuth />}>
           <Route index element={<Dashboard />} />
           <Route path="instructions" element={<Instructions />} />
-          <Route path="exam" element={<ExamSwitch />} />
+          <Route path="exam" element={<AdaptiveExam />} />
           <Route path="result" element={<Result />} />
           <Route path="sheets" element={<Sheets />} />
           <Route path="typing" element={<Typing />} />
