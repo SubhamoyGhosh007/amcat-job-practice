@@ -1,6 +1,7 @@
 // Piper TTS client (self-hosted voice server on the VPS).
 // Configure with VITE_TTS_URL (+VITE_TTS_TOKEN). Responses are cached per
 // sentence so repeats are instant and the server barely notices.
+import { useSession } from '../stores/session';
 
 const TTS_URL = String(import.meta.env.VITE_TTS_URL || '').replace(/\/+$/, '');
 const TTS_TOKEN = String(import.meta.env.VITE_TTS_TOKEN || '');
@@ -10,6 +11,34 @@ export function ttsConfigured(): boolean {
 }
 
 const cache = new Map<string, string>();
+
+/**
+ * Stable per-user id for the VPS sliding-window limiter (X-User-Id header).
+ * Logged-in users send their user_id; guests send a persisted random id so
+ * one guest can't burn the shared IP bucket for everyone behind the IP.
+ */
+function callerId(): string {
+  try {
+    const uid = useSession.getState().userId;
+    if (uid) return uid;
+    let g = localStorage.getItem('amcat_guest');
+    if (!g) {
+      g = `guest-${Math.random().toString(36).slice(2, 10)}`;
+      localStorage.setItem('amcat_guest', g);
+    }
+    return g;
+  } catch {
+    return 'guest-unknown';
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    ...(TTS_TOKEN ? { 'X-TTS-Token': TTS_TOKEN } : {}),
+    'X-User-Id': callerId(),
+  };
+}
 
 function evict() {
   if (cache.size <= 60) return;
@@ -31,10 +60,7 @@ export async function speak(text: string, opts?: { voice?: string }): Promise<st
   if (hit) return hit;
   const res = await fetch(`${TTS_URL}/speak`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(TTS_TOKEN ? { 'X-TTS-Token': TTS_TOKEN } : {}),
-    },
+    headers: authHeaders(),
     body: JSON.stringify({ text: key, ...(voice ? { voice } : {}) }),
   });
   if (!res.ok) throw new Error(`Voice server answered ${res.status}. Check VITE_TTS_URL / token.`);
@@ -76,10 +102,7 @@ export async function geminiViaProxy(model: string, contents: unknown, generatio
     if (attempt > 0) await new Promise((r) => setTimeout(r, delays[attempt]));
     const res = await fetch(`${TTS_URL}/gemini`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(TTS_TOKEN ? { 'X-TTS-Token': TTS_TOKEN } : {}),
-      },
+      headers: authHeaders(),
       body: JSON.stringify({ model, contents, generationConfig }),
     });
     if (res.status === 429) throw new Error('AI is busy — too many requests, try again in a minute.');
