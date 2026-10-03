@@ -257,7 +257,15 @@ export function offlineSet(difficulty: Difficulty = 'medium', adaptive = false):
     const take = adaptive ? pool : pool.slice(0, s.count);
     take.forEach((q, i) => {
       const tier = tiers[Math.min(2, Math.floor((i / Math.max(1, take.length)) * 3))];
-      picked.push({ ...q, id: uid(), difficulty: q.difficulty || tier });
+      // Shuffle option order (remapped answer) so repeat serves feel less identical.
+      const order = shuffle([0, 1, 2, 3]);
+      picked.push({
+        ...q,
+        id: uid(),
+        difficulty: q.difficulty || tier,
+        options: order.map((o) => q.options[o]) as [string, string, string, string],
+        answerIndex: order.indexOf(q.answerIndex),
+      });
     });
   }
   return { id: uid(), createdAt: Date.now(), source: 'offline-bank', difficulty, origin: 'offline', adaptive, questions: adaptive ? shuffle(picked) : shuffle(picked) };
@@ -303,7 +311,9 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
   const order = PROVIDER === 'gemini' ? (['gemini', 'zen'] as const) : (['zen', 'gemini'] as const);
   for (const p of order) {
     try {
-      if (p === 'gemini' && GEMINI_KEY) {
+      // Gemini works keyless through the self-hosted proxy — only skip it when
+      // neither a direct key nor the proxy is configured.
+      if (p === 'gemini' && (GEMINI_KEY || ttsConfigured())) {
         const qs = await callGemini(prompt, adaptive);
         const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-gemini', difficulty, origin: source, adaptive, questions: qs };
         rememberAvoid(qs);
