@@ -10,7 +10,7 @@ const PROVIDER = String(import.meta.env.VITE_AI_PROVIDER || 'zen').toLowerCase()
 const ZEN_KEY = String(import.meta.env.VITE_OPENCODE_API_KEY || '');
 const ZEN_MODEL = String(import.meta.env.VITE_OPENCODE_MODEL || 'muse-spark-1.3-contributor-free');
 const GEMINI_KEY = String(import.meta.env.VITE_GEMINI_API_KEY || '');
-const GEMINI_MODEL = String(import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash');
+const GEMINI_MODEL = String(import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash');
 
 export function describeSource(): string {
   if (PROVIDER === 'gemini') return `gemini • ${GEMINI_MODEL}`;
@@ -113,8 +113,8 @@ function geminiText(data: any): string {
   return data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
 }
 
-/** Live models, highest free quota first (2.5 Flash: 250 RPD free; 3.x IDs are throttled to ~2/day). */
-const GEMINI_FALLBACKS = ['gemini-2.5-flash-lite', 'gemini-3.5-flash', 'gemini-3-flash', 'gemini-3.6-flash', 'gemini-3.8-flash'];
+/** Live models, verified working 2026-10-03. 2.5 IDs are gated for new accounts (generate 404s); gemini-3-flash doesn't exist. */
+const GEMINI_FALLBACKS = ['gemini-3.6-flash', 'gemini-3.8-flash'];
 
 /** Direct Google Gemini API. Falls back through live models if the configured id is unknown. */
 async function callGemini(prompt: string, adaptive = false): Promise<Question[]> {
