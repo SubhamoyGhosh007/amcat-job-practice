@@ -75,6 +75,16 @@ export async function geminiViaProxy(model: string, contents: unknown, generatio
     body: JSON.stringify({ model, contents, generationConfig }),
   });
   if (res.status === 429) throw new Error('AI is busy — too many requests, try again in a minute.');
-  if (!res.ok) throw new Error(`AI proxy HTTP ${res.status}`);
+  if (!res.ok) {
+    // The sidecar names the real cause in the body ("AI upstream 429" etc.) —
+    // surface it so the console says WHY, not just 502.
+    let detail = '';
+    try {
+      detail = (await res.text()).slice(0, 200);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(`AI proxy HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
   return res.json();
 }

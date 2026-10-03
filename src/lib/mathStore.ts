@@ -14,6 +14,18 @@ export interface MathSession {
   questions: Question[];
 }
 
+/** Set once the cloud table proves missing — stops spamming 404s until the SQL is run. */
+let noTable = false;
+function isMissingTable(error: any): boolean {
+  if (noTable) return true;
+  const msg = String(error?.message || '') + String(error?.code || '');
+  if (/PGRST205|could not find the table/i.test(msg)) {
+    noTable = true;
+    return true;
+  }
+  return false;
+}
+
 export function mathSessionFromAnswers(
   owner: { userId: string; username: string },
   questions: Question[],
@@ -54,10 +66,11 @@ export async function saveMathSession(s: MathSession): Promise<void> {
     /* ignore */
   }
   try {
+    if (noTable) return;
     const token = await apiToken();
     const db = sb(token);
     if (!db || !token) return;
-    await db.from('math_sessions').insert({
+    const { error } = await db.from('math_sessions').insert({
       id: s.id,
       user_id: s.userId,
       username: s.username,
@@ -67,6 +80,7 @@ export async function saveMathSession(s: MathSession): Promise<void> {
       answers: s.answers,
       questions: s.questions,
     });
+    if (error) isMissingTable(error);
   } catch {
     /* table missing or offline — local copy still holds */
   }
@@ -74,6 +88,7 @@ export async function saveMathSession(s: MathSession): Promise<void> {
 
 export async function listMathSessions(userId: string | null): Promise<MathSession[]> {
   const local = localSessions().filter((s) => !userId || s.userId === userId);
+  if (noTable) return local;
   try {
     const token = await apiToken();
     const db = sb(token);
@@ -84,7 +99,10 @@ export async function listMathSessions(userId: string | null): Promise<MathSessi
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50);
-    if (error || !data) return local;
+    if (error || !data) {
+      if (error) isMissingTable(error);
+      return local;
+    }
     const cloud: MathSession[] = data.map((d: any) => ({
       id: d.id,
       userId: d.user_id,
@@ -110,10 +128,12 @@ export async function deleteMathSession(id: string): Promise<void> {
     /* ignore */
   }
   try {
+    if (noTable) return;
     const token = await apiToken();
     const db = sb(token);
     if (!db || !token) return;
-    await db.from('math_sessions').delete().eq('id', id);
+    const { error } = await db.from('math_sessions').delete().eq('id', id);
+    if (error) isMissingTable(error);
   } catch {
     /* ignore */
   }
@@ -122,7 +142,7 @@ export async function deleteMathSession(id: string): Promise<void> {
 /** Newest cloud session timestamp (0 when the table is missing/offline). */
 export async function lastCloudMathAt(userId: string | null): Promise<number> {
   try {
-    if (!userId) return 0;
+    if (!userId || noTable) return 0;
     const token = await apiToken();
     const db = sb(token);
     if (!db || !token) return 0;
@@ -133,7 +153,10 @@ export async function lastCloudMathAt(userId: string | null): Promise<number> {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error || !data) return 0;
+    if (error || !data) {
+      if (error) isMissingTable(error);
+      return 0;
+    }
     return new Date(data.created_at).getTime();
   } catch {
     return 0;
