@@ -19,6 +19,12 @@ export default function Footer({ onEnter }: { onEnter: () => void }) {
           <button className="link" onClick={onEnter}>Take a set</button>
         </div>
         <div>
+          <h4>Free guides</h4>
+          <a className="link" href="/guides/amcat-pattern">AMCAT pattern explained</a>
+          <a className="link" href="/guides/svar-round">SVAR round decoded</a>
+          <a className="link" href="/guides/typing-test">Typing test guide</a>
+        </div>
+        <div>
           <h4>After the test</h4>
           <button className="link" onClick={go('login')}>Answer scripts</button>
           <button className="link" onClick={go('login')}>Report PDFs</button>

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Landing from '../landing/Landing';
 import Privacy from '../pages/Privacy';
 import Terms from '../pages/Terms';
+import { AmcatPatternGuide, SvarGuide, TypingGuide } from '../pages/Guides';
 import AuthPage from '../pages/AuthPage';
 import AppShell from '../layout/AppShell';
 import Dashboard from '../pages/Dashboard';
@@ -46,6 +47,9 @@ export default function AppRouter() {
         <Route path="/" element={<Root />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/guides/amcat-pattern" element={<AmcatPatternGuide />} />
+        <Route path="/guides/svar-round" element={<SvarGuide />} />
+        <Route path="/guides/typing-test" element={<TypingGuide />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/app" element={<RequireAuth />}>
           <Route index element={<Dashboard />} />

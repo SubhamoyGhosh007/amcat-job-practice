@@ -242,7 +242,27 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* FAQ — visible answers double as the FAQPage structured data in index.html */}
+          {/* FREE GUIDES */}
+          <div style={{ marginTop: 44 }}>
+            <Reveal>
+              <h2 className="display">Read the playbook first</h2>
+              <p className="sub">Three free guides — the pattern, the spoken round, the typing test. Original notes, no copied content.</p>
+            </Reveal>
+            <div className="hover-grid" style={{ marginTop: 18 }}>
+              {[
+                { to: '/guides/amcat-pattern', tag: 'Pattern', title: 'AMCAT pattern explained', text: 'Four sections, the clock, and the order of attack that wastes the least time.' },
+                { to: '/guides/svar-round', tag: 'Speaking', title: 'SVAR round decoded', text: 'All seven spoken parts, what each measures, and the three mistakes that sink scores.' },
+                { to: '/guides/typing-test', tag: 'Typing', title: 'Typing test guide', text: 'The WPM to aim for and a two-week drill that builds speed without wrecking accuracy.' },
+              ].map((g) => (
+                <a key={g.to} href={g.to} className="hover-card" style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <div className="glow" />
+                  <span className="tag">{g.tag} • free guide</span>
+                  <h3>{g.title}</h3>
+                  <p>{g.text}</p>
+                </a>
+              ))}
+            </div>
+          </div>
           <div id="faq" style={{ marginTop: 44 }}>
             <Reveal>
               <h2 className="display">Questions aspirants ask</h2>

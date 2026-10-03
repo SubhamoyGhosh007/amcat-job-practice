@@ -302,3 +302,7 @@ button.ghost-cta { background: none; border-top: none; border-left: none; border
 .footer-start { background: #4d7cfe; color: #fff; font-weight: 700; font-size: 14px; border: none; border-radius: 9px; padding: 11px 20px; cursor: pointer; font-family: inherit; }
 .footer-start:hover { background: #3b6bf0; }
 .footer-bottom { max-width: 1160px; margin: 0 auto; padding: 18px 20px 30px; border-top: 1px solid rgba(125,160,255,.12); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 12.5px; }
+
+.guide-body h2 { margin: 30px 0 8px; font-size: 24px; }
+.guide-body p { font-size: 15.5px; line-height: 1.75; color: #c4d0e6; margin: 0 0 14px; }
+.guide-body b { color: #fff; }
