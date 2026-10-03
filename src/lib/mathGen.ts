@@ -148,6 +148,9 @@ async function callMathRetried(spec: SliceSpec, seed: number, avoid: string[]): 
   try {
     return await callMath(spec, seed, avoid);
   } catch (e) {
+    // Quota exhaustion won't heal in 2.5s — retrying just burns another
+    // request against the same daily wall. Fail fast with the real reason.
+    if (/429|quota|rate limit/i.test(String((e as any)?.message || e))) throw e;
     await sleep(2500);
     return callMath(spec, seed + 999, avoid);
   }

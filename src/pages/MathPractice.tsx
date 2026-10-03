@@ -100,6 +100,13 @@ export default function MathPractice() {
   const [wait, setWait] = useState(0);
   const [now, setNow] = useState(() => Date.now());
 
+  function friendlyErr(e: any): string {
+    const m = String(e?.message || e);
+    if (/429|quota|rate limit/i.test(m))
+      return "Google's free AI quota is exhausted for today — fresh sets resume tomorrow. Saved sessions and PDFs still work.";
+    return m || 'AI is busy — retry in a minute.';
+  }
+
   useEffect(() => {
     listMathSessions(userId).then(setHistory).catch(() => {});
   }, [userId]);
@@ -141,7 +148,7 @@ export default function MathPractice() {
       setPhase('answering');
       window.scrollTo({ top: 0 });
     } catch (e: any) {
-      setError(e?.message || 'AI is busy — retry in a minute.');
+      setError(friendlyErr(e));
       setPhase('idle');
     } finally {
       setLoading(false);
@@ -161,7 +168,7 @@ export default function MathPractice() {
         pagesRef.current = [...pagesRef.current, next];
         setPages(pagesRef.current);
       } catch (e: any) {
-        setError(e?.message || 'AI is busy — retry in a minute.');
+        setError(friendlyErr(e));
         ok = false;
         break;
       } finally {
