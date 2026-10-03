@@ -15,13 +15,32 @@ export function isDbConfigured(): boolean {
  * enforced by Postgres RLS policies that read the Supabase user id out of the
  * validated session JWT (native Supabase Auth — no third-party handshake).
  */
+let _data: SupabaseClient | null = null;
+let _token: string | null = null;
+
+/**
+ * Single shared data client (one GoTrue instance, ever). The session token
+ * is attached per request, so concurrent calls can never spawn competing
+ * auth engines — this is what silences the "Multiple GoTrueClient" warning.
+ * Auth state itself lives in the authClient() singleton.
+ */
 export function sb(token?: string | null): SupabaseClient | null {
   if (!isDbConfigured()) return null;
-  return createClient(
-    URL,
-    ANON,
-    token ? { global: { headers: { Authorization: `Bearer ${token}` } } } : undefined
-  );
+  if (!_data) {
+    _data = createClient(URL, ANON, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: {
+        fetch: (url, init: any = {}) => {
+          const h = new Headers(init.headers);
+          if (!h.has('apikey')) h.set('apikey', ANON);
+          h.set('Authorization', `Bearer ${_token || ANON}`);
+          return fetch(url, { ...init, headers: Object.fromEntries(h.entries()) });
+        },
+      },
+    });
+  }
+  _token = token ?? null;
+  return _data;
 }
 
 let _auth: SupabaseClient | null = null;
