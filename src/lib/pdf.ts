@@ -2,28 +2,56 @@ import { jsPDF } from 'jspdf';
 import { SECTIONS } from '../types';
 import type { ScoreSheet } from './store';
 
-const M = 14;
-const W = 210 - M * 2;
+type RGB = [number, number, number];
+
+const INK: RGB = [10, 22, 51];
+const DARK: RGB = [22, 33, 58];
+const BLUE: RGB = [27, 79, 160];
+const BRIGHT: RGB = [77, 124, 254];
+const GREEN: RGB = [30, 158, 98];
+const RED: RGB = [214, 69, 69];
+const MUTED: RGB = [91, 107, 136];
+const FAINT: RGB = [182, 193, 214];
+const BORDER: RGB = [223, 230, 242];
+const PAGE_BG: RGB = [241, 244, 250];
+const WHY_BG: RGB = [230, 237, 251];
+const BODY: RGB = [60, 66, 80];
+
+const PM = 12;
+const PW = 210 - PM * 2;
+const BOTTOM = 283;
+
+function paintPage(doc: jsPDF) {
+  doc.setFillColor(...PAGE_BG);
+  doc.rect(0, 0, 210, 297, 'F');
+}
 
 function header(doc: jsPDF, title: string, sub: string) {
-  doc.setFillColor(27, 79, 160);
+  doc.setFillColor(...INK);
   doc.rect(0, 0, 210, 30, 'F');
+  doc.setFillColor(...BRIGHT);
+  doc.rect(0, 30, 210, 2.2, 'F');
   doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text(title, M, 13);
-  doc.setFontSize(10);
-  doc.text(sub, M, 21);
+  doc.text(title, PM, 13);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(185, 199, 228);
+  const subLines = (doc.splitTextToSize(sub, PW) as string[]).slice(0, 2);
+  doc.text(subLines, PM, 21.5);
   doc.setTextColor(0, 0, 0);
-  return 38;
+  return 40;
 }
 
 function footer(doc: jsPDF) {
   const n = doc.getNumberOfPages();
   for (let i = 1; i <= n; i++) {
     doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
-    doc.text(`Concentrix AMCAT Practice • page ${i}/${n}`, M, 290);
+    doc.text(`Concentrix AMCAT Practice • page ${i}/${n}`, PM, 290);
   }
 }
 
@@ -31,63 +59,233 @@ function sectionName(id: string): string {
   return SECTIONS.find((s) => s.id === id)?.name || id;
 }
 
+function ensureSpace(doc: jsPDF, y: number, need: number): number {
+  if (y + need > BOTTOM) {
+    doc.addPage();
+    paintPage(doc);
+    return 14;
+  }
+  return y;
+}
+
 /** One-page style result card: score, section table, verdict. */
 export function downloadReport(sheet: ScoreSheet) {
   const doc = new jsPDF();
   let y = header(doc, 'AMCAT Practice — Test Report', `${sheet.username} • ${new Date(sheet.createdAt).toLocaleString()} • Set ${sheet.setId} • ${sheet.difficulty || 'medium'} • ${(sheet.origin || 'offline') === 'pyq' ? 'PYQ papers' : (sheet.origin || 'offline')}`);
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(26);
-  doc.text(`${sheet.pct}%`, M, y + 12);
+  doc.setTextColor(...INK);
+  doc.text(`${sheet.pct}%`, PM, y + 12);
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  doc.text(`${sheet.correct} correct out of ${sheet.total}  •  source: ${sheet.source}`, M + 30, y + 11);
+  doc.setTextColor(...MUTED);
+  doc.text(`${sheet.correct} correct out of ${sheet.total}  •  source: ${sheet.source}`, PM + 30, y + 11);
+  doc.setTextColor(0, 0, 0);
   y += 22;
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text('Section breakdown', M, y);
+  doc.text('Section breakdown', PM, y);
   y += 6;
   for (const [id, s] of Object.entries(sheet.sections)) {
     const pct = s.t ? Math.round((s.c / s.t) * 100) : 0;
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
-    doc.text(`${sectionName(id)}: ${s.c}/${s.t} (${pct}%)`, M, y);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${sectionName(id)}: ${s.c}/${s.t} (${pct}%)`, PM, y);
     doc.setDrawColor(200, 200, 200);
-    doc.rect(M + 90, y - 4, 80, 5);
+    doc.rect(PM + 90, y - 4, 80, 5);
     doc.setFillColor(pct >= 70 ? 30 : pct >= 50 ? 240 : 214, pct >= 70 ? 158 : pct >= 50 ? 180 : 69, pct >= 70 ? 98 : pct >= 50 ? 30 : 69);
-    doc.rect(M + 90, y - 4, Math.max(1, (80 * pct) / 100), 5, 'F');
+    doc.rect(PM + 90, y - 4, Math.max(1, (80 * pct) / 100), 5, 'F');
     y += 9;
   }
   y += 4;
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   const verdict = sheet.pct >= 70 ? 'Excellent — ready for the real drive.' : sheet.pct >= 50 ? 'Good — revise weak sections and retry a new set.' : 'Keep practising — review the Q&A sheet, then retry.';
-  doc.text(doc.splitTextToSize(`Verdict: ${verdict}`, W), M, y);
+  doc.text(doc.splitTextToSize(`Verdict: ${verdict}`, PW), PM, y);
   footer(doc);
   doc.save(`amcat-report-${sheet.setId}.pdf`);
 }
 
-/** Full Q&A study sheet: every question, options (correct marked), your answer, explanation. */
+/** Designed answer script: score hero, section bands, option badges, why-boxes. */
 export function downloadAnswerSheet(sheet: ScoreSheet) {
   const doc = new jsPDF();
-  let y = header(doc, 'AMCAT Practice — Answer Sheet', `${sheet.username} • Set ${sheet.setId} • ${sheet.correct}/${sheet.total} (${sheet.pct}%) • ${sheet.difficulty || 'medium'}`);
-  sheet.questions.forEach((q, i) => {
-    const mine = sheet.answers[q.id];
-    const lines: string[] = [];
-    lines.push(`Q${i + 1} [${sectionName(q.section)} • ${q.topic}] ${mine === q.answerIndex ? '(correct)' : '(wrong)'}`);
-    lines.push(q.prompt);
-    q.options.forEach((op, oi) => {
-      const mark = oi === q.answerIndex ? '[CORRECT]' : oi === mine ? '[YOUR ANSWER]' : '           ';
-      lines.push(`${mark} ${'ABCD'[oi]}. ${op}`);
-    });
-    lines.push(`Why: ${q.explanation}`);
-    const block = doc.splitTextToSize(lines.join('\n'), W) as string[];
-    const need = block.length * 5 + 4;
-    if (y + need > 282) {
-      doc.addPage();
-      y = 16;
-    }
+  paintPage(doc);
+  let y = header(
+    doc,
+    'AMCAT Practice — Answer Script',
+    `${sheet.username} • ${new Date(sheet.createdAt).toLocaleString()} • Set ${sheet.setId} • ${sheet.difficulty || 'medium'} • ${(sheet.origin || 'offline') === 'pyq' ? 'PYQ papers' : (sheet.origin || 'offline')}`
+  );
+
+  // ---- score hero ----
+  const heroH = 26;
+  y = ensureSpace(doc, y, heroH + 4);
+  doc.setDrawColor(...BORDER);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(PM, y, PW, heroH, 3, 3, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(24);
+  doc.setTextColor(...INK);
+  doc.text(`${sheet.pct}%`, PM + 6, y + 16);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED);
+  doc.text(`${sheet.correct} correct out of ${sheet.total}`, PM + 30, y + 11);
+  doc.setFontSize(9);
+  doc.text('green = correct   •   red = your wrong pick', PM + 30, y + 17.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  const diffLabel = sheet.difficulty || 'medium';
+  const originLabel = (sheet.origin || 'offline') === 'pyq' ? 'PYQ papers' : sheet.origin || 'offline';
+  const chip1 = diffLabel;
+  const chip2 = originLabel;
+  doc.setFontSize(8.5);
+  const w2 = doc.getTextWidth(chip2) + 8;
+  const w1 = doc.getTextWidth(chip1) + 8;
+  let cx = PM + PW - 6 - w2;
+  doc.setFillColor(...BLUE);
+  doc.roundedRect(cx, y + 13.5, w2, 6.5, 3, 3, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.text(chip2, cx + 4, y + 18);
+  cx -= w1 + 4;
+  doc.setFillColor(...WHY_BG);
+  doc.roundedRect(cx, y + 13.5, w1, 6.5, 3, 3, 'F');
+  doc.setTextColor(...BLUE);
+  doc.text(chip1, cx + 4, y + 18);
+  y += heroH + 6;
+
+  // ---- questions, grouped by section ----
+  const indexed = sheet.questions.map((q, i) => ({ q, i }));
+  for (const s of SECTIONS) {
+    const group = indexed.filter(({ q }) => q.section === s.id);
+    if (!group.length) continue;
+    const correct = group.filter(({ q }) => sheet.answers[q.id] === q.answerIndex).length;
+    const pct = Math.round((correct / group.length) * 100);
+
+    const bandH = 11;
+    y = ensureSpace(doc, y, bandH + 4);
+    doc.setFillColor(...BLUE);
+    doc.roundedRect(PM, y, PW, bandH, 2.5, 2.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(s.name, PM + 5, y + 7.4);
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(block, M, y);
-    y += need;
-    doc.setDrawColor(220, 220, 220);
-    doc.line(M, y - 2, M + W, y - 2);
-    y += 2;
-  });
+    const right = `${correct}/${group.length} • ${pct}%`;
+    doc.text(right, PM + PW - 5 - doc.getTextWidth(right), y + 7.4);
+    y += bandH + 4;
+
+    for (const { q, i } of group) {
+      y = questionCard(doc, q, i, sheet.answers[q.id], y);
+    }
+  }
+
   footer(doc);
   doc.save(`amcat-answers-${sheet.setId}.pdf`);
+}
+
+function questionCard(doc: jsPDF, q: any, qi: number, mine: number | undefined, y: number): number {
+  const ok = mine === q.answerIndex;
+  const pad = 5;
+  const inner = PW - pad * 2;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  const promptLines = doc.splitTextToSize(q.prompt, inner) as string[];
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const optBlocks: string[][] = q.options.map((op: string) => doc.splitTextToSize(op, inner - 12) as string[]);
+
+  doc.setFontSize(9.5);
+  const whyLines = doc.splitTextToSize(q.explanation, inner - 6) as string[];
+
+  const headH = 9;
+  const promptH = promptLines.length * 5.3;
+  const optsH = optBlocks.reduce((a: number, b: string[]) => a + b.length * 4.8 + 2.5, 0);
+  const whyH = 3.5 + 4.5 + 1 + whyLines.length * 4.7 + 3.5;
+  const total = 5 + headH + 2 + promptH + 3 + optsH + 3 + whyH + 5 + 4; // +4 slack
+
+  y = ensureSpace(doc, y, total);
+  const top = y;
+
+  doc.setDrawColor(...BORDER);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(PM, y, PW, total, 3, 3, 'FD');
+  doc.setFillColor(...(ok ? GREEN : RED));
+  doc.rect(PM, y + 3, 1.8, total - 6, 'F');
+
+  let cy = top + 5;
+
+  // header row: Q pill + meta + status
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  const qtag = `Q${qi + 1}`;
+  const qw = doc.getTextWidth(qtag) + 8;
+  doc.setFillColor(...INK);
+  doc.roundedRect(PM + pad, cy - 4.4, qw, 6.4, 3, 3, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.text(qtag, PM + pad + 4, cy);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...MUTED);
+  doc.text(`${sectionName(q.section)} • ${q.topic}`, PM + pad + qw + 3, cy);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(...(ok ? GREEN : RED));
+  const status = ok ? '✓ Correct' : '✗ Wrong';
+  doc.text(status, PM + PW - pad - doc.getTextWidth(status), cy);
+  cy += headH + 2;
+
+  // prompt
+  doc.setTextColor(...DARK);
+  doc.setFontSize(11);
+  doc.text(promptLines, PM + pad, cy, { lineHeightFactor: 1.35 } as any);
+  cy += promptH + 3;
+
+  // options
+  q.options.forEach((op: string, oi: number) => {
+    const lines = optBlocks[oi];
+    const isRight = oi === q.answerIndex;
+    const isMine = oi === mine;
+    const ccx = PM + pad + 3;
+    const ccy = cy + 2.6;
+    if (isRight) {
+      doc.setFillColor(...GREEN);
+      doc.circle(ccx, ccy, 2.7, 'F');
+      doc.setTextColor(255, 255, 255);
+    } else if (isMine) {
+      doc.setFillColor(...RED);
+      doc.circle(ccx, ccy, 2.7, 'F');
+      doc.setTextColor(255, 255, 255);
+    } else {
+      doc.setDrawColor(...FAINT);
+      doc.setFillColor(255, 255, 255);
+      doc.circle(ccx, ccy, 2.7, 'FD');
+      doc.setTextColor(...MUTED);
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text('ABCD'[oi], ccx - doc.getTextWidth('ABCD'[oi]) / 2, ccy + 1.1);
+    doc.setFont('helvetica', isRight || isMine ? 'bold' : 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...(isRight ? GREEN : isMine ? RED : BODY));
+    doc.text(lines, PM + pad + 9, cy + 1, { lineHeightFactor: 1.35 } as any);
+    cy += lines.length * 4.8 + 2.5;
+  });
+  cy += 3;
+
+  // why box
+  const boxH = 3.5 + 4.5 + 1 + whyLines.length * 4.7 + 3.5;
+  doc.setFillColor(...WHY_BG);
+  doc.roundedRect(PM + pad, cy, inner, boxH, 2.5, 2.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...BLUE);
+  doc.text('WHY THIS ANSWER', PM + pad + 3, cy + 5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...DARK);
+  doc.text(whyLines, PM + pad + 3, cy + 5 + 5.5, { lineHeightFactor: 1.4 } as any);
+
+  return top + total;
 }
