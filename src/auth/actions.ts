@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { authClient } from '../lib/supabase';
+import { verifyLoginMfa } from '../lib/mfa';
 import { useSession } from '../stores/session';
 
 export type OAuthProvider = 'google' | 'github';
@@ -25,10 +26,21 @@ export function useAuthActions() {
     if (error) throw error;
   }, []);
 
-  const loginEmail = useCallback(async (em: string, pw: string) => {
+  const loginEmail = useCallback(async (em: string, pw: string): Promise<'done' | 'mfa'> => {
     const c = needClient();
     const { error } = await c.auth.signInWithPassword({ email: em, password: pw });
     if (error) throw error;
+    try {
+      const { data } = await c.auth.mfa.getAuthenticatorAssuranceLevel();
+      if ((data as any)?.nextLevel === 'aal2') return 'mfa';
+    } catch {
+      /* no MFA enrolled — plain login */
+    }
+    return 'done';
+  }, []);
+
+  const verifyMfa = useCallback(async (code: string) => {
+    await verifyLoginMfa(code);
   }, []);
 
   const registerEmail = useCallback(async (_name: string, em: string, pw: string): Promise<'done' | 'confirm'> => {
@@ -53,5 +65,5 @@ export function useAuthActions() {
     useSession.getState().reset();
   }, []);
 
-  return { login, loginEmail, registerEmail, resendConfirm, logout };
+  return { login, loginEmail, verifyMfa, registerEmail, resendConfirm, logout };
 }

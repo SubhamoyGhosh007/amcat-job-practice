@@ -17,12 +17,13 @@ function friendly(e: any): string {
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { loginEmail, registerEmail, resendConfirm } = useAuthActions();
+  const { loginEmail, verifyMfa, registerEmail, resendConfirm } = useAuthActions();
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [stage, setStage] = useState<'form' | 'confirm'>('form');
+  const [stage, setStage] = useState<'form' | 'confirm' | 'mfa'>('form');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
+  const [code, setCode] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -43,8 +44,13 @@ export default function AuthPage() {
     setBusy(true);
     try {
       if (mode === 'login') {
-        await loginEmail(email.trim(), pw);
-        goApp();
+        const st = await loginEmail(email.trim(), pw);
+        if (st === 'mfa') {
+          setStage('mfa');
+          setMsg('');
+        } else {
+          goApp();
+        }
       } else {
         const st = await registerEmail(name.trim(), email.trim(), pw);
         if (st === 'confirm') {
@@ -61,11 +67,27 @@ export default function AuthPage() {
     }
   }
 
-  async function resend() {
-    setBusy(true);
+  async function resend() {    setBusy(true);
     try {
       await resendConfirm(email.trim());
       setMsg('Confirmation email re-sent — check your inbox (and spam).');
+    } catch (e) {
+      setMsg(friendly(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitMfa() {
+    setMsg('');
+    if (code.trim().length < 6) {
+      setMsg('Enter the 6-digit code from your authenticator app.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await verifyMfa(code.trim());
+      goApp();
     } catch (e) {
       setMsg(friendly(e));
     } finally {
@@ -108,10 +130,12 @@ export default function AuthPage() {
                 transition={{ duration: 0.25 }}
               >
                 <h1 className="display" style={{ fontSize: 32, margin: '14px 0 6px' }}>
-                  {stage === 'confirm' ? 'Check your email' : mode === 'login' ? 'Welcome back' : 'Create your account'}
+                  {stage === 'mfa' ? 'Two-factor check' : stage === 'confirm' ? 'Check your email' : mode === 'login' ? 'Welcome back' : 'Create your account'}
                 </h1>
                 <p style={{ color: '#9fb0cc', fontSize: 14.5, margin: '0 0 20px', lineHeight: 1.6 }}>
-                  {stage === 'confirm'
+                  {stage === 'mfa'
+                    ? 'This account has 2FA on — open your authenticator app and enter the 6-digit code.'
+                    : stage === 'confirm'
                     ? 'One click in that email activates your account.'
                     : mode === 'login'
                       ? 'Log in to continue your sets, sheets and PDFs.'
@@ -126,7 +150,31 @@ export default function AuthPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12, type: 'spring', stiffness: 110, damping: 17 }}
             >
-              {stage === 'confirm' ? (
+              {stage === 'mfa' ? (
+                <>
+                  <div className="field">
+                    <label>6-digit code</label>
+                    <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456" inputMode="numeric"
+                      onKeyDown={(e) => { if (e.key === 'Enter') submitMfa(); }} />
+                  </div>
+                  <AnimatePresence>{msg && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                      <div className="err">{msg}</div>
+                    </motion.div>
+                  )}</AnimatePresence>
+                  <div className="btnrow">
+                    <motion.button className="btn-primary" style={{ flex: 1 }} disabled={busy} onClick={submitMfa} whileTap={{ scale: 0.98 }}>
+                      {busy ? 'Verifying…' : 'Verify & log in'}
+                    </motion.button>
+                  </div>
+                  <p className="hint" style={{ marginBottom: 0 }}>
+                    Lost your authenticator?{' '}
+                    <button onClick={() => { setStage('form'); setCode(''); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                      Back to log in
+                    </button>
+                  </p>
+                </>
+              ) : stage === 'confirm' ? (
                 <>
                   {msg && <div className="err">{msg}</div>}
                   <div className="btnrow">

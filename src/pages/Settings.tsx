@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { authClient } from '../lib/supabase';
 import type { Identity } from '../auth/actions';
+import { confirmEnroll, enrollTotp, listVerifiedTotp, removeTotp, type TotpEnrollment } from '../lib/mfa';
+import { Badge, Button, Card, CardDesc, CardTitle, Field, Input, Skeleton } from '../ui/primitives';
 import { useNavigate } from 'react-router-dom';
 import { useAuthActions } from '../auth/actions';
 import { AvatarFace, AvatarGrid } from '../components/AuthWidgets';
@@ -22,6 +25,92 @@ export default function Settings() {
   const [msg, setMsg] = useState('');
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
+  const [factors, setFactors] = useState<{ id: string; createdAt: string }[] | null>(null);
+  const [mfaMode, setMfaMode] = useState<'idle' | 'enroll' | 'disable'>('idle');
+  const [enroll, setEnroll] = useState<TotpEnrollment | null>(null);
+  const [code, setCode] = useState('');
+  const [mfaMsg, setMfaMsg] = useState('');
+  const [mfaBusy, setMfaBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function loadFactors() {
+    try {
+      setFactors(await listVerifiedTotp());
+    } catch {
+      setFactors([]);
+    }
+  }
+
+  useEffect(() => {
+    loadFactors();
+  }, [userId]);
+
+  async function startEnroll() {
+    setMfaMsg('');
+    setMfaBusy(true);
+    try {
+      setEnroll(await enrollTotp());
+      setCode('');
+      setMfaMode('enroll');
+    } catch (e: any) {
+      setMfaMsg(e?.message || 'Could not start enrollment. Try again.');
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function confirm() {
+    if (!enroll) return;
+    if (code.trim().length < 6) {
+      setMfaMsg('Enter the 6-digit code from your authenticator app.');
+      return;
+    }
+    setMfaMsg('');
+    setMfaBusy(true);
+    try {
+      await confirmEnroll(enroll.factorId, code.trim());
+      setEnroll(null);
+      setCode('');
+      setMfaMode('idle');
+      await loadFactors();
+    } catch (e: any) {
+      setMfaMsg(/totp|expired|invalid/i.test(String(e?.message)) ? 'Wrong or expired code — codes refresh every 30 seconds.' : e?.message || 'Verification failed. Try again.');
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  async function disable() {
+    const f = factors?.[0];
+    if (!f) return;
+    if (code.trim().length < 6) {
+      setMfaMsg('Enter a fresh code from your authenticator to confirm it’s you.');
+      return;
+    }
+    setMfaMsg('');
+    setMfaBusy(true);
+    try {
+      await removeTotp(f.id, code.trim());
+      setCode('');
+      setMfaMode('idle');
+      await loadFactors();
+    } catch (e: any) {
+      setMfaMsg(/totp|expired|invalid/i.test(String(e?.message)) ? 'Wrong or expired code — codes refresh every 30 seconds.' : e?.message || 'Could not disable. Try again.');
+    } finally {
+      setMfaBusy(false);
+    }
+  }
+
+  function copySecret() {
+    if (!enroll) return;
+    try {
+      navigator.clipboard?.writeText(enroll.secret);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
   const [identities, setIdentities] = useState<Identity[]>([]);
 
   useEffect(() => {
@@ -106,6 +195,67 @@ export default function Settings() {
         <p className="hint">No linked-provider details available.</p>
       )}
       <p className="hint">Google/GitHub logins sharing a verified email stay on one account — one history everywhere.</p>
+
+      <h4>Two-factor authentication</h4>
+      <Card>
+        {factors === null ? (
+          <Skeleton style={{ height: 60 }} />
+        ) : factors.length === 0 && mfaMode !== 'enroll' ? (
+          <>
+            <CardTitle>Authenticator app</CardTitle>
+            <CardDesc>Add a 6-digit code step to logins. Works with Google Authenticator, Authy, 1Password and any TOTP app.</CardDesc>
+            <div style={{ marginTop: 12 }}>
+              <Button disabled={mfaBusy} onClick={startEnroll}>Enable authenticator app</Button>
+            </div>
+          </>
+        ) : factors.length > 0 && mfaMode !== 'disable' ? (
+          <>
+            <CardTitle>Authenticator app</CardTitle>
+            <CardDesc>
+              On — a code is required at every login{ factors[0]?.createdAt ? ` (linked ${new Date(factors[0].createdAt).toLocaleDateString()})` : ''}.
+            </CardDesc>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <Badge tone="success">Protected</Badge>
+              <Button variant="outline" size="sm" onClick={() => { setMfaMode('disable'); setCode(''); setMfaMsg(''); }}>Disable</Button>
+            </div>
+          </>
+        ) : null}
+
+        {mfaMode === 'enroll' && enroll && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 16 }}>
+            <p style={{ fontSize: 14, margin: '0 0 8px' }}><b>1.</b> Scan this with your authenticator app:</p>
+            <div style={{ background: '#fff', padding: 12, borderRadius: 12, display: 'inline-block', border: '1px solid var(--border)' }}>
+              <span dangerouslySetInnerHTML={{ __html: enroll.qrCode }} />
+            </div>
+            <p style={{ fontSize: 14, margin: '12px 0 8px' }}>
+              <b>2.</b> Can’t scan? Enter this secret manually: <code>{enroll.secret}</code>{' '}
+              <Button variant="ghost" size="sm" onClick={copySecret}>{copied ? 'Copied ✓' : 'Copy'}</Button>
+            </p>
+            <Field label="3. Enter the 6-digit code it shows now">
+              <Input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456" inputMode="numeric" />
+            </Field>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <Button disabled={mfaBusy} onClick={confirm}>{mfaBusy ? 'Verifying…' : 'Verify & enable'}</Button>
+              <Button variant="ghost" onClick={() => { setMfaMode('idle'); setEnroll(null); setCode(''); setMfaMsg(''); }}>Cancel</Button>
+            </div>
+          </motion.div>
+        )}
+
+        {mfaMode === 'disable' && factors?.[0] && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 16 }}>
+            <Field label="Enter a fresh code to confirm it’s you">
+              <Input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456" inputMode="numeric" />
+            </Field>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <Button variant="danger" disabled={mfaBusy} onClick={disable}>{mfaBusy ? 'Removing…' : 'Verify & disable'}</Button>
+              <Button variant="ghost" onClick={() => { setMfaMode('idle'); setCode(''); setMfaMsg(''); }}>Cancel</Button>
+            </div>
+          </motion.div>
+        )}
+
+        {mfaMsg && <div className="err" style={{ marginTop: 12 }}>{mfaMsg}</div>}
+      </Card>
+      <p className="hint">Keep the authenticator app — there are no recovery codes in this version, so losing it means an account reset.</p>
 
       <h4>Account</h4>
       <div className="btnrow">
