@@ -10,6 +10,7 @@ import {
   type MathSession,
 } from '../lib/mathStore';
 import { formatWait, mathQuotaStatus } from '../lib/mathQuota';
+import { friendlyError } from '../lib/friendly';
 import { downloadMathSheet } from '../lib/pdf';
 import { useSession } from '../stores/session';
 import { useUi } from '../stores/ui';
@@ -106,10 +107,7 @@ export default function MathPractice() {
   const [now, setNow] = useState(() => Date.now());
 
   function friendlyErr(e: any): string {
-    const m = String(e?.message || e);
-    if (/429|quota|rate limit/i.test(m))
-      return "Google's free AI quota is exhausted for today — fresh sets resume tomorrow. Saved sessions and PDFs still work.";
-    return m || 'AI is busy — retry in a minute.';
+    return friendlyError(e);
   }
 
   useEffect(() => {

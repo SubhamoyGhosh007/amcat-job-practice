@@ -61,6 +61,14 @@ export async function bumpQuota(kind: QuotaKind, userId: string | null): Promise
     const token = await apiToken();
     const db = sb(token);
     if (!db || !token) return;
+    // Atomic single round-trip; falls back to read-then-write when the
+    // `increment_quota` RPC hasn't been created yet (pre-SQL tolerance).
+    try {
+      const { error } = await db.rpc('increment_quota', { p_user_id: userId, p_day: todayKey(), p_kind: kind });
+      if (!error) return;
+    } catch {
+      /* fall through to legacy path */
+    }
     const { data } = await db
       .from('daily_usage')
       .select('sets,speaking,typing')

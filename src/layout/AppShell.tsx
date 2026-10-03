@@ -125,7 +125,9 @@ export default function AppShell() {
     const fn = (e: BeforeUnloadEvent) => {
       const guard = useUi.getState().leaveGuard;
       if (!guard) return;
+      // Native dialog requires returnValue set (preventDefault alone is ignored).
       e.preventDefault();
+      e.returnValue = '';
       try {
         guard.confirmLeave();
       } catch {

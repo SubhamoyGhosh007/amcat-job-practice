@@ -5,6 +5,7 @@ import { useSession } from '../stores/session';
 import { isDbConfigured } from '../lib/supabase';
 import { AVATARS, avatarById } from '../data/avatars';
 import { isUsernameTaken, validUsername } from '../lib/store';
+import { friendlyError } from '../lib/friendly';
 import { GithubLogo, GoogleLogo } from './BrandLogos';
 
 export function AvatarFace({ id, size = 40 }: { id: number; size?: number }) {
@@ -84,7 +85,7 @@ export function UsernameModal() {
       }
       await applyProfile(name, avatar);
     } catch (e: any) {
-      setMsg(e?.message || 'Could not save. Try again.');
+      setMsg(friendlyError(e));
     } finally {
       setBusy(false);
     }

@@ -58,6 +58,8 @@ export interface MockSession {
   durationSec: number;
   /** Tab/fullscreen violations during the attempt. */
   flags?: number;
+  /** Which test paper was used (pool id or static id). */
+  testId?: string;
 }
 
 export const MOCK_TEST_01: MockTest = {
@@ -233,5 +235,69 @@ export async function recordRun(userId: string | null, answers: number, duration
     });
   } catch {
     /* duplicate or offline — the local lock still holds */
+  }
+}
+
+// ---------- mock test pool (tier-separated, MOCK_TEST_01 fallback) ----------
+// mock_tests rows: { id: "<test_id>:<tier>", test_id, tier, sections }.
+// mock_test_attempts rows: { user_id, test_id }. Both tables may not exist yet
+// (pre-SQL tolerance): every pool call degrades to the static MOCK_TEST_01.
+
+export type MockTier = 'free' | 'pro';
+
+function poolId(testId: string, tier: MockTier): string {
+  return `${testId}:${tier}`;
+}
+
+/** A pooled test this user hasn't completed, or null (static fallback applies). */
+export async function fetchUnattemptedMockTest(userId: string | null, tier: MockTier = 'free'): Promise<MockTest | null> {
+  try {
+    const token = await apiToken();
+    const db = sb(token);
+    if (!db || !token) return null;
+    let done: string[] = [];
+    if (userId) {
+      const { data, error } = await db.from('mock_test_attempts').select('test_id').eq('user_id', userId);
+      if (error) return null;
+      done = (data || []).map((d: any) => d.test_id);
+    }
+    let q = db.from('mock_tests').select('*').eq('tier', tier).limit(1);
+    // Native JS array — never a hand-built string.
+    if (done.length) q = q.not('test_id', 'in', done);
+    const { data, error } = await q;
+    if (error || !data?.length) return null;
+    const row = data[0] as any;
+    if (!row?.sections) return null;
+    return { test_id: row.test_id, sections: row.sections } as MockTest;
+  } catch {
+    return null;
+  }
+}
+
+/** Publish a full mock test to the pool (insert-or-ignore, never throws). */
+export async function publishMockTest(test: MockTest, tier: MockTier = 'free'): Promise<void> {
+  try {
+    const token = await apiToken();
+    const db = sb(token);
+    if (!db || !token) return;
+    await db.from('mock_tests').upsert(
+      { id: poolId(test.test_id, tier), test_id: test.test_id, tier, sections: test.sections },
+      { onConflict: 'id', ignoreDuplicates: true }
+    );
+  } catch {
+    /* table missing or offline — static bank still works */
+  }
+}
+
+/** Record that a user completed a pooled test (best-effort, never throws). */
+export async function recordMockAttempt(userId: string | null, testId: string): Promise<void> {
+  if (!userId) return;
+  try {
+    const token = await apiToken();
+    const db = sb(token);
+    if (!db || !token) return;
+    await db.from('mock_test_attempts').insert({ user_id: userId, test_id: testId });
+  } catch {
+    /* duplicate, missing table, or offline — ignore */
   }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { speak } from '../lib/tts';
+import { friendlyError } from '../lib/friendly';
 
 function fmt(s: number): string {
   if (!isFinite(s) || s < 0) s = 0;
@@ -100,7 +101,7 @@ export function TTSVoicePlayer({ text, label, voice, onPlayed }: { text: string;
       setSrc(u);
       onPlayed?.();
     } catch (e: any) {
-      setError(e?.message || 'Voice error');
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }

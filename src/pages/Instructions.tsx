@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SECTIONS, totalMinutes, totalQuestions } from '../types';
 import { describeSource, generateSet } from '../lib/generator';
 import { GROQ_PRO_MODELS, groqConfigured, groqProPick, setGroqProPick } from '../lib/groq';
+import { friendlyError } from '../lib/friendly';
 import { bumpQuota, quotaStatus } from '../lib/usage';
 import { useExam } from '../stores/exam';
 import { useSession } from '../stores/session';
@@ -66,7 +67,7 @@ export default function Instructions() {
       }
       navigate('/app/exam');
     } catch (e: any) {
-      setError(e?.message || 'Failed to generate set. Try again.');
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }

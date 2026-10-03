@@ -2,37 +2,12 @@ import type { Question } from '../types';
 import { MATH_TOPICS } from '../data/mathTopics';
 import { geminiViaProxy, ttsConfigured } from './tts';
 import { groqChat, groqConfigured, groqModelFor } from './groq';
+import { extractJson } from './generator';
+import { requireToken } from './rateLimiter';
+import { recentAvoid, rememberAvoid, shuffle, uid } from './genUtils';
 
 const GEMINI_KEY = String(import.meta.env.VITE_GEMINI_API_KEY || '');
 const GEMINI_MODEL = String(import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash');
-
-const uid = () => Math.random().toString(36).slice(2, 9);
-const shuffle = <T,>(arr: T[]): T[] => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-function recentAvoid(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem('amcat_avoid') || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function rememberAvoid(qs: Question[]) {
-  try {
-    const prev: string[] = recentAvoid();
-    const topics = qs.map((q) => q.prompt.slice(0, 80));
-    localStorage.setItem('amcat_avoid', JSON.stringify([...topics, ...prev].slice(0, 60)));
-  } catch {
-    /* ignore */
-  }
-}
 
 function mathPrompt(spec: SliceSpec, seed: number, avoid: string[]): string {
   const lines = spec.map(({ topic, count }) => {
@@ -102,8 +77,7 @@ async function callMath(spec: SliceSpec, seed: number, avoid: string[]): Promise
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text || '').join('') || '';
   if (!text) throw new Error('Empty Gemini response');
-  const start = text.search(/[{[]/);
-  return sanitiseMath(JSON.parse(text.slice(start, Math.max(text.lastIndexOf('}'), text.lastIndexOf(']')) + 1)));
+  return sanitiseMath(extractJson(text));
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -133,8 +107,7 @@ async function callGroqMath(spec: SliceSpec, seed: number, avoid: string[]): Pro
     mathPrompt(spec, seed, avoid) + '\n\nReply with valid JSON only.',
     4000
   );
-  const start = text.search(/[{[]/);
-  return sanitiseMath(JSON.parse(text.slice(start, Math.max(text.lastIndexOf('}'), text.lastIndexOf(']')) + 1)));
+  return sanitiseMath(extractJson(text));
 }
 
 async function callMathRetried(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
@@ -153,6 +126,7 @@ async function callMathRetried(spec: SliceSpec, seed: number, avoid: string[]): 
 export async function generateMathPage(page: number): Promise<Question[]> {
   const spec = MATH_PAGE_SLICES[page];
   if (!spec) throw new Error('No such maths page.');
+  if (groqConfigured() || GEMINI_KEY || ttsConfigured()) requireToken();
   const seed = Math.floor(Math.random() * 1_000_000);
   const avoid = recentAvoid();
   let questions: Question[];

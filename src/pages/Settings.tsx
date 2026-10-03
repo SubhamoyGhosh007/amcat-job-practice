@@ -10,6 +10,7 @@ import { useAuthActions } from '../auth/actions';
 import { AvatarFace, AvatarGrid } from '../components/AuthWidgets';
 import { useConfirm } from '../ui/alert-dialog';
 import { isUsernameTaken, validUsername } from '../lib/store';
+import { friendlyError } from '../lib/friendly';
 import { useSession } from '../stores/session';
 
 export default function Settings() {
@@ -63,7 +64,7 @@ export default function Settings() {
       setSavedAck(false);
       setRcodes(await listBackupCodes(userId));
     } catch (e: any) {
-      setRcMsg(e?.message || 'Could not generate. Try again.');
+      setRcMsg(friendlyError(e));
     } finally {
       setRcBusy(false);
     }
@@ -84,7 +85,7 @@ export default function Settings() {
       setFresh(null);
       setRcodes([]);
     } catch (e: any) {
-      setRcMsg(e?.message || 'Could not revoke. Try again.');
+      setRcMsg(friendlyError(e));
     } finally {
       setRcBusy(false);
     }
@@ -142,7 +143,7 @@ export default function Settings() {
       setMfaMode('idle');
       await loadFactors();
     } catch (e: any) {
-      setMfaMsg(/totp|expired|invalid/i.test(String(e?.message)) ? 'Wrong or expired code — codes refresh every 30 seconds.' : e?.message || 'Verification failed. Try again.');
+      setMfaMsg(/totp|expired|invalid/i.test(String(e?.message)) ? 'Wrong or expired code — codes refresh every 30 seconds.' : friendlyError(e));
     } finally {
       setMfaBusy(false);
     }
@@ -163,7 +164,7 @@ export default function Settings() {
       setMfaMode('idle');
       await loadFactors();
     } catch (e: any) {
-      setMfaMsg(/totp|expired|invalid/i.test(String(e?.message)) ? 'Wrong or expired code — codes refresh every 30 seconds.' : e?.message || 'Could not disable. Try again.');
+      setMfaMsg(/totp|expired|invalid/i.test(String(e?.message)) ? 'Wrong or expired code — codes refresh every 30 seconds.' : friendlyError(e));
     } finally {
       setMfaBusy(false);
     }
@@ -217,7 +218,7 @@ export default function Settings() {
       await applyProfile(name, avatar);
       setOk('Profile updated ✓ (synced wherever the cloud is reachable)');
     } catch (e: any) {
-      setMsg(e?.message || 'Could not save.');
+      setMsg(friendlyError(e));
     } finally {
       setBusy(false);
     }

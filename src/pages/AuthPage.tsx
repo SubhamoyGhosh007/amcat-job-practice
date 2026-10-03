@@ -4,6 +4,7 @@ import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { useAuthActions } from '../auth/actions';
 import { redeemBackupCode, sendRecoveryLink } from '../lib/backupCodes';
 import { LoginButtons } from '../components/AuthWidgets';
+import { friendlyError } from '../lib/friendly';
 import '../landing/landing.css';
 
 function friendly(e: any): string {
@@ -13,7 +14,7 @@ function friendly(e: any): string {
   if (/not confirmed|confirm.*email|verify.*email/i.test(m)) return 'Email not confirmed yet — check your inbox for the link.';
   if (/breach|pwned|common|unsafe|weak|short/i.test(m)) return 'That password is too weak — choose a longer one.';
   if (/rate limit|too many/i.test(m)) return 'Too many attempts — wait a minute and retry.';
-  return m.length > 220 ? m.slice(0, 220) + '…' : m;
+  return friendlyError(e);
 }
 
 export default function AuthPage() {

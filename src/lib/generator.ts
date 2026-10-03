@@ -3,7 +3,13 @@ import { SECTIONS, type ExamSet, type Question, type SectionId } from '../types'
 import { fetchUnattempted, publishSet, type BankSource, type Difficulty } from './bank';
 import { geminiViaProxy, ttsConfigured } from './tts';
 import { groqChat, groqConfigured, groqModelFor } from './groq';
+import { extractJson, rememberAvoid, recentAvoid, shuffle, uid } from './genUtils';
+import { requireToken } from './rateLimiter';
 import { useSession } from '../stores/session';
+
+// Canonical JSON extractor lives in genUtils; re-exported here so every
+// generator imports it from this module and never duplicates it.
+export { extractJson };
 
 // Config comes ONLY from build-time env (.env file / deploy dashboard).
 // Nothing is asked in the UI and no key is ever displayed.
@@ -18,16 +24,6 @@ export function describeSource(): string {
   if (PROVIDER === 'zen') return `zen • ${ZEN_MODEL}`;
   return 'offline bank';
 }
-
-const uid = () => Math.random().toString(36).slice(2, 9);
-const shuffle = <T,>(arr: T[]): T[] => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
 
 function buildPrompt(seed: number, avoid: string[], difficulty: Difficulty, source: BankSource, adaptive = false): string {
   const spec = adaptive
@@ -56,17 +52,6 @@ Rules:
 - explanation: 1-2 lines, teaches the shortcut/rule.
 Return ONLY a JSON object: {"questions":[{"section":"english|quant|logical|csat","topic":"...","prompt":"...","options":["a","b","c","d"],"answerIndex":0,"explanation":"..."${adaptive ? ',"difficulty":"easy|medium|hard"' : ''}}]}
 No markdown fences, no extra text. Total questions must be ${adaptive ? 36 : SECTIONS.reduce((a, s) => a + s.count, 0)}.`;
-}
-
-function extractJson(text: string): any {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const raw = (fenced ? fenced[1] : text).trim();
-  const start = raw.search(/[{[]/);
-  const endObj = raw.lastIndexOf('}');
-  const endArr = raw.lastIndexOf(']');
-  const end = Math.max(endObj, endArr);
-  const slice = start >= 0 && end > start ? raw.slice(start, end + 1) : raw;
-  return JSON.parse(slice);
 }
 
 function validDiff(d: any): 'easy' | 'medium' | 'hard' {
@@ -284,41 +269,26 @@ export function offlineSet(difficulty: Difficulty = 'medium', adaptive = false):
   return { id: uid(), createdAt: Date.now(), source: 'offline-bank', difficulty, origin: 'offline', adaptive, questions: adaptive ? shuffle(picked) : shuffle(picked) };
 }
 
-function recentAvoid(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem('amcat_avoid') || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function rememberAvoid(qs: Question[]) {
-  try {
-    const prev: string[] = recentAvoid();
-    const topics = qs.map((q) => q.prompt.slice(0, 80));
-    localStorage.setItem('amcat_avoid', JSON.stringify([...topics, ...prev].slice(0, 60)));
-  } catch {
-    /* ignore */
-  }
-}
-
 /** Generate a fresh set: shared pool first, then AI (published back), then offline bank. */
 export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolean; adaptive?: boolean }): Promise<ExamSet> {
   const difficulty: Difficulty = opts?.difficulty || 'medium';
   const source: BankSource = opts?.pyq ? 'pyq' : 'ai';
   const adaptive = !!opts?.adaptive;
   const userId = useSession.getState().userId;
+  const tier = useSession.getState().profile?.tier ?? 'free';
   const seed = Math.floor(Math.random() * 1_000_000);
   const prompt = buildPrompt(seed, recentAvoid(), difficulty, source, adaptive);
 
-  // 1. serve a set this learner hasn't attempted yet
-  const shared = await fetchUnattempted(userId, difficulty, source);
+  // 1. serve a set this learner hasn't attempted yet (same tier only)
+  const shared = await fetchUnattempted(userId, difficulty, source, tier);
   if (shared) {
     rememberAvoid(shared.questions);
     return shared;
   }
 
   // 2. make a new one with AI and share it with the pool.
+  // The leaky bucket gates AI calls only — pool serves and the offline bank cost nothing.
+  if (groqConfigured() || GEMINI_KEY || ttsConfigured() || ZEN_KEY) requireToken();
   // Groq goes first when keyed (generous shared free tier, tier-picked model),
   // then the configured providers, then the offline bank.
   const rest = PROVIDER === 'gemini' ? (['gemini', 'zen'] as const) : (['zen', 'gemini'] as const);
@@ -329,7 +299,7 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
         const qs = await callGroq(prompt, adaptive);
         const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-groq', difficulty, origin: source, adaptive, questions: qs };
         rememberAvoid(qs);
-        await publishSet(set, userId, difficulty, source);
+        await publishSet(set, userId, difficulty, source, tier);
         return set;
       }
       // Gemini works keyless through the self-hosted proxy — only skip it when
@@ -338,14 +308,14 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
         const qs = await callGemini(prompt, adaptive);
         const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-gemini', difficulty, origin: source, adaptive, questions: qs };
         rememberAvoid(qs);
-        await publishSet(set, userId, difficulty, source);
+        await publishSet(set, userId, difficulty, source, tier);
         return set;
       }
       if (p === 'zen' && ZEN_KEY) {
         const qs = await callZen(prompt, adaptive);
         const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-zen', difficulty, origin: source, adaptive, questions: qs };
         rememberAvoid(qs);
-        await publishSet(set, userId, difficulty, source);
+        await publishSet(set, userId, difficulty, source, tier);
         return set;
       }
     } catch (e) {

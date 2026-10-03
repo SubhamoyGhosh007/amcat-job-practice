@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { VoicePlayer } from '../components/VoicePlayer';
 import { useConfirm } from '../ui/alert-dialog';
+import { friendlyError } from '../lib/friendly';
 import { PageSkeleton } from '../ui/page-skeleton';
 import { useUi } from '../stores/ui';
 import { speak, ttsConfigured } from '../lib/tts';
@@ -9,17 +10,21 @@ import {
   MOCK_TEST_01,
   deleteMockSession,
   fetchTodayRun,
+  fetchUnattemptedMockTest,
   getLastCompletion,
   listMockSessions,
+  publishMockTest,
+  recordMockAttempt,
   recordRun,
   saveMockSession,
   todayKey,
   type MockSession,
+  type MockTest,
   type PartEItem,
 } from '../data/mockInterview';
 import '../svar.css';
 
-const T = MOCK_TEST_01.sections;
+/* ---------------- countdown ---------------- */
 
 /* ---------------- countdown ---------------- */
 function useCountdown(seconds: number, active: boolean, onDone?: () => void) {
@@ -64,7 +69,7 @@ function OnceAudio({ text, label, onPlayed }: { text: string; label: string; onP
       await a.play();
     } catch (e: any) {
       setState('idle');
-      setError(e?.message || 'Voice error');
+      setError(friendlyError(e));
     }
   }
 
@@ -230,7 +235,7 @@ function stepPart(s: Step): string {
   return 'finish';
 }
 
-function buildSteps(): Step[] {
+  function buildSteps(T: MockTest['sections']): Step[] {
   const steps: Step[] = [];
   (['a', 'b'] as const).forEach((ab) => {
     const part = ab.toUpperCase() as 'A' | 'B';
@@ -298,7 +303,7 @@ function untilMidnight(now: number): string {
   return `${h}h ${m}m ${s}s`;
 }
 
-function HistoryList({ history, remove }: { history: MockSession[]; remove: (id: string) => void }) {
+function HistoryList({ history, remove, testId }: { history: MockSession[]; remove: (id: string) => void; testId: string }) {
   if (!history.length) return <p className="hint">No sessions yet — finish one above and it lands here.</p>;
   return (
     <>
@@ -308,7 +313,7 @@ function HistoryList({ history, remove }: { history: MockSession[]; remove: (id:
           <div className="meta">
             <div style={{ fontWeight: 700 }}>{h.answers} answers • {Math.floor(h.durationSec / 60)}m {h.durationSec % 60}s run</div>
             <div className="hint">
-              {new Date(h.at).toLocaleString()} • {MOCK_TEST_01.test_id}
+              {new Date(h.at).toLocaleString()} • {h.testId || testId}
               {typeof h.flags === 'number' && h.flags > 0 && <> • ⚠ {h.flags} tab {h.flags === 1 ? 'switch' : 'switches'}</>}
             </div>
           </div>
@@ -324,6 +329,10 @@ function HistoryList({ history, remove }: { history: MockSession[]; remove: (id:
 export default function Interview() {
   const ask = useConfirm();
   const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
+  // Pooled test when available, static MOCK_TEST_01 otherwise (offline included).
+  const [mockTest, setMockTest] = useState<MockTest>(MOCK_TEST_01);
+  const T = mockTest.sections;
   const [t0, setT0] = useState(() => Date.now());
   const [answers, setAnswers] = useState(0);
   const [history, setHistory] = useState<MockSession[]>(() => listMockSessions());
@@ -345,8 +354,26 @@ export default function Interview() {
   const setLeaveGuard = useUi((s) => s.setLeaveGuard);
   const finalizeRef = useRef(() => {});
 
-  const steps = useMemo(buildSteps, []);
+  const steps = useMemo(() => buildSteps(T), [T]);
   const step = steps[stepIdx];
+
+  // Pool: serve an unattempted mock for this tier; self-seed MOCK_TEST_01 into
+  // an empty pool so the first-ever deploy populates itself. Never swaps the
+  // test under a running attempt.
+  useEffect(() => {
+    if (phase !== 'idle') return;
+    let live = true;
+    (async () => {
+      const pooled = await fetchUnattemptedMockTest(userId, tier);
+      if (!live) return;
+      if (pooled) setMockTest(pooled);
+      else publishMockTest(MOCK_TEST_01, tier).catch(() => {});
+    })();
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, tier, phase]);
 
   const bump = () => setAnswers((a) => a + 1);
   const heard = (id: string) => setPlayedCtx((p) => ({ ...p, [id]: true }));
@@ -501,9 +528,11 @@ export default function Interview() {
       answers,
       durationSec,
       flags: flagsRef.current,
+      testId: mockTest.test_id,
     };
     setHistory(saveMockSession(s));
     recordRun(userId, answers, durationSec).catch(() => {});
+    recordMockAttempt(userId, mockTest.test_id).catch(() => {});
     setLocked(true);
     setPhase('idle');
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -536,7 +565,7 @@ export default function Interview() {
           <p className="hint">Paid plans with extra categories are coming — your streak keeps counting meanwhile.</p>
         </div>
         <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
-        <HistoryList history={history} remove={remove} />
+        <HistoryList history={history} remove={remove} testId={mockTest.test_id} />
       </div>
     );
   }
@@ -701,7 +730,7 @@ export default function Interview() {
       )}
 
       <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
-      <HistoryList history={history} remove={remove} />
+      <HistoryList history={history} remove={remove} testId={mockTest.test_id} />
     </div>
   );
 }

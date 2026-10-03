@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { SECTIONS } from '../types';
-import { sourceLabel } from '../lib/friendly';
+import { friendlyError, sourceLabel } from '../lib/friendly';
 import { generateSet } from '../lib/generator';
 import { bumpQuota, quotaStatus } from '../lib/usage';
 import { useConfirm } from '../ui/alert-dialog';
@@ -76,7 +76,7 @@ export default function Result() {
       if (userId) await bumpQuota('sets', userId);
       navigate('/app/exam');
     } catch (e: any) {
-      setError(e?.message || 'Failed to generate set. Try again.');
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }
