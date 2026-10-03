@@ -225,7 +225,11 @@ export default function Settings() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: 16 }}>
             <p style={{ fontSize: 14, margin: '0 0 8px' }}><b>1.</b> Scan this with your authenticator app:</p>
             <div style={{ background: '#fff', padding: 12, borderRadius: 12, display: 'inline-block', border: '1px solid var(--border)' }}>
-              <span dangerouslySetInnerHTML={{ __html: enroll.qrCode }} />
+              {enroll.qrCode.startsWith('data:image') ? (
+                <img src={enroll.qrCode} alt="Authenticator QR code" style={{ width: 180, height: 180, display: 'block' }} />
+              ) : (
+                <span dangerouslySetInnerHTML={{ __html: enroll.qrCode }} />
+              )}
             </div>
             <p style={{ fontSize: 14, margin: '12px 0 8px' }}>
               <b>2.</b> Can’t scan? Enter this secret manually: <code>{enroll.secret}</code>{' '}
@@ -278,10 +282,7 @@ export default function Settings() {
           Erase local data
         </button>
       </div>
-      <h4>Backend status</h4>
-      <p className="hint">
-        Moved to its own page — open <b>Health check</b> in the sidebar to test Auth, Database, AI and storage.
-      </p>
+      
     </div>
   );
 }
