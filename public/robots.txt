@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://amcat-practice.antideploy.app/sitemap.xml

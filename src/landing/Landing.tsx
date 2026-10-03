@@ -28,6 +28,29 @@ const TOPICS = [
   'Synonyms', 'Ratios', 'Prioritisation', 'Data privacy',
 ];
 
+const FAQS = [
+  {
+    q: 'What is the Concentrix AMCAT exam pattern?',
+    a: 'The Concentrix hiring test follows the AMCAT pattern: four timed sections — English Ability, Quantitative Ability, Logical Reasoning, and a Customer Service round — with no negative marking. This site mirrors that pattern with fresh questions on every attempt.',
+  },
+  {
+    q: 'Is this an official AMCAT mock test?',
+    a: 'No. This is a free, unofficial practice project built by an aspirant — it is not affiliated with Concentrix, AMCAT, or SHL. Use it to warm up, and always confirm the current pattern from your official hall ticket or recruiter.',
+  },
+  {
+    q: 'Does it cover the SVAR spoken-English round?',
+    a: 'Yes. The speaking lab covers repeat sentences, read-aloud, extempore and error correction, and the mock interview runs all seven spoken parts on exam timers with one-play audio.',
+  },
+  {
+    q: 'Is there a typing test for Concentrix preparation?',
+    a: 'Yes. The typing arena measures live WPM, accuracy and consistency, monkeytype-style, and saves every attempt to your history.',
+  },
+  {
+    q: 'Is the Concentrix AMCAT practice free?',
+    a: 'Yes. Practice sets, the typing arena, the speaking lab and a daily mock interview are free, and solved answer scripts download as PDF.',
+  },
+];
+
 function DemoCard() {
   const [pick, setPick] = useState<number | null>(null);
   return (
@@ -100,9 +123,9 @@ export default function Landing() {
               <span className="type-caret" />
             </div>
             <p className="lede">
-              A practice ground shaped exactly like the Concentrix AMCAT — four timed sections,
-              a fresh set of questions every attempt, and an answer script that teaches you
-              after every test. Move your mouse: the hall reacts.
+              Free Concentrix AMCAT mock test practice shaped exactly like the real hiring test — four timed sections
+              (English Ability, Quantitative Ability, Logical Reasoning, Customer Service), a fresh set of questions
+              every attempt, and an answer script that teaches you after every test. Move your mouse: the hall reacts.
             </p>
             <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
               <Magnetic>
@@ -216,6 +239,30 @@ export default function Landing() {
               <Magnetic strength={24}>
                 <MovingCta onClick={onEnter}>{userId ? 'Jump back into practice' : 'Claim your first set'}</MovingCta>
               </Magnetic>
+            </div>
+          </div>
+
+          {/* FAQ — visible answers double as the FAQPage structured data in index.html */}
+          <div id="faq" style={{ marginTop: 44 }}>
+            <Reveal>
+              <h2 className="display">Questions aspirants ask</h2>
+              <p className="sub">Straight answers about the pattern, the SVAR round, typing, and what this site is.</p>
+            </Reveal>
+            <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
+              {FAQS.map((f) => (
+                <details
+                  key={f.q}
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 12,
+                    padding: '12px 16px',
+                  }}
+                >
+                  <summary style={{ cursor: 'pointer', fontWeight: 700 }}>{f.q}</summary>
+                  <p className="sub" style={{ margin: '8px 0 2px' }}>{f.a}</p>
+                </details>
+              ))}
             </div>
           </div>
         </div>
