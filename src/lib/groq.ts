@@ -2,18 +2,14 @@ import { useSession } from '../stores/session';
 
 /**
  * Groq (OpenAI-compatible, generous free tier) — tried before Gemini so the
- * Google quota lasts. Model choice is entirely backend: each tier gets an
- * ordered rotation, first 200 wins. Dead IDs (404) and exhausted models (429)
- * just fall through to the next — the user never picks, never sees names.
+ * Google quota lasts. Model choice is entirely backend: currently only
+ * `openai/gpt-oss-120b` answers on this account, so both tiers use it.
+ * The rotation machinery stays: if it ever 404s/429s, add the replacement ID
+ * to the list and the first 200 wins again. The user never picks, never sees names.
  * Key lives in VITE_GROQ_API_KEY (same handling as the existing Zen key).
  */
-export const GROQ_FREE_MODELS = ['llama-3.1-8b-instant', 'openai/gpt-oss-120b'];
-export const GROQ_PRO_MODELS = [
-  'llama-3.3-70b-versatile',
-  'openai/gpt-oss-120b',
-  'moonshotai/kimi-k2-instruct',
-  'llama-3.1-8b-instant',
-];
+export const GROQ_FREE_MODELS = ['openai/gpt-oss-120b'];
+export const GROQ_PRO_MODELS = ['openai/gpt-oss-120b'];
 
 const GROQ_KEY = String(import.meta.env.VITE_GROQ_API_KEY || '');
 

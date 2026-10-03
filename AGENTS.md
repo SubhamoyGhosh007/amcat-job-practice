@@ -29,7 +29,7 @@ Cross-cutting: leaving any live session (sidebar/logout/back/tab-close) **submit
 Practice sets: **shared pool → Groq (tier model) → Gemini via VPS proxy → Zen → 120-Q offline bank** (`src/lib/generator.ts`, `src/data/bank.ts`).
 Maths pages: **Groq → Gemini proxy** (`src/lib/mathGen.ts`).
 
-- Free tier → `llama-3.1-8b-instant` (+ `openai/gpt-oss-120b` fallback). Pro → auto-rotation `llama-3.3-70b-versatile` → `openai/gpt-oss-120b` → `moonshotai/kimi-k2-instruct` → `llama-3.1-8b-instant` (first 200 wins; 404/429 falls through). Model choice is backend-only — never show model pickers or model names in the UI.
+- Free + Pro → `openai/gpt-oss-120b` (verified 2026-10-03: the only Groq ID answering on this account; all llama/kimi IDs 404). Rotation machinery in `groq.ts` stays — if it ever dies, append the replacement ID. Model choice is backend-only — never show model pickers or model names in the UI.
 - Needs `VITE_GROQ_API_KEY` (dashboard + local `.env`; free tier, no billing attached — it ships in the browser bundle).
 - Verified 2026-10-03: `gemini-3.5-flash` + `gemini-3.6-flash` return 200; `gemini-3.8-flash` is RPD-starved (2/day free); `gemini-2.5-*` is **gated for new accounts** (generate 404s); `gemini-3-flash` doesn't exist. Re-verify IDs from the VPS before trusting any model name.
 - Pollinations.ai was tested and **removed**: truncates long JSON (~77 chars) after ~47s. Do not re-add without re-testing a full 30Q prompt.
