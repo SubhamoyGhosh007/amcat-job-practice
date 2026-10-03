@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBlocker } from 'react-router-dom';
 import { VoicePlayer } from '../components/VoicePlayer';
 import { useConfirm } from '../ui/alert-dialog';
 import { speak, ttsConfigured } from '../lib/tts';
@@ -335,6 +336,9 @@ export default function Interview() {
   const [camTick, setCamTick] = useState(0);
   const flagsRef = useRef(0);
   const dialogOpen = useRef(false);
+  // Block sidebar/in-app navigation while the mock is running — visibilitychange
+  // never fires for SPA route changes, so without this the attempt dies silently.
+  const blocker = useBlocker(phase === 'running');
 
   const steps = useMemo(buildSteps, []);
   const step = steps[stepIdx];
@@ -403,6 +407,25 @@ export default function Interview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // In-app navigation (sidebar links, logout): SPA route changes never hide the
+  // tab, so the visibility listener above can't see them — block and ask instead.
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    void handleViolationLeave('navigate');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocker.state]);
+
+  // Tab close / reload / refresh while running: the browser shows its own
+  // generic prompt (custom text isn't allowed), but the attempt isn't lost silently.
+  useEffect(() => {
+    if (phase !== 'running') return;
+    const fn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', fn);
+    return () => window.removeEventListener('beforeunload', fn);
+  }, [phase]);
+
   async function startInterview() {
     try {
       await document.documentElement.requestFullscreen();
@@ -417,18 +440,29 @@ export default function Interview() {
     setPhase('running');
   }
 
-  async function handleViolationLeave(kind: 'tab' | 'fullscreen') {
+  async function handleViolationLeave(kind: 'tab' | 'fullscreen' | 'navigate') {
     if (dialogOpen.current || phase !== 'running') return;
     dialogOpen.current = true;
     flagsRef.current += 1;
     const ok = await ask({
-      title: kind === 'tab' ? 'You left the interview tab' : 'Fullscreen was exited',
+      title:
+        kind === 'tab'
+          ? 'You left the interview tab'
+          : kind === 'fullscreen'
+            ? 'Fullscreen was exited'
+            : 'Leave the interview?',
       description: 'The screen is monitored during the mock. Cancel this mock test, or resume where you left off? Leaving is recorded on your session.',
       actionLabel: 'Cancel mock test',
+      cancelLabel: 'Resume interview',
       danger: true,
     });
     dialogOpen.current = false;
-    if (ok) cancelAttempt();
+    if (ok) {
+      if (kind === 'navigate' && blocker.state === 'blocked') blocker.proceed();
+      cancelAttempt();
+    } else if (kind === 'navigate' && blocker.state === 'blocked') {
+      blocker.reset();
+    }
   }
 
   function cancelAttempt() {

@@ -5,6 +5,7 @@ export interface ConfirmOptions {
   title: string;
   description?: string;
   actionLabel?: string;
+  cancelLabel?: string;
   danger?: boolean;
 }
 

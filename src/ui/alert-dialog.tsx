@@ -46,7 +46,7 @@ export function ConfirmDialog() {
             {dialog.description && <p>{dialog.description}</p>}
             <div className="alert-actions">
               <Button variant="outline" onClick={() => answer(false)}>
-                Cancel
+                {dialog.cancelLabel || 'Cancel'}
               </Button>
               <Button variant={dialog.danger ? 'danger' : 'default'} onClick={() => answer(true)}>
                 {dialog.actionLabel || 'Continue'}
