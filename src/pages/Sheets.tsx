@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteScoreSheet, listScoreSheets, type ScoreSheet } from '../lib/store';
+import { PageSkeleton } from '../ui/page-skeleton';
 import { useConfirm } from '../ui/alert-dialog';
 import { useExam } from '../stores/exam';
 import { useSession } from '../stores/session';
@@ -42,7 +43,7 @@ export default function Sheets() {
     navigate('/app/result');
   }
 
-  if (loading) return <div className="card">Loading score sheets…</div>;
+  if (loading) return <PageSkeleton variant="list" />;
   if (!sheets.length)
     return (
       <div className="page-hero">

@@ -97,7 +97,7 @@ export function UsernameModal() {
         <p className="hint">Logged in as <b>{email || 'OAuth user'}</b>. Usernames are unique — first come, first served.</p>
         <div className="field">
           <label>Username</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. priya_practises" maxLength={20} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. johndoe_99" maxLength={20} />
         </div>
         <div className="field">
           <label>Avatar (16 to choose from)</label>

@@ -15,6 +15,7 @@ import Svar from '../pages/Svar';
 import Interview from '../pages/Interview';
 import Health from '../pages/Health';
 import SessionSync from '../auth/SessionSync';
+import { PageSkeleton } from '../ui/page-skeleton';
 import { useSession } from '../stores/session';
 
 function Root() {
@@ -24,7 +25,7 @@ function Root() {
 function LoginRoute() {
   const ready = useSession((s) => s.ready);
   const userId = useSession((s) => s.userId);
-  if (!ready) return <div className="wrap"><div className="card">Loading…</div></div>;
+  if (!ready) return <PageSkeleton variant="app" />;
   if (userId) return <Navigate to="/app" replace />;
   return <AuthPage />;
 }
@@ -32,7 +33,7 @@ function LoginRoute() {
 function RequireAuth() {
   const ready = useSession((s) => s.ready);
   const userId = useSession((s) => s.userId);
-  if (!ready) return <div className="wrap"><div className="card">Loading…</div></div>;
+  if (!ready) return <PageSkeleton variant="app" />;
   if (!userId) return <Navigate to="/login" replace />;
   return <AppShell />;
 }

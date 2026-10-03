@@ -177,7 +177,7 @@ export default function AuthPage() {
                       {mode === 'register' && (
                         <div className="field">
                           <label>Your name</label>
-                          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Priya Sharma" maxLength={40} />
+                          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" maxLength={40} />
                         </div>
                       )}
                       <div className="field">
