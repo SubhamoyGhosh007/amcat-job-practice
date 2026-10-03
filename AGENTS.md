@@ -108,7 +108,7 @@ Done: meta pack, JSON-LD (WebSite + EducationalApplication + FAQPage + per-guide
 - [x] Wire `setLeaveGuard` in `AdaptiveExam.tsx`, `Typing.tsx`, `Svar.tsx` (+ `MathPractice.tsx`) — done, finalize-submits on leave.
 - [x] Add `e.returnValue = ''` to `beforeunload` handler in `AppShell.tsx` — done.
 - [ ] Create Groq key, set `VITE_GROQ_API_KEY` (dashboard + local `.env`).
-- [ ] Add sliding-window rate limiter to VPS sidecar (`~/pipertts`).
+- [x] Sliding-window rate limiter on VPS sidecar (`~/pipertts`) — done 2026-10-03: `check_rate_limit` per `X-User-Id` (`/gemini` 10/60s, `/speak` 30/60s, 429 `rate_limit`); app sends the header; CORS allows it. Rebuild with `--build` after any `.py` edit (code is baked into the image).
 - [ ] Decide: Google Tier 1 billing (paise/month at this volume) vs living on Groq-free + bank.
 - [ ] AdSense when traffic justifies it; share-image for link previews if wanted.
 - [ ] VPS: keep `--workers 4`, `GEMINI_TIMEOUT=240`; `GEMINI_MODELS` must list every model the app sends or the sidecar 400s.
