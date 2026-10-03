@@ -77,3 +77,13 @@
   box-shadow: 0 12px 40px rgba(0,0,0,.4); z-index: 60; background: #000;
 }
 @media (max-width: 560px) { .proc-cam { width: 108px; right: 10px; bottom: 10px; } }
+
+/* ---------- adaptive single-question hall ---------- */
+.adaptive .qprompt { font-size: 22px; line-height: 1.6; }
+.adaptive .opt { padding: 16px 18px; font-size: 17px; }
+.adaptive .opt b { font-size: 17px; }
+.adaptive .qnum { font-size: 14px; }
+@media (max-width: 560px) {
+  .adaptive .qprompt { font-size: 19px; }
+  .adaptive .opt { padding: 14px; font-size: 16px; }
+}

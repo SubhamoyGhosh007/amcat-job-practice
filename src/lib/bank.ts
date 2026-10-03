@@ -59,6 +59,7 @@ export async function fetchUnattempted(
           source: 'shared-bank' as ExamSet['source'],
           difficulty,
           origin: row.source === 'pyq' ? 'pyq' : 'ai',
+          adaptive: false,
           questions: row.questions,
         };
       }

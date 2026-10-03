@@ -18,6 +18,7 @@ export default function Result() {
   const violations = useExam((s) => s.violations);
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
+  const examStyle = useExam((s) => s.examStyle);
   const ask = useConfirm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -64,7 +65,7 @@ export default function Result() {
           return;
         }
       }
-      const s = await generateSet({ difficulty, pyq });
+      const s = await generateSet({ difficulty, pyq, adaptive: examStyle === 'adaptive' });
       start(s);
       if (userId) await bumpQuota('sets', userId);
       navigate('/app/exam');
@@ -82,7 +83,19 @@ export default function Result() {
           <div className="ring dark" style={{ '--p': score.pct } as any}><span>{score.pct}%</span></div>
           <div style={{ flex: 1, minWidth: 220 }}>
             <h2>{score.pct >= 70 ? 'Test-hall ready 🎉' : score.pct >= 50 ? 'Getting there' : 'Keep practising'}</h2>
-                <p>Set #{set.id} • {set.source} • {sheet.difficulty || 'medium'} • {(sheet.origin || 'offline') === 'pyq' ? 'PYQ papers' : (sheet.origin || 'offline')} • {new Date(set.createdAt).toLocaleString()} • {score.correct} correct out of {set.questions.length}</p>
+                <p>Set #{set.id} • {set.source} • {sheet.difficulty || 'medium'} • {(sheet.origin || 'offline') === 'pyq' ? 'PYQ papers' : (sheet.origin || 'offline')}{set.adaptive ? ' • 🎯 adaptive' : ''} • {new Date(set.createdAt).toLocaleString()} • {score.correct} correct out of {set.questions.length}</p>
+                {set.adaptive && (
+                  <div style={{ marginTop: 8 }}>
+                    {SECTIONS.map((s) => {
+                      const sqs = set.questions.filter((q) => q.section === s.id);
+                      const answered = sqs.filter((q) => answers[q.id] !== undefined);
+                      const last = answered[answered.length - 1];
+                      const tier = last ? (last.difficulty || 'medium') : '—';
+                      const cls = tier === 'hard' ? 'chip red' : tier === 'easy' ? 'chip green' : 'chip amber';
+                      return <span key={s.id} className={cls}>{s.name} → {tier}</span>;
+                    })}
+                  </div>
+                )}
             <div style={{ marginTop: 8 }}>
               {SECTIONS.map((s) => {
                 const qs = set.questions.filter((q) => q.section === s.id);
@@ -124,7 +137,7 @@ export default function Result() {
         const ok = mine === q.answerIndex;
         return (
           <div key={q.id} className={`rev ${ok ? 'correct' : 'wrong'}`}>
-            <div className="qnum">Q{i + 1} • {SECTIONS.find((s) => s.id === q.section)?.name} • {q.topic} • {ok ? '✅ Correct' : '❌ Wrong'}</div>
+              <div className="qnum">Q{i + 1} • {SECTIONS.find((s) => s.id === q.section)?.name} • {q.topic} • {q.difficulty || 'medium'} • {ok ? '✅ Correct' : '❌ Wrong'}</div>
             <div style={{ fontWeight: 600 }}>{q.prompt}</div>
             <div style={{ marginTop: 8, fontSize: 14 }}>
               {q.options.map((op, oi) => (

@@ -15,6 +15,8 @@ interface ExamState {
   lastSheet: ScoreSheet | null;
   difficulty: 'easy' | 'medium' | 'hard';
   pyq: boolean;
+  examStyle: 'classic' | 'adaptive';
+  setExamStyle: (v: 'classic' | 'adaptive') => void;
   proctored: boolean;
   violations: Violation[];
   setPrefs: (p: { difficulty?: 'easy' | 'medium' | 'hard'; pyq?: boolean }) => void;
@@ -32,10 +34,13 @@ export const useExam = create<ExamState>()((set) => ({
   lastSheet: null,
   difficulty: 'medium',
   pyq: false,
+  examStyle: 'adaptive',
   proctored: false,
   violations: [],
 
   setPrefs: (p) => set((s) => ({ difficulty: p.difficulty ?? s.difficulty, pyq: p.pyq ?? s.pyq })),
+
+  setExamStyle: (v) => set({ examStyle: v }),
 
   setProctored: (v) => set({ proctored: v }),
 
@@ -58,6 +63,7 @@ export const useExam = create<ExamState>()((set) => ({
         source: sheet.source as ExamSet['source'],
         difficulty: (sheet.difficulty as ExamSet['difficulty']) || 'medium',
         origin: (sheet.origin as ExamSet['origin']) || 'offline',
+        adaptive: false,
         questions: sheet.questions,
       },
       activeAnswers: sheet.answers,

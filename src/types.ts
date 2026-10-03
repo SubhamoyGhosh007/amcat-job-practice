@@ -8,6 +8,8 @@ export interface Question {
   options: [string, string, string, string];
   answerIndex: number; // 0-3
   explanation: string;
+  /** Difficulty label for adaptive mode; missing = medium. */
+  difficulty?: 'easy' | 'medium' | 'hard';
 }
 
 export interface ExamSet {
@@ -16,6 +18,7 @@ export interface ExamSet {
   source: 'ai-gemini' | 'ai-zen' | 'offline-bank' | 'shared-bank';
   difficulty: 'easy' | 'medium' | 'hard';
   origin: 'ai' | 'pyq' | 'offline' | 'shared';
+  adaptive: boolean;
   questions: Question[];
 }
 

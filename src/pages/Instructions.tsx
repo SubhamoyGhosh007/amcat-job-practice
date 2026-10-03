@@ -12,6 +12,8 @@ export default function Instructions() {
   const difficulty = useExam((s) => s.difficulty);
   const pyq = useExam((s) => s.pyq);
   const setPrefs = useExam((s) => s.setPrefs);
+  const examStyle = useExam((s) => s.examStyle);
+  const setExamStyle = useExam((s) => s.setExamStyle);
   const proctored = useExam((s) => s.proctored);
   const setProctored = useExam((s) => s.setProctored);
   const userId = useSession((s) => s.userId);
@@ -50,7 +52,7 @@ export default function Instructions() {
           return;
         }
       }
-      const s = await generateSet({ difficulty, pyq });
+      const s = await generateSet({ difficulty, pyq, adaptive: examStyle === 'adaptive' });
       start(s);
       if (userId) {
         await bumpQuota('sets', userId);
@@ -114,6 +116,14 @@ export default function Instructions() {
                 <div className={`radio-pill ${proctored ? 'active' : ''}`} onClick={() => setProctored(true)}>🎥 Proctored</div>
               </div>
               <p className="hint">{proctored ? 'Camera on, fullscreen locked, tab-switch + face-presence tracking. Flags never affect your score.' : 'Relaxed practice, no monitoring.'}</p>
+            </div>
+            <div className="field">
+              <label>Exam style</label>
+              <div className="radio-row">
+                <div className={`radio-pill ${examStyle === 'adaptive' ? 'active' : ''}`} onClick={() => setExamStyle('adaptive')}>🎯 Adaptive (real AMCAT)</div>
+                <div className={`radio-pill ${examStyle === 'classic' ? 'active' : ''}`} onClick={() => setExamStyle('classic')}>📝 Classic</div>
+              </div>
+              <p className="hint">{examStyle === 'adaptive' ? 'One big question per screen — answer right and the next gets harder, wrong and it gets easier. No going back, just like the hall.' : 'All questions with palette navigation, mark-for-review and back button.'}</p>
             </div>
             {error && <div className="err">{error}</div>}
         <div className="btnrow">
