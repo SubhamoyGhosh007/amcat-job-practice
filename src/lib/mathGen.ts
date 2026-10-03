@@ -3,7 +3,7 @@ import { MATH_TOPICS } from '../data/mathTopics';
 import { geminiViaProxy, ttsConfigured } from './tts';
 
 const GEMINI_KEY = String(import.meta.env.VITE_GEMINI_API_KEY || '');
-const GEMINI_MODEL = String(import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.8-flash');
+const GEMINI_MODEL = String(import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash');
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const shuffle = <T,>(arr: T[]): T[] => {
