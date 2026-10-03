@@ -2,6 +2,7 @@ import { BANK } from '../data/bank';
 import { SECTIONS, type ExamSet, type Question, type SectionId } from '../types';
 import { fetchUnattempted, publishSet, type BankSource, type Difficulty } from './bank';
 import { geminiViaProxy, ttsConfigured } from './tts';
+import { groqChat, groqConfigured, groqModelFor } from './groq';
 import { useSession } from '../stores/session';
 
 // Config comes ONLY from build-time env (.env file / deploy dashboard).
@@ -177,6 +178,18 @@ function extractResponsesText(data: any): string {
   return chunks.join('');
 }
 
+/** Groq (OpenAI chat completions). Model picked by tier — 8b free, heavyweight pro. */
+async function callGroq(prompt: string, adaptive = false): Promise<Question[]> {
+  const model = groqModelFor();
+  const text = await groqChat(
+    model,
+    'You are an AMCAT exam setter. Always reply with valid JSON only.',
+    prompt + '\n\nReply with valid JSON only.',
+    adaptive ? 9000 : 6000
+  );
+  return sanitise(extractJson(text), !adaptive);
+}
+
 /**
  * OpenCode Zen. Endpoint depends on the model family (see opencode.ai/zen docs):
  * - muse-spark / gpt / grok families → OpenAI Responses API (/responses)
@@ -306,11 +319,19 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
   }
 
   // 2. make a new one with AI and share it with the pool.
-  // Providers fall back to each other (a CORS-blocked Zen yields to Gemini
-  // when its key exists) before the offline bank — order still honors config.
-  const order = PROVIDER === 'gemini' ? (['gemini', 'zen'] as const) : (['zen', 'gemini'] as const);
+  // Groq goes first when keyed (generous shared free tier, tier-picked model),
+  // then the configured providers, then the offline bank.
+  const rest = PROVIDER === 'gemini' ? (['gemini', 'zen'] as const) : (['zen', 'gemini'] as const);
+  const order = groqConfigured() ? (['groq', ...rest] as const) : rest;
   for (const p of order) {
     try {
+      if (p === 'groq') {
+        const qs = await callGroq(prompt, adaptive);
+        const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-groq', difficulty, origin: source, adaptive, questions: qs };
+        rememberAvoid(qs);
+        await publishSet(set, userId, difficulty, source);
+        return set;
+      }
       // Gemini works keyless through the self-hosted proxy — only skip it when
       // neither a direct key nor the proxy is configured.
       if (p === 'gemini' && (GEMINI_KEY || ttsConfigured())) {

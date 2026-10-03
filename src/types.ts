@@ -17,7 +17,7 @@ export interface Question {
 export interface ExamSet {
   id: string;
   createdAt: number;
-  source: 'ai-gemini' | 'ai-zen' | 'offline-bank' | 'shared-bank';
+  source: 'ai-gemini' | 'ai-zen' | 'ai-groq' | 'offline-bank' | 'shared-bank';
   difficulty: 'easy' | 'medium' | 'hard';
   origin: 'ai' | 'pyq' | 'offline' | 'shared';
   adaptive: boolean;

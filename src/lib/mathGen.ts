@@ -1,6 +1,7 @@
 import type { Question } from '../types';
 import { MATH_TOPICS } from '../data/mathTopics';
 import { geminiViaProxy, ttsConfigured } from './tts';
+import { groqChat, groqConfigured, groqModelFor } from './groq';
 
 const GEMINI_KEY = String(import.meta.env.VITE_GEMINI_API_KEY || '');
 const GEMINI_MODEL = String(import.meta.env.VITE_GEMINI_MODEL || 'gemini-3.5-flash');
@@ -123,6 +124,19 @@ export const MATH_PAGE_SLICES: SliceSpec[] = MATH_TOPICS.map((t) => [{ topic: t.
 
 export const MATH_TOTAL_PAGES = MATH_PAGE_SLICES.length;
 
+/** Groq first (generous quota, tier-picked model), Gemini proxy as backup. */
+async function callGroqMath(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
+  if (!groqConfigured()) throw new Error('No Groq key configured');
+  const text = await groqChat(
+    groqModelFor(),
+    'You are an AMCAT exam setter. Always reply with valid JSON only.',
+    mathPrompt(spec, seed, avoid) + '\n\nReply with valid JSON only.',
+    4000
+  );
+  const start = text.search(/[{[]/);
+  return sanitiseMath(JSON.parse(text.slice(start, Math.max(text.lastIndexOf('}'), text.lastIndexOf(']')) + 1)));
+}
+
 async function callMathRetried(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
   try {
     return await callMath(spec, seed, avoid);
@@ -140,7 +154,13 @@ export async function generateMathPage(page: number): Promise<Question[]> {
   const spec = MATH_PAGE_SLICES[page];
   if (!spec) throw new Error('No such maths page.');
   const seed = Math.floor(Math.random() * 1_000_000);
-  const questions = await callMathRetried(spec, seed, recentAvoid());
+  const avoid = recentAvoid();
+  let questions: Question[];
+  try {
+    questions = await callGroqMath(spec, seed, avoid);
+  } catch {
+    questions = await callMathRetried(spec, seed, avoid);
+  }
   const capped = new Map<string, Question[]>();
   for (const q of questions) {
     const want = spec.find((s) => s.topic === q.topic)?.count ?? 0;
