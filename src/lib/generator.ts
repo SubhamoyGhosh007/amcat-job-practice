@@ -2,7 +2,7 @@ import { BANK } from '../data/bank';
 import { SECTIONS, type ExamSet, type Question, type SectionId } from '../types';
 import { fetchUnattempted, publishSet, type BankSource, type Difficulty } from './bank';
 import { geminiViaProxy, ttsConfigured } from './tts';
-import { groqChat, groqConfigured, groqModelFor } from './groq';
+import { groqChat, groqConfigured, groqModelsFor } from './groq';
 import { extractJson, rememberAvoid, recentAvoid, shuffle, uid } from './genUtils';
 import { requireToken } from './rateLimiter';
 import { useSession } from '../stores/session';
@@ -163,16 +163,24 @@ function extractResponsesText(data: any): string {
   return chunks.join('');
 }
 
-/** Groq (OpenAI chat completions). Model picked by tier — 8b free, heavyweight pro. */
+/** Groq rotation: first 200 wins; dead (404) or exhausted (429) models fall through. */
 async function callGroq(prompt: string, adaptive = false): Promise<Question[]> {
-  const model = groqModelFor();
-  const text = await groqChat(
-    model,
-    'You are an AMCAT exam setter. Always reply with valid JSON only.',
-    prompt + '\n\nReply with valid JSON only.',
-    adaptive ? 9000 : 6000
-  );
-  return sanitise(extractJson(text), !adaptive);
+  let lastErr = 'Groq unavailable';
+  for (const model of groqModelsFor()) {
+    try {
+      const text = await groqChat(
+        model,
+        'You are an AMCAT exam setter. Always reply with valid JSON only.',
+        prompt + '\n\nReply with valid JSON only.',
+        adaptive ? 9000 : 6000
+      );
+      return sanitise(extractJson(text), !adaptive);
+    } catch (e: any) {
+      lastErr = `Groq (${model}): ${e?.message || e}`;
+      continue;
+    }
+  }
+  throw new Error(lastErr);
 }
 
 /**

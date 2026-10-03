@@ -29,21 +29,21 @@ Cross-cutting: leaving any live session (sidebar/logout/back/tab-close) **submit
 Practice sets: **shared pool → Groq (tier model) → Gemini via VPS proxy → Zen → 120-Q offline bank** (`src/lib/generator.ts`, `src/data/bank.ts`).
 Maths pages: **Groq → Gemini proxy** (`src/lib/mathGen.ts`).
 
-- Free tier → `llama-3.1-8b-instant`. Pro → in-UI toggle: `llama-3.3-70b-versatile`, `openai/gpt-oss-120b`, `moonshotai/kimi-k2-instruct` (pick in localStorage).
+- Free tier → `llama-3.1-8b-instant` (+ `openai/gpt-oss-120b` fallback). Pro → auto-rotation `llama-3.3-70b-versatile` → `openai/gpt-oss-120b` → `moonshotai/kimi-k2-instruct` → `llama-3.1-8b-instant` (first 200 wins; 404/429 falls through). Model choice is backend-only — never show model pickers or model names in the UI.
 - Needs `VITE_GROQ_API_KEY` (dashboard + local `.env`; free tier, no billing attached — it ships in the browser bundle).
 - Verified 2026-10-03: `gemini-3.5-flash` + `gemini-3.6-flash` return 200; `gemini-3.8-flash` is RPD-starved (2/day free); `gemini-2.5-*` is **gated for new accounts** (generate 404s); `gemini-3-flash` doesn't exist. Re-verify IDs from the VPS before trusting any model name.
 - Pollinations.ai was tested and **removed**: truncates long JSON (~77 chars) after ~47s. Do not re-add without re-testing a full 30Q prompt.
 
 ## 4. Quotas & tiers
 
-Free: 5 sets, 5 speaking, 10 typing /day; 1 mock/day; 1 maths /4h. **Pro (`profiles.tier='pro'`) = unlimited everything + model toggle.** Grant via SQL or dashboard Table Editor. Checks run *before* effort; offline = grace mode. Maths quota is cloud (`math_sessions`) truth + local mirror.
+Free: 5 sets, 5 speaking, 10 typing /day; 1 mock/day; 1 maths /4h. **Pro (`profiles.tier='pro'`) = unlimited everything.** Grant via SQL or dashboard Table Editor. Checks run *before* effort; offline = grace mode. Maths quota is cloud (`math_sessions`) truth + local mirror.
 
 ## 5. Question pool & shared bank design
 
 **Token efficiency rule**: a set generated for one user is published to the shared pool and served to all other users of the **same tier** who have not yet attempted it. When every pooled set for that (difficulty, source, tier) is exhausted, a fresh AI set is generated and published back.
 
 - `shared_sets` has a `tier TEXT CHECK (tier IN ('free','pro'))` column. Free pool and Pro pool are strictly separate — a free user never sees a pro-generated set and vice versa.
-- `set_attempts` records per-user completions and is used to exclude already-seen sets via `.not('id', 'in', doneIds)` where `doneIds` is a **native JS array** (not a hand-built string).
+- `set_attempts` records per-user completions and is used to exclude already-seen sets via a **JS-side `Set` filter** (never send a `.not('id','in',…)` filter — odd ids 400 the query string).
 - `times_used` must be incremented atomically via `rpc('increment_set_usage', { set_id })` — never a read-then-write UPDATE.
 - `generator.ts` reads `useSession.getState().profile?.tier ?? 'free'` and passes it to both `fetchUnattempted` and `publishSet`.
 - The second pass in `fetchUnattempted` (source fallback to `null`) must still respect the tier filter.
@@ -124,4 +124,4 @@ Done: meta pack, JSON-LD (WebSite + EducationalApplication + FAQPage + per-guide
 - When fixing any Supabase write that needs atomicity (counters, quotas), use an RPC — never read-then-write.
 - `extractJson()` in `generator.ts` is the canonical JSON extractor — import it in `mathGen.ts`; do not duplicate.
 - Shared utilities (`uid`, `shuffle`, `recentAvoid`, `rememberAvoid`) must live in `src/lib/genUtils.ts` — not copy-pasted per file.
-- The `.not('id', 'in', array)` Supabase filter always takes a **native JS array**, never a hand-built string.
+- Supabase exclusion filters (`.not(x,'in',…)`) are banned — filter in JS instead.

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SECTIONS, totalMinutes, totalQuestions } from '../types';
 import { describeSource, generateSet } from '../lib/generator';
-import { GROQ_PRO_MODELS, groqConfigured, groqProPick, setGroqProPick } from '../lib/groq';
 import { friendlyError } from '../lib/friendly';
 import { bumpQuota, quotaStatus } from '../lib/usage';
 import { useExam } from '../stores/exam';
@@ -14,14 +13,11 @@ export default function Instructions() {
   const difficulty = useExam((s) => s.difficulty);
   const pyq = useExam((s) => s.pyq);
   const setPrefs = useExam((s) => s.setPrefs);
-  const proctored = useExam((s) => s.proctored);
-  const setProctored = useExam((s) => s.setProctored);
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [left, setLeft] = useState<number | null>(null);
-  const [groqPick, setGroqPick] = useState(() => groqProPick());
 
   async function refreshQuota() {
     if (!userId) {
@@ -109,37 +105,7 @@ export default function Instructions() {
               </div>
             </div>
             <div className="field">
-              <label>AI question writer</label>
-              {tier === 'pro' && groqConfigured() ? (
-                <div className="radio-row">
-                  {GROQ_PRO_MODELS.map((m) => (
-                    <div
-                      key={m}
-                      className={`radio-pill ${groqPick === m ? 'active' : ''}`}
-                      onClick={() => {
-                        setGroqProPick(m);
-                        setGroqPick(m);
-                      }}
-                      style={{ fontSize: 12 }}
-                    >
-                      {m.split('/').pop()}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="hint" style={{ margin: '4px 0 0' }}>
-                  {groqConfigured()
-                    ? 'Free plan writes with Llama 8B • Pro unlocks the 70B + 120B + Kimi toggle.'
-                    : 'AI writes when a key is configured — otherwise the practice bank serves.'}
-                </p>
-              )}
-            </div>
-            <div className="field">
-              <label>Exam environment</label>              <div className="radio-row">
-                <div className={`radio-pill ${!proctored ? 'active' : ''}`} onClick={() => setProctored(false)}>📝 Normal</div>
-                <div className={`radio-pill ${proctored ? 'active' : ''}`} onClick={() => setProctored(true)}>🎥 Proctored</div>
-              </div>
-              <p className="hint">{proctored ? 'Camera on, fullscreen locked, tab-switch + face-presence tracking. Flags never affect your score.' : 'Relaxed practice, no monitoring.'}</p>
+              <span className="hint">Fresh AI questions, newly made for every attempt — the backend picks the fastest available writer automatically.</span>
             </div>
             {error && <div className="err">{error}</div>}
         <div className="btnrow">

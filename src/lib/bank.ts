@@ -45,6 +45,9 @@ async function bumpUsage(db: any, setId: string): Promise<boolean> {
  * separate. When the pool runs dry for a (difficulty, source, tier) combo,
  * a fresh AI set is generated and shared.
  *
+ * Exclusion happens in JS over a natively-typed doneIds array — no `not.in`
+ * filter is ever sent, so odd ids can never break the query string.
+ *
  * Pre-SQL tolerance: the `tier` column and `increment_set_usage` RPC may not
  * exist yet — every tiered/RPC step falls back to the legacy path instead of
  * throwing, so the app works before and after the migration.
@@ -60,38 +63,43 @@ export async function fetchUnattempted(
     const db = sb(token);
     if (!db || !token) return null;
 
-    // Native JS array — never a hand-built string (see .not() below).
-    let doneIds: string[] = [];
+    const done = new Set<string>();
     if (userId) {
       const { data } = await db.from('set_attempts').select('set_id').eq('user_id', userId);
-      doneIds = (data || []).map((d: any) => d.set_id);
+      for (const d of (data || []) as any[]) done.add(String(d.set_id));
     }
-    const exclude = (q: any) => (doneIds.length ? q.not('id', 'in', doneIds) : q);
-    const withTier = (q: any) => q.eq('tier', tier);
 
     // exact match first, then same difficulty any source (tier still respected)
     for (const src of [source, null] as const) {
       const build = (tiered: boolean) => {
-        let q = db.from('shared_sets').select('*').eq('difficulty', difficulty);
-        if (tiered) q = withTier(q);
+        let q = db
+          .from('shared_sets')
+          .select('id,source,questions,times_used')
+          .eq('difficulty', difficulty)
+          .order('times_used', { ascending: true })
+          .limit(25);
+        if (tiered) q = q.eq('tier', tier);
         if (src) q = q.eq('source', src);
-        return exclude(q.order('times_used', { ascending: true }).limit(1));
+        return q;
       };
       // Tiered pass; if the column doesn't exist yet, PostgREST errors and we
       // retry the identical query untiered.
       let res = await build(true);
       if (res.error) res = await build(false);
-      const row = (res.data as SharedRow[] | null)?.[0];
-      if (row && Array.isArray(row.questions) && row.questions.length >= 10) {
-        const atomic = await bumpUsage(db, row.id);
-        if (!atomic) {
-          await db
-            .from('shared_sets')
-            .update({ times_used: (row.times_used || 0) + 1 })
-            .eq('id', row.id);
-        }
-        return toExamSet(row, difficulty);
+      if (res.error) continue;
+      const rows = ((res.data as SharedRow[] | null) || []).filter(
+        (r) => !done.has(String(r.id)) && Array.isArray(r.questions) && r.questions.length >= 10
+      );
+      const row = rows[0];
+      if (!row) continue;
+      const atomic = await bumpUsage(db, row.id);
+      if (!atomic) {
+        await db
+          .from('shared_sets')
+          .update({ times_used: (row.times_used || 0) + 1 })
+          .eq('id', row.id);
       }
+      return toExamSet(row, difficulty);
     }
     return null;
   } catch {

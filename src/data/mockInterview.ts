@@ -255,19 +255,17 @@ export async function fetchUnattemptedMockTest(userId: string | null, tier: Mock
     const token = await apiToken();
     const db = sb(token);
     if (!db || !token) return null;
-    let done: string[] = [];
+    const done = new Set<string>();
     if (userId) {
       const { data, error } = await db.from('mock_test_attempts').select('test_id').eq('user_id', userId);
       if (error) return null;
-      done = (data || []).map((d: any) => d.test_id);
+      for (const d of (data || []) as any[]) done.add(String(d.test_id));
     }
-    let q = db.from('mock_tests').select('*').eq('tier', tier).limit(1);
-    // Native JS array — never a hand-built string.
-    if (done.length) q = q.not('test_id', 'in', done);
-    const { data, error } = await q;
-    if (error || !data?.length) return null;
-    const row = data[0] as any;
-    if (!row?.sections) return null;
+    // Exclusion in JS over a native Set — no `not.in` filter is ever sent.
+    const { data, error } = await db.from('mock_tests').select('*').eq('tier', tier).limit(25);
+    if (error || !data) return null;
+    const row = (data as any[]).find((r) => r?.sections && !done.has(String(r.test_id)));
+    if (!row) return null;
     return { test_id: row.test_id, sections: row.sections } as MockTest;
   } catch {
     return null;

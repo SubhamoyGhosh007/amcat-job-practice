@@ -2,52 +2,33 @@ import { useSession } from '../stores/session';
 
 /**
  * Groq (OpenAI-compatible, generous free tier) — tried before Gemini so the
- * Google quota lasts. Model depends on tier:
- * - free: llama-3.1-8b-instant (fast, cheap, always available)
- * - pro: the user's picked heavyweight (stored pick, see GROQ_PRO_MODELS)
+ * Google quota lasts. Model choice is entirely backend: each tier gets an
+ * ordered rotation, first 200 wins. Dead IDs (404) and exhausted models (429)
+ * just fall through to the next — the user never picks, never sees names.
  * Key lives in VITE_GROQ_API_KEY (same handling as the existing Zen key).
  */
-export const GROQ_FREE_MODEL = 'llama-3.1-8b-instant';
+export const GROQ_FREE_MODELS = ['llama-3.1-8b-instant', 'openai/gpt-oss-120b'];
 export const GROQ_PRO_MODELS = [
   'llama-3.3-70b-versatile',
   'openai/gpt-oss-120b',
   'moonshotai/kimi-k2-instruct',
-] as const;
+  'llama-3.1-8b-instant',
+];
 
 const GROQ_KEY = String(import.meta.env.VITE_GROQ_API_KEY || '');
-const GROQ_PICK_KEY = 'amcat_groq_model';
 
 export function groqConfigured(): boolean {
   return Boolean(GROQ_KEY);
 }
 
-export function groqProPick(): string {
-  try {
-    const v = localStorage.getItem(GROQ_PICK_KEY) || '';
-    if ((GROQ_PRO_MODELS as readonly string[]).includes(v)) return v;
-  } catch {
-    /* ignore */
-  }
-  return GROQ_PRO_MODELS[0];
-}
-
-export function setGroqProPick(m: string) {
-  try {
-    if ((GROQ_PRO_MODELS as readonly string[]).includes(m)) localStorage.setItem(GROQ_PICK_KEY, m);
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Which Groq model this user gets: fixed 8b for free, picked heavyweight for pro. */
-export function groqModelFor(): string {
+/** Ordered rotation for this user: free gets the light pair, pro the heavies first. */
+export function groqModelsFor(): string[] {
   try {
     const tier = useSession.getState().profile?.tier ?? 'free';
-    if (tier === 'pro') return groqProPick();
+    return [...(tier === 'pro' ? GROQ_PRO_MODELS : GROQ_FREE_MODELS)];
   } catch {
-    /* ignore */
+    return [...GROQ_FREE_MODELS];
   }
-  return GROQ_FREE_MODEL;
 }
 
 export async function groqChat(model: string, system: string, user: string, maxTokens: number): Promise<string> {

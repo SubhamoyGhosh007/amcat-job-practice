@@ -1,7 +1,7 @@
 import type { Question } from '../types';
 import { MATH_TOPICS } from '../data/mathTopics';
 import { geminiViaProxy, ttsConfigured } from './tts';
-import { groqChat, groqConfigured, groqModelFor } from './groq';
+import { groqChat, groqConfigured, groqModelsFor } from './groq';
 import { extractJson } from './generator';
 import { requireToken } from './rateLimiter';
 import { recentAvoid, rememberAvoid, shuffle, uid } from './genUtils';
@@ -98,16 +98,25 @@ export const MATH_PAGE_SLICES: SliceSpec[] = MATH_TOPICS.map((t) => [{ topic: t.
 
 export const MATH_TOTAL_PAGES = MATH_PAGE_SLICES.length;
 
-/** Groq first (generous quota, tier-picked model), Gemini proxy as backup. */
+/** Groq first (generous quota, tier rotation), Gemini proxy as backup. */
 async function callGroqMath(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
   if (!groqConfigured()) throw new Error('No Groq key configured');
-  const text = await groqChat(
-    groqModelFor(),
-    'You are an AMCAT exam setter. Always reply with valid JSON only.',
-    mathPrompt(spec, seed, avoid) + '\n\nReply with valid JSON only.',
-    4000
-  );
-  return sanitiseMath(extractJson(text));
+  let lastErr = 'No Groq model answered';
+  for (const model of groqModelsFor()) {
+    try {
+      const text = await groqChat(
+        model,
+        'You are an AMCAT exam setter. Always reply with valid JSON only.',
+        mathPrompt(spec, seed, avoid) + '\n\nReply with valid JSON only.',
+        4000
+      );
+      return sanitiseMath(extractJson(text));
+    } catch (e: any) {
+      lastErr = `Groq (${model}): ${e?.message || e}`;
+      continue;
+    }
+  }
+  throw new Error(lastErr);
 }
 
 async function callMathRetried(spec: SliceSpec, seed: number, avoid: string[]): Promise<Question[]> {
