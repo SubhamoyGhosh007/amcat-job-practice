@@ -16,7 +16,7 @@ Live: https://amcat-practice.antideploy.app · Repo: `SubhamoyGhosh007/amcat-job
 |---|---|---|
 | Practice sets (full-paper, grouped by section) | `/app` → `/app/instructions` → `/app/exam` → `/app/result` | 30Q, answer script + PDFs, difficulty + PYQ mode |
 | Typing arena | `/app/typing` | WPM/acc/consistency, history, 10/day free |
-| Speaking lab (SVAR) | `/app/speaking` | listen practice + recorded sessions (6 read + 6 repeat, fixed 45s/25s limits), one marks report per session (Whisper turbo + clarity/coverage/pace), report PDF, dashboard mirror |
+| Speaking lab (SVAR) | `/app/speaking` | listen practice + recorded sessions (6 read + 6 repeat, fixed 45s/25s limits, items from shared voice pool w/ per-user completion tracking), one marks report per session (Whisper turbo + clarity/coverage/pace), report PDF, dashboard mirror |
 | Mock interview (7 parts, monitored) | `/app/interview` | gated start, fullscreen, tab-leave dialog, 1/day |
 | Maths arena (40Q, 10×4 pages) | `/app/maths` | shadcn pagination, sheet + tricks + PDF, 1 per 4h free |
 | Guides (SEO) | `/guides/*`, FAQ band, sitemap | original content only, never paraphrased |

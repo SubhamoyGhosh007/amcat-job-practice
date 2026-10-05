@@ -179,6 +179,37 @@ create policy "own_speaking_write" on speaking_reports for insert to authenticat
   with check ((auth.jwt() ->> 'sub') = user_id);
 create policy "own_speaking_delete" on speaking_reports for delete to authenticated
   using ((auth.jwt() ->> 'sub') = user_id);
+create table if not exists voice_samples (
+  id text primary key,
+  kind text not null,
+  tier text not null default 'free',
+  text text not null,
+  tip text not null default '',
+  created_at timestamptz not null default now(),
+  times_used int not null default 0
+);
+create index if not exists voice_pool_idx on voice_samples(kind, tier, times_used);
+alter table voice_samples enable row level security;
+drop policy if exists "pool_voice_read" on voice_samples;
+drop policy if exists "pool_voice_write" on voice_samples;
+create policy "pool_voice_read" on voice_samples for select to authenticated using (true);
+create policy "pool_voice_write" on voice_samples for all to authenticated using (true) with check (true);
+create table if not exists voice_sample_attempts (
+  user_id text not null,
+  sample_id text not null,
+  created_at timestamptz not null default now(),
+  unique(user_id, sample_id)
+);
+alter table voice_sample_attempts enable row level security;
+drop policy if exists "own_voice_attempts" on voice_sample_attempts;
+create policy "own_voice_attempts" on voice_sample_attempts for all to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id) with check ((auth.jwt() ->> 'sub') = user_id);
+create or replace function increment_voice_usage(sample_id text)
+returns void language plpgsql security definer as $$
+begin
+  update voice_samples set times_used = times_used + 1 where id = sample_id;
+end; $$;
+grant execute on function increment_voice_usage(text) to authenticated;
 ```
 
 ### Backup codes + daily quotas (2FA recovery, free-tier limits)

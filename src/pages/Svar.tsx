@@ -16,6 +16,8 @@ import {
   speakingReportFromItems,
   type SpeakingReport,
 } from '../lib/speakingStore';
+import { fetchUnattemptedSamples, publishSamples, recordSampleCompletions } from '../lib/voicePool';
+import { generateVoiceBatch } from '../lib/voiceGen';
 import { downloadSpeakingReport } from '../lib/pdf';
 import { useSession } from '../stores/session';
 import { useUi } from '../stores/ui';
@@ -314,12 +316,17 @@ interface SessionItem {
   text: string;
   tip?: string;
   limit: number;
+  /** Set when the item came from the shared voice pool (completion-tracked). */
+  poolId?: string;
 }
 
-const SESSION_ITEMS: SessionItem[] = [
-  ...READ_BANK.map((r) => ({ key: `read-${r.id}`, kind: 'read' as const, id: r.id, text: r.text, tip: r.tip, limit: SPEAK_LIMITS.read })),
-  ...REPEAT_BANK.map((r) => ({ key: `repeat-${r.id}`, kind: 'repeat' as const, id: r.id, text: r.text, limit: SPEAK_LIMITS.repeat })),
-];
+/** Static fallback — always available offline. Pool items replace these when served. */
+function staticItems(): SessionItem[] {
+  return [
+    ...READ_BANK.map((r) => ({ key: `read-${r.id}`, kind: 'read' as const, id: r.id, text: r.text, tip: r.tip, limit: SPEAK_LIMITS.read })),
+    ...REPEAT_BANK.map((r) => ({ key: `repeat-${r.id}`, kind: 'repeat' as const, id: r.id, text: r.text, limit: SPEAK_LIMITS.repeat })),
+  ];
+}
 
 export interface SessionRec {
   url: string;
@@ -424,6 +431,7 @@ export default function Svar() {
 
   const [phase, setPhase] = useState<Phase>('lobby');
   const [stepIdx, setStepIdx] = useState(0);
+  const [items, setItems] = useState<SessionItem[]>(() => staticItems());
   const [recs, setRecs] = useState<Record<string, SessionRec>>({});
   const [report, setReport] = useState<SpeakingReport | null>(null);
   const [scoring, setScoring] = useState({ done: 0, total: 0 });
@@ -471,6 +479,60 @@ export default function Svar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, setLeaveGuard]);
 
+  /**
+   * Assemble the session: unattempted pool samples first (old unfinished ones
+   * keep coming back until done), fresh AI batches for the shortfall
+   * (published back to the pool), static bank filling whatever remains.
+   */
+  async function assembleItems(): Promise<SessionItem[]> {
+    const WANT = 6;
+    const built: SessionItem[] = [];
+    for (const kind of ['read', 'repeat'] as const) {
+      const limit = SPEAK_LIMITS[kind];
+      const pooled = await fetchUnattemptedSamples(userId, kind, WANT, tier);
+      for (const p of pooled) {
+        built.push({ key: `pool-${p.id}`, kind, id: p.id, text: p.text, tip: p.tip, limit, poolId: p.id });
+      }
+      const short = WANT - pooled.length;
+      if (short > 0) {
+        try {
+          const fresh = await generateVoiceBatch(kind, short);
+          const published = await publishSamples(
+            fresh.map((f) => ({ kind, text: f.text, tip: f.tip })),
+            tier
+          );
+          const use = published.length ? published : fresh.map((f, i) => ({ ...f, id: `ai-${Date.now().toString(36)}-${i}` }));
+          for (const u of use) {
+            built.push({
+              key: `pool-${u.id}`,
+              kind,
+              id: u.id,
+              text: u.text,
+              tip: (u as any).tip,
+              limit,
+              poolId: published.length ? u.id : undefined,
+            });
+          }
+        } catch {
+          /* AI unavailable — static fill below covers it */
+        }
+      }
+      const have = built.filter((b) => b.kind === kind).length;
+      const bank = (kind === 'read' ? READ_BANK : REPEAT_BANK).slice(0, Math.max(0, WANT - have));
+      for (const r of bank as any[]) {
+        built.push({
+          key: `${kind}-${r.id}`,
+          kind,
+          id: r.id,
+          text: r.text,
+          tip: (r as any).tip,
+          limit,
+        });
+      }
+    }
+    return built;
+  }
+
   async function startSession() {
     setError('');
     if (userId) {
@@ -483,6 +545,15 @@ export default function Svar() {
       } catch {
         /* grace */
       }
+    }
+    setLoading(true);
+    try {
+      const assembled = await assembleItems();
+      setItems(assembled.length ? assembled : staticItems());
+    } catch {
+      setItems(staticItems());
+    } finally {
+      setLoading(false);
     }
     setRecs({});
     setReport(null);
@@ -511,7 +582,7 @@ export default function Svar() {
     setScoring({ done: 0, total: keys.length });
     const items: SpeakingReport['items'] = [];
     for (const key of keys) {
-      const item = SESSION_ITEMS.find((i) => i.key === key)!;
+      const item = items.find((i) => i.key === key)!;
       const rec = recs[key];
       // Fresh recordings are always transcribed fresh; saved reports never re-call.
       let review = null;
@@ -522,7 +593,7 @@ export default function Svar() {
       } catch (e) {
         review = null;
       }
-      items.push({ key, kind: item.kind, text: item.text, secs: rec.secs, review });
+      items.push({ key, kind: item.kind, text: item.text, secs: rec.secs, review, poolId: item.poolId });
       setScoring((s) => ({ ...s, done: s.done + 1 }));
     }
     const rep = speakingReportFromItems(
@@ -532,6 +603,12 @@ export default function Svar() {
     setReport(rep);
     setPhase('report');
     window.scrollTo({ top: 0 });
+    // Pool samples scored in this finished session count as completed —
+    // unfinished old ones keep coming back until done.
+    recordSampleCompletions(
+      userId,
+      items.filter((i) => i.poolId && i.review).map((i) => i.poolId as string)
+    ).catch(() => {});
     saveSpeakingReport(rep)
       .then(() => listSpeakingReports(userId).then(setHistory).catch(() => {}))
       .catch(() => {});
@@ -559,7 +636,7 @@ export default function Svar() {
     setHistory((h) => h.filter((x) => x.id !== id));
   }
 
-  const item = SESSION_ITEMS[stepIdx];
+  const item = items[stepIdx];
   const recordedCount = Object.keys(recs).length;
 
   return (
@@ -568,7 +645,7 @@ export default function Svar() {
         <h2>Speaking & listening lab</h2>
         <p>SVAR-style speaking sessions on your own voice server — read aloud and repeat, each on a fixed timer. Finish the session for one marks report with pronunciation feedback.</p>
         <div style={{ marginTop: 10 }}>
-          <span className="chip ghost">🎙 {SESSION_ITEMS.length} spoken items</span>{' '}
+          <span className="chip ghost">🎙 {items.length} spoken items</span>{' '}
           <span className="chip ghost">📄 report + PDF</span>{' '}
           {tier === 'pro' ? (
             <span className="chip green">Pro • unlimited</span>
@@ -600,11 +677,12 @@ export default function Svar() {
           <h3 style={{ margin: '12px 0 6px' }}>Ready for a speaking session?</h3>
           <p className="hint">
             {READ_BANK.length} read-aloud ({SPEAK_LIMITS.read}s each) + {REPEAT_BANK.length} repeat-after-me ({SPEAK_LIMITS.repeat}s each).
-            Recordings stop at the limit automatically — finish early and your actual time is what counts. One report with marks at the end.
+            Recordings stop at the limit automatically — finish early and your actual time is what counts. Samples come
+            from the shared pool: unfinished ones keep returning until you complete them. One report with marks at the end.
           </p>
           <div className="btnrow" style={{ justifyContent: 'center' }}>
             <button className="btn-big" disabled={loading} onClick={() => { setLoading(true); startSession().finally(() => setLoading(false)); }}>
-              {loading ? 'Checking…' : 'Start speaking session →'}
+              {loading ? 'Setting your samples…' : 'Start speaking session →'}
             </button>
           </div>
         </div>
@@ -614,15 +692,15 @@ export default function Svar() {
         <>
           <div className="card" style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-              <b>Item {stepIdx + 1} of {SESSION_ITEMS.length} • {recordedCount} recorded</b>
-              <span className="hint">{Math.round(((stepIdx + 1) / SESSION_ITEMS.length) * 100)}%</span>
+              <b>Item {stepIdx + 1} of {items.length} • {recordedCount} recorded</b>
+              <span className="hint">{Math.round(((stepIdx + 1) / items.length) * 100)}%</span>
             </div>
             <div style={{ height: 6, borderRadius: 999, background: '#e7ecf5', marginTop: 8, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${((stepIdx + 1) / SESSION_ITEMS.length) * 100}%`, background: 'linear-gradient(90deg,#4d7cfe,#38bdf8)', borderRadius: 999 }} />
+              <div style={{ height: '100%', width: `${((stepIdx + 1) / items.length) * 100}%`, background: 'linear-gradient(90deg,#4d7cfe,#38bdf8)', borderRadius: 999 }} />
             </div>
             <div className="btnrow" style={{ marginBottom: 0 }}>
               <button className="btn-ghost" disabled={stepIdx === 0} onClick={() => { setStepIdx((i) => i - 1); window.scrollTo({ top: 0 }); }}>← Back</button>
-              {stepIdx < SESSION_ITEMS.length - 1 && (
+              {stepIdx < items.length - 1 && (
                 <button className="btn-primary" onClick={() => { setStepIdx((i) => i + 1); window.scrollTo({ top: 0 }); }}>Next →</button>
               )}
             </div>
@@ -642,7 +720,7 @@ export default function Svar() {
 
           <div className="card" style={{ textAlign: 'center' }}>
             <button className="btn-big" onClick={finishSession}>
-              Finish & get my report ✓ ({recordedCount}/{SESSION_ITEMS.length})
+              Finish & get my report ✓ ({recordedCount}/{items.length})
             </button>
             <p className="hint">Unrecorded items stay unscored. Leaving now counts one voice session.</p>
           </div>

@@ -16,6 +16,7 @@ export interface SpeakingReport {
     text: string;
     secs: number;
     review: SpeechReview | null;
+    poolId?: string;
   }[];
 }
 
