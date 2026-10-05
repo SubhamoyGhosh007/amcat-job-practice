@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { LISTEN_BANK, READ_BANK, REPEAT_BANK } from '../data/svar';
 import { speak, ttsConfigured } from '../lib/tts';
 import { bumpQuota, quotaStatus } from '../lib/usage';
+import { friendlyError } from '../lib/friendly';
+import {
+  readReview,
+  reviewConfigured,
+  saveReview,
+  scoreAttempt,
+  transcribeAudio,
+  type SpeechReview,
+} from '../lib/speechReview';
 import { useSession } from '../stores/session';
 import { useUi } from '../stores/ui';
 import { TTSVoicePlayer as PlayButton, VoicePlayer } from '../components/VoicePlayer';
@@ -42,6 +51,7 @@ function bump(patch: Partial<SvarStats>) {
 function useRecorder() {
   const [recording, setRecording] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
+  const [blob, setBlob] = useState<Blob | null>(null);
   const [error, setError] = useState('');
   const [secs, setSecs] = useState(0);
   const ref = useRef<{ stop: () => void } | null>(null);
@@ -61,7 +71,9 @@ function useRecorder() {
       };
       rec.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        setUrl(URL.createObjectURL(new Blob(chunks, { type: rec.mimeType || 'audio/webm' })));
+        const b = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+        setBlob(b);
+        setUrl(URL.createObjectURL(b));
         setRecording(false);
       };
       const t0 = Date.now();
@@ -97,20 +109,129 @@ function useRecorder() {
     []
   );
 
-  return { recording, url, secs, error, start, stop };
+  return { recording, url, blob, secs, error, start, stop };
 }
 
-function RecordBlock({ onRecorded }: { onRecorded: () => void }) {
+function ReviewCard({ review }: { review: SpeechReview }) {
+  const bar = (v: number) => (
+    <span
+      style={{
+        display: 'inline-block',
+        width: 90,
+        height: 8,
+        borderRadius: 99,
+        background: '#e7ecf5',
+        overflow: 'hidden',
+        verticalAlign: 'middle',
+      }}
+    >
+      <span
+        style={{
+          display: 'block',
+          height: '100%',
+          width: `${v}%`,
+          background: v >= 70 ? '#1e9e62' : v >= 45 ? '#f5a623' : '#d64545',
+          borderRadius: 99,
+        }}
+      />
+    </span>
+  );
+  return (
+    <div className="rev correct" style={{ marginTop: 10 }}>
+      <div className="qnum">
+        ⭐ {review.marks}/10 • clarity {review.accuracy}% • coverage {review.completeness}% • pace {review.wpm} wpm
+      </div>
+      <div style={{ fontSize: 13.5, margin: '6px 0' }}>
+        <div>Clarity {bar(review.accuracy)} {review.accuracy}%</div>
+        <div>Coverage {bar(review.completeness)} {review.completeness}%</div>
+        <div>Fluency {bar(review.fluency)} {review.fluency}%</div>
+      </div>
+      <div className="exp">
+        <b>Heard:</b> “{review.transcript}”
+      </div>
+      <div style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.9 }}>
+        {review.words.map((w, i) => (
+          <span
+            key={i}
+            title={w.status === 'correct' ? 'heard right' : w.status === 'substituted' ? `heard as “${w.heard}”` : 'skipped'}
+            style={{
+              padding: '1px 5px',
+              borderRadius: 6,
+              marginRight: 3,
+              background: w.status === 'correct' ? '#e9f7ef' : w.status === 'substituted' ? '#fef4e2' : '#fdeeee',
+              borderBottom: w.status === 'correct' ? 'none' : `2px solid ${w.status === 'substituted' ? '#f5a623' : '#d64545'}`,
+            }}
+          >
+            {w.expected}
+          </span>
+        ))}
+      </div>
+      <div className="exp" style={{ marginTop: 6 }}>
+        <b>Areas to improve:</b>
+        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          {review.improvements.map((im, i) => (
+            <li key={i}>{im}</li>
+          ))}
+        </ul>
+      </div>
+      <p className="hint" style={{ margin: '6px 0 0' }}>
+        Clarity = how accurately the recognizer heard each word (pronunciation proxy), not a true accent classifier.
+      </p>
+    </div>
+  );
+}
+
+function RecordBlock({ onRecorded, reviewFor }: { onRecorded: () => void; reviewFor?: { itemId: string; target: string } }) {
+  const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const r = useRecorder();
   const fired = useRef(false);
   const cb = useRef(onRecorded);
   cb.current = onRecorded;
+  const [review, setReview] = useState<SpeechReview | null>(() =>
+    reviewFor ? readReview(reviewFor.itemId) : null
+  );
+  const [reviewing, setReviewing] = useState(false);
+  const [reviewErr, setReviewErr] = useState('');
   useEffect(() => {
     if (r.url && !fired.current) {
       fired.current = true;
       cb.current();
     }
   }, [r.url]);
+  // New recording invalidates the previous review.
+  useEffect(() => {
+    if (r.url) {
+      setReview(null);
+      setReviewErr('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [r.blob]);
+
+  async function runReview() {
+    if (!r.blob || !reviewFor || reviewing) return;
+    setReviewErr('');
+    if (!reviewConfigured()) {
+      setReviewErr('Voice review needs the AI key — ask the admin to configure it.');
+      return;
+    }
+    setReviewing(true);
+    try {
+      if (userId) {
+        const q = await quotaStatus('speaking', userId, tier);
+        if (!q.allowed && !q.offline) throw new Error(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
+      }
+      const { text } = await transcribeAudio(r.blob);
+      const scored = scoreAttempt(reviewFor.target, text, r.secs);
+      saveReview(reviewFor.itemId, scored);
+      setReview(scored);
+      if (userId) bumpQuota('speaking', userId).catch(() => {});
+    } catch (e) {
+      setReviewErr(friendlyError(e));
+    } finally {
+      setReviewing(false);
+    }
+  }
 
   return (
     <div>
@@ -124,6 +245,19 @@ function RecordBlock({ onRecorded }: { onRecorded: () => void }) {
         )}
         {r.url && <VoicePlayer src={r.url} />}
       </div>
+      {reviewFor && r.url && !r.recording && (
+        <div className="btnrow" style={{ marginTop: 8 }}>
+          <button className="btn-primary" disabled={reviewing} onClick={runReview}>
+            {reviewing ? (
+              <><span className="spinner" /> Transcribing & scoring…</>
+            ) : (
+              '⭐ Review my pronunciation'
+            )}
+          </button>
+        </div>
+      )}
+      {reviewErr && <div className="err">{reviewErr}</div>}
+      {review && <ReviewCard review={review} />}
       {r.error && <div className="err">{r.error}</div>}
     </div>
   );
@@ -278,7 +412,7 @@ function ReadTab({ refresh }: { refresh: () => void }) {
           <span className="topic">Read aloud {doneIds[r.id] ? '• ✅ practised' : ''}</span>
           <div className="svar-sentence">“{r.text}”</div>
           <div className="svar-tip"><b>Coach tip:</b> {r.tip}</div>
-          <RecordBlock onRecorded={recorded} />
+              <RecordBlock onRecorded={recorded} reviewFor={{ itemId: `repeat-${r.id}`, target: r.text }} />
           <div className="btnrow">
             <button className="btn-ghost" disabled={doneIds[r.id]} onClick={() => markDone(r.id)}>
               {doneIds[r.id] ? 'Done ✓' : 'Sounds good — mark done'}
@@ -342,7 +476,7 @@ function RepeatTab({ refresh }: { refresh: () => void }) {
             </div>
             <div className="cell">
               <b>2 · You</b>
-              <RecordBlock onRecorded={recorded} />
+          <RecordBlock onRecorded={recorded} reviewFor={{ itemId: `read-${r.id}`, target: r.text }} />
             </div>
           </div>
           <div className="svar-tip"><b>Coach tip:</b> {r.tip}</div>
