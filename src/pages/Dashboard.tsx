@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SECTIONS, totalMinutes, totalQuestions } from '../types';
 import { useSession } from '../stores/session';
+import { downloadSpeakingReport } from '../lib/pdf';
+import { listSpeakingReports, type SpeakingReport } from '../lib/speakingStore';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const userId = useSession((s) => s.userId);
   const profile = useSession((s) => s.profile);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
   const syncNote = useSession((s) => s.syncNote);
@@ -16,6 +19,10 @@ export default function Dashboard() {
       return [];
     }
   });
+  const [speaking, setSpeaking] = useState<SpeakingReport[]>([]);
+  useEffect(() => {
+    listSpeakingReports(userId).then((r) => setSpeaking(r.slice(0, 5))).catch(() => {});
+  }, [userId]);
 
   const best = history.length ? Math.max(...history) : null;
   const avg = history.length ? Math.round(history.reduce((a, b) => a + b, 0) / history.length) : null;
@@ -53,6 +60,24 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+      {speaking.length > 0 && (
+        <>
+          <h3 style={{ marginTop: 18 }}>Latest speaking reports</h3>
+          {speaking.map((r) => (
+            <div className="t-row" key={r.id}>
+              <div className="ring" style={{ '--p': r.marks * 10 } as any}><span>{r.marks}</span></div>
+              <div className="meta">
+                <div style={{ fontWeight: 700 }}>{r.marks}/10 • {r.items.length} items</div>
+                <div className="hint">{new Date(r.at).toLocaleString()}</div>
+              </div>
+              <div className="btnrow" style={{ marginTop: 0 }}>
+                <button className="btn-ghost" onClick={() => navigate('/app/speaking')}>Open lab</button>
+                <button className="btn-ghost" onClick={() => downloadSpeakingReport(r)}>PDF</button>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }

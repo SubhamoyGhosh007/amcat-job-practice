@@ -1,22 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { LISTEN_BANK, READ_BANK, REPEAT_BANK } from '../data/svar';
-import { speak, ttsConfigured } from '../lib/tts';
+import { ttsConfigured } from '../lib/tts';
 import { bumpQuota, quotaStatus } from '../lib/usage';
-import { friendlyError } from '../lib/friendly';
 import {
-  readReview,
-  reviewConfigured,
   saveReview,
   scoreAttempt,
   transcribeAudio,
   type SpeechReview,
 } from '../lib/speechReview';
+import {
+  SPEAK_LIMITS,
+  deleteSpeakingReport,
+  listSpeakingReports,
+  saveSpeakingReport,
+  speakingReportFromItems,
+  type SpeakingReport,
+} from '../lib/speakingStore';
+import { downloadSpeakingReport } from '../lib/pdf';
 import { useSession } from '../stores/session';
 import { useUi } from '../stores/ui';
+import { useConfirm } from '../ui/alert-dialog';
 import { TTSVoicePlayer as PlayButton, VoicePlayer } from '../components/VoicePlayer';
 import '../svar.css';
 
-type Tab = 'listen' | 'read' | 'repeat';
+type Tab = 'listen' | 'session';
 
 interface SvarStats {
   plays: number;
@@ -43,9 +50,6 @@ function bump(patch: Partial<SvarStats>) {
     /* ignore */
   }
 }
-
-/* PlayButton = reactive TTSVoicePlayer (see components/VoicePlayer) — model audio
-   plays through the voice-reactive visualizer, recordings use <VoicePlayer/>. */
 
 /* ---------------- mic recording ---------------- */
 function useRecorder() {
@@ -98,6 +102,19 @@ function useRecorder() {
     ref.current?.stop();
   }
 
+  function reset() {
+    try {
+      ref.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    setUrl(null);
+    setBlob(null);
+    setSecs(0);
+    setError('');
+    setRecording(false);
+  }
+
   useEffect(
     () => () => {
       try {
@@ -109,158 +126,7 @@ function useRecorder() {
     []
   );
 
-  return { recording, url, blob, secs, error, start, stop };
-}
-
-function ReviewCard({ review }: { review: SpeechReview }) {
-  const bar = (v: number) => (
-    <span
-      style={{
-        display: 'inline-block',
-        width: 90,
-        height: 8,
-        borderRadius: 99,
-        background: '#e7ecf5',
-        overflow: 'hidden',
-        verticalAlign: 'middle',
-      }}
-    >
-      <span
-        style={{
-          display: 'block',
-          height: '100%',
-          width: `${v}%`,
-          background: v >= 70 ? '#1e9e62' : v >= 45 ? '#f5a623' : '#d64545',
-          borderRadius: 99,
-        }}
-      />
-    </span>
-  );
-  return (
-    <div className="rev correct" style={{ marginTop: 10 }}>
-      <div className="qnum">
-        ⭐ {review.marks}/10 • clarity {review.accuracy}% • coverage {review.completeness}% • pace {review.wpm} wpm
-      </div>
-      <div style={{ fontSize: 13.5, margin: '6px 0' }}>
-        <div>Clarity {bar(review.accuracy)} {review.accuracy}%</div>
-        <div>Coverage {bar(review.completeness)} {review.completeness}%</div>
-        <div>Fluency {bar(review.fluency)} {review.fluency}%</div>
-      </div>
-      <div className="exp" style={{ overflowWrap: 'anywhere' }}>
-        <b>Heard:</b> “{review.transcript}”
-      </div>
-      <div style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.9, display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: '100%' }}>
-        {review.words.map((w, i) => (
-          <span
-            key={i}
-            title={w.status === 'correct' ? 'heard right' : w.status === 'substituted' ? `heard as “${w.heard}”` : 'skipped'}
-            style={{
-              padding: '1px 5px',
-              borderRadius: 6,
-              overflowWrap: 'anywhere',
-              background: w.status === 'correct' ? '#e9f7ef' : w.status === 'substituted' ? '#fef4e2' : '#fdeeee',
-              borderBottom: w.status === 'correct' ? 'none' : `2px solid ${w.status === 'substituted' ? '#f5a623' : '#d64545'}`,
-            }}
-          >
-            {w.expected}
-          </span>
-        ))}
-      </div>
-      <div className="exp" style={{ marginTop: 6 }}>
-        <b>Areas to improve:</b>
-        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-          {review.improvements.map((im, i) => (
-            <li key={i}>{im}</li>
-          ))}
-        </ul>
-      </div>
-      <p className="hint" style={{ margin: '6px 0 0' }}>
-        Clarity = how accurately the recognizer heard each word (pronunciation proxy), not a true accent classifier.
-      </p>
-    </div>
-  );
-}
-
-function RecordBlock({ onRecorded, reviewFor }: { onRecorded: () => void; reviewFor?: { itemId: string; target: string } }) {
-  const userId = useSession((s) => s.userId);
-  const tier = useSession((s) => s.profile?.tier ?? 'free');
-  const r = useRecorder();
-  const fired = useRef(false);
-  const cb = useRef(onRecorded);
-  cb.current = onRecorded;
-  const [review, setReview] = useState<SpeechReview | null>(() =>
-    reviewFor ? readReview(reviewFor.itemId) : null
-  );
-  const [reviewing, setReviewing] = useState(false);
-  const [reviewErr, setReviewErr] = useState('');
-  useEffect(() => {
-    if (r.url && !fired.current) {
-      fired.current = true;
-      cb.current();
-    }
-  }, [r.url]);
-  // New recording invalidates the previous review.
-  useEffect(() => {
-    if (r.url) {
-      setReview(null);
-      setReviewErr('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [r.blob]);
-
-  async function runReview() {
-    if (!r.blob || !reviewFor || reviewing) return;
-    setReviewErr('');
-    if (!reviewConfigured()) {
-      setReviewErr('Voice review needs the AI key — ask the admin to configure it.');
-      return;
-    }
-    setReviewing(true);
-    try {
-      if (userId) {
-        const q = await quotaStatus('speaking', userId, tier);
-        if (!q.allowed && !q.offline) throw new Error(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
-      }
-      const { text } = await transcribeAudio(r.blob);
-      const scored = scoreAttempt(reviewFor.target, text, r.secs);
-      saveReview(reviewFor.itemId, scored);
-      setReview(scored);
-      if (userId) bumpQuota('speaking', userId).catch(() => {});
-    } catch (e) {
-      setReviewErr(friendlyError(e));
-    } finally {
-      setReviewing(false);
-    }
-  }
-
-  return (
-    <div>
-      <div className="svar-audio">
-        {!r.recording ? (
-          <button className="btn-ghost" onClick={() => r.start()}>🎙 Start recording</button>
-        ) : (
-          <button className="btn-ghost" onClick={r.stop}>
-            <span className="svar-rec"><span className="live" /> Stop ({r.secs}s)</span>
-          </button>
-        )}
-        {r.url && <VoicePlayer src={r.url} />}
-      </div>
-      {reviewFor && r.url && !r.recording && (
-        <div className="btnrow" style={{ marginTop: 8 }}>
-          <button className="btn-primary" disabled={reviewing} onClick={runReview}>
-            {reviewing ? (
-              <><span className="spinner" /> Transcribing & scoring…</>
-            ) : (
-              '⭐ Review my pronunciation'
-            )}
-          </button>
-        </div>
-      )}
-      {reviewErr && <div className="err">{reviewErr}</div>}
-      {review && <ReviewCard review={review} />}
-      {r.error && <div className="err">{r.error}</div>}
-    </div>
-  );
+  return { recording, url, blob, secs, error, start, stop, reset };
 }
 
 function TtsGate() {
@@ -273,7 +139,7 @@ function TtsGate() {
   );
 }
 
-/* ---------------- tab 1: listen & answer ---------------- */
+/* ---------------- tab 1: listen & answer (standalone practice) ---------------- */
 function ListenTab({ refresh }: { refresh: () => void }) {
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
@@ -370,153 +236,200 @@ function ListenTab({ refresh }: { refresh: () => void }) {
   );
 }
 
-/* ---------------- tab 2: read aloud ---------------- */
-function ReadTab({ refresh }: { refresh: () => void }) {
-  const userId = useSession((s) => s.userId);
-  const tier = useSession((s) => s.profile?.tier ?? 'free');
-  const [doneIds, setDoneIds] = useState<Record<string, boolean>>({});
-  const [qerr, setQerr] = useState('');
-
-  function recorded() {
-    bump({ records: readStats().records + 1 });
-    refresh();
-  }
-
-  function markDone(id: string) {
-    if (doneIds[id]) return;
-    setQerr('');
-    void (async () => {
-      if (userId) {
-        try {
-          const q = await quotaStatus('speaking', userId, tier);
-          if (!q.allowed && !q.offline) {
-            setQerr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
-            return;
-          }
-        } catch {
-          /* grace */
-        }
-      }
-      setDoneIds((d) => ({ ...d, [id]: true }));
-      bump({ done: readStats().done + 1 });
-      if (userId) bumpQuota('speaking', userId).catch(() => {});
-      refresh();
-    })();
-  }
-
+/* ---------------- review card (per scored item) ---------------- */
+function ReviewCard({ review }: { review: SpeechReview }) {
+  const bar = (v: number) => (
+    <span
+      style={{
+        display: 'inline-block',
+        width: 90,
+        height: 8,
+        borderRadius: 99,
+        background: '#e7ecf5',
+        overflow: 'hidden',
+        verticalAlign: 'middle',
+      }}
+    >
+      <span
+        style={{
+          display: 'block',
+          height: '100%',
+          width: `${v}%`,
+          background: v >= 70 ? '#1e9e62' : v >= 45 ? '#f5a623' : '#d64545',
+          borderRadius: 99,
+        }}
+      />
+    </span>
+  );
   return (
-    <div>
-      {qerr && <div className="err" style={{ marginBottom: 10 }}>{qerr}</div>}
-      {READ_BANK.map((r) => (
-        <div className="svar-card" key={r.id}>
-          <span className="topic">Read aloud {doneIds[r.id] ? '• ✅ practised' : ''}</span>
-          <div className="svar-sentence">“{r.text}”</div>
-          <div className="svar-tip"><b>Coach tip:</b> {r.tip}</div>
-              <RecordBlock onRecorded={recorded} reviewFor={{ itemId: `repeat-${r.id}`, target: r.text }} />
-          <div className="btnrow">
-            <button className="btn-ghost" disabled={doneIds[r.id]} onClick={() => markDone(r.id)}>
-              {doneIds[r.id] ? 'Done ✓' : 'Sounds good — mark done'}
-            </button>
-          </div>
-        </div>
-      ))}
+    <div className="rev correct" style={{ marginTop: 10 }}>
+      <div className="qnum">
+        ⭐ {review.marks}/10 • clarity {review.accuracy}% • coverage {review.completeness}% • pace {review.wpm} wpm
+      </div>
+      <div style={{ fontSize: 13.5, margin: '6px 0' }}>
+        <div>Clarity {bar(review.accuracy)} {review.accuracy}%</div>
+        <div>Coverage {bar(review.completeness)} {review.completeness}%</div>
+        <div>Fluency {bar(review.fluency)} {review.fluency}%</div>
+      </div>
+      <div className="exp" style={{ overflowWrap: 'anywhere' }}>
+        <b>Heard:</b> “{review.transcript}”
+      </div>
+      <div style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.9, display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: '100%' }}>
+        {review.words.map((w, i) => (
+          <span
+            key={i}
+            title={w.status === 'correct' ? 'heard right' : w.status === 'substituted' ? `heard as “${w.heard}”` : 'skipped'}
+            style={{
+              padding: '1px 5px',
+              borderRadius: 6,
+              overflowWrap: 'anywhere',
+              background: w.status === 'correct' ? '#e9f7ef' : w.status === 'substituted' ? '#fef4e2' : '#fdeeee',
+              borderBottom: w.status === 'correct' ? 'none' : `2px solid ${w.status === 'substituted' ? '#f5a623' : '#d64545'}`,
+            }}
+          >
+            {w.expected}
+          </span>
+        ))}
+      </div>
+      <div className="exp" style={{ marginTop: 6 }}>
+        <b>Areas to improve:</b>
+        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          {review.improvements.map((im, i) => (
+            <li key={i}>{im}</li>
+          ))}
+        </ul>
+      </div>
+      <p className="hint" style={{ margin: '6px 0 0' }}>
+        Clarity = how accurately the recognizer heard each word (pronunciation proxy), not a true accent classifier.
+      </p>
     </div>
   );
 }
 
-/* ---------------- tab 3: repeat after me ---------------- */
-function RepeatTab({ refresh }: { refresh: () => void }) {
-  const userId = useSession((s) => s.userId);
-  const tier = useSession((s) => s.profile?.tier ?? 'free');
-  const [doneIds, setDoneIds] = useState<Record<string, boolean>>({});
-  const [qerr, setQerr] = useState('');
-
-  function played() {
-    bump({ plays: readStats().plays + 1 });
-  }
-
-  function recorded() {
-    bump({ records: readStats().records + 1 });
-    refresh();
-  }
-
-  function markDone(id: string) {
-    if (doneIds[id]) return;
-    setQerr('');
-    void (async () => {
-      if (userId) {
-        try {
-          const q = await quotaStatus('speaking', userId, tier);
-          if (!q.allowed && !q.offline) {
-            setQerr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
-            return;
-          }
-        } catch {
-          /* grace */
-        }
-      }
-      setDoneIds((d) => ({ ...d, [id]: true }));
-      bump({ done: readStats().done + 1 });
-      if (userId) bumpQuota('speaking', userId).catch(() => {});
-      refresh();
-    })();
-  }
-
-  return (
-    <div>
-      <TtsGate />
-      {qerr && <div className="err" style={{ marginBottom: 10 }}>{qerr}</div>}
-      {REPEAT_BANK.map((r) => (
-        <div className="svar-card" key={r.id}>
-          <span className="topic">Repeat after me {doneIds[r.id] ? '• ✅ practised' : ''}</span>
-          <div className="svar-duo" style={{ marginTop: 10 }}>
-            <div className="cell">
-              <b>1 · Model</b>
-              <PlayButton text={r.text} label="Hear it" onPlayed={played} />
-            </div>
-            <div className="cell">
-              <b>2 · You</b>
-          <RecordBlock onRecorded={recorded} reviewFor={{ itemId: `read-${r.id}`, target: r.text }} />
-            </div>
-          </div>
-          <div className="svar-tip"><b>Coach tip:</b> {r.tip}</div>
-          <div className="btnrow">
-            <button className="btn-ghost" disabled={doneIds[r.id]} onClick={() => markDone(r.id)}>
-              {doneIds[r.id] ? 'Done ✓' : 'Matched it — mark done'}
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+/* ---------------- session: fixed-limit recorder with progress ---------------- */
+interface SessionItem {
+  key: string;
+  kind: 'read' | 'repeat';
+  id: string;
+  text: string;
+  tip?: string;
+  limit: number;
 }
 
-export default function Svar() {
-  const userId = useSession((s) => s.userId);
-  const tier = useSession((s) => s.profile?.tier ?? 'free');
-  const [tab, setTab] = useState<Tab>('listen');
-  const [stats, setStats] = useState<SvarStats>(() => readStats());
-  const [leftS, setLeftS] = useState<number | null>(null);
-  const setLeaveGuard = useUi((s) => s.setLeaveGuard);
-  // Recordings made this visit that were never submitted. Leaving counts one
-  // voice session against the limit — the "submit" for unfinished practice.
-  const baseRecords = useRef<number | null>(null);
-  if (baseRecords.current === null) baseRecords.current = stats.records;
-  const dirty = stats.records > (baseRecords.current || 0);
+const SESSION_ITEMS: SessionItem[] = [
+  ...READ_BANK.map((r) => ({ key: `read-${r.id}`, kind: 'read' as const, id: r.id, text: r.text, tip: r.tip, limit: SPEAK_LIMITS.read })),
+  ...REPEAT_BANK.map((r) => ({ key: `repeat-${r.id}`, kind: 'repeat' as const, id: r.id, text: r.text, limit: SPEAK_LIMITS.repeat })),
+];
+
+export interface SessionRec {
+  url: string;
+  blob: Blob;
+  secs: number;
+}
+
+function SessionRecorder({
+  limit,
+  existing,
+  onDone,
+}: {
+  limit: number;
+  existing?: SessionRec | null;
+  onDone: (r: SessionRec | null) => void;
+}) {
+  const r = useRecorder();
+  const cb = useRef(onDone);
+  cb.current = onDone;
+  const sent = useRef(false);
+  const [replacing, setReplacing] = useState(false);
 
   useEffect(() => {
-    if (!dirty) {
-      setLeaveGuard(null);
-      return;
+    if (r.url && r.blob && !sent.current) {
+      sent.current = true;
+      cb.current({ url: r.url, blob: r.blob, secs: r.secs });
     }
-    setLeaveGuard({
-      confirmLeave: () => {
-        if (userId) bumpQuota('speaking', userId).catch(() => {});
-      },
-    });
-    return () => setLeaveGuard(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dirty, setLeaveGuard]);
+  }, [r.url, r.blob, r.secs]);
+
+  function retry() {
+    sent.current = false;
+    onDone(null);
+    r.reset();
+  }
+
+  const pct = Math.min(100, Math.round((r.secs / limit) * 100));
+  const autoStopped = !r.recording && r.url && r.secs >= limit;
+
+  if (existing && !replacing && !r.url && !r.recording) {
+    return (
+      <div>
+        <VoicePlayer src={existing.url} />
+        <p className="hint">Recorded {existing.secs}s of {limit}s.</p>
+        <div className="btnrow">
+          <button className="btn-ghost" onClick={() => setReplacing(true)}>↻ Re-record</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {!r.url && !r.recording && (
+        <div className="btnrow" style={{ marginTop: 8 }}>
+          <button className="btn-ghost" onClick={() => r.start(limit)}>🎙 Start recording ({limit}s max)</button>
+        </div>
+      )}
+      {r.recording && (
+        <div className="svar-audio" style={{ display: 'block' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>
+            <span>🔴 {r.secs}s / {limit}s</span>
+            <span>{pct}%</span>
+          </div>
+          <div style={{ height: 8, borderRadius: 99, background: '#e7ecf5', marginTop: 6, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, borderRadius: 99, background: pct >= 90 ? '#d64545' : '#1b4fa0', transition: 'width 0.5s linear' }} />
+          </div>
+          <div className="btnrow" style={{ marginTop: 8 }}>
+            <button className="btn-ghost" onClick={r.stop}>Stop — I’m done ({r.secs}s)</button>
+          </div>
+          <p className="hint">Recording stops automatically at {limit}s.</p>
+        </div>
+      )}
+      {r.url && (
+        <>
+          <VoicePlayer src={r.url} />
+          <p className="hint">
+            Recorded {r.secs}s of {limit}s{autoStopped ? ' (time limit reached)' : ''}.
+          </p>
+          <div className="btnrow">
+            <button className="btn-ghost" onClick={retry}>↻ Re-record</button>
+          </div>
+        </>
+      )}
+      {r.error && <div className="err">{r.error}</div>}
+    </div>
+  );
+}
+
+/* ---------------- main page ---------------- */
+type Phase = 'lobby' | 'running' | 'scoring' | 'report';
+
+export default function Svar() {
+  const ask = useConfirm();
+  const userId = useSession((s) => s.userId);
+  const email = useSession((s) => s.email);
+  const profile = useSession((s) => s.profile);
+  const tier = profile?.tier ?? 'free';
+  const setLeaveGuard = useUi((s) => s.setLeaveGuard);
+  const [tab, setTab] = useState<Tab>('session');
+  const [stats, setStats] = useState<SvarStats>(() => readStats());
+  const [leftS, setLeftS] = useState<number | null>(null);
+
+  const [phase, setPhase] = useState<Phase>('lobby');
+  const [stepIdx, setStepIdx] = useState(0);
+  const [recs, setRecs] = useState<Record<string, SessionRec>>({});
+  const [report, setReport] = useState<SpeakingReport | null>(null);
+  const [scoring, setScoring] = useState({ done: 0, total: 0 });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<SpeakingReport[]>([]);
 
   async function refreshQuota() {
     if (!userId) {
@@ -534,35 +447,261 @@ export default function Svar() {
   const refresh = () => {
     setStats(readStats());
     refreshQuota();
+    listSpeakingReports(userId).then(setHistory).catch(() => {});
   };
 
   useEffect(() => {
     refreshQuota();
+    listSpeakingReports(userId).then(setHistory).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  // Leaving a live session counts it: bump one voice session, drafts are lost.
+  useEffect(() => {
+    if (phase !== 'running') {
+      setLeaveGuard(null);
+      return;
+    }
+    setLeaveGuard({
+      confirmLeave: () => {
+        if (userId) bumpQuota('speaking', userId).catch(() => {});
+      },
+    });
+    return () => setLeaveGuard(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, setLeaveGuard]);
+
+  async function startSession() {
+    setError('');
+    if (userId) {
+      try {
+        const q = await quotaStatus('speaking', userId, tier);
+        if (!q.allowed && !q.offline) {
+          setError(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
+          return;
+        }
+      } catch {
+        /* grace */
+      }
+    }
+    setRecs({});
+    setReport(null);
+    setStepIdx(0);
+    setPhase('running');
+    window.scrollTo({ top: 0 });
+  }
+
+  function setRec(key: string, r: SessionRec | null) {
+    setRecs((prev) => {
+      const next = { ...prev };
+      if (r) next[key] = r;
+      else delete next[key];
+      return next;
+    });
+  }
+
+  async function finishSession() {
+    setError('');
+    const keys = Object.keys(recs);
+    if (!keys.length) {
+      setError('Record at least one item before finishing — empty sessions don’t count.');
+      return;
+    }
+    setPhase('scoring');
+    setScoring({ done: 0, total: keys.length });
+    const items: SpeakingReport['items'] = [];
+    for (const key of keys) {
+      const item = SESSION_ITEMS.find((i) => i.key === key)!;
+      const rec = recs[key];
+      // Fresh recordings are always transcribed fresh; saved reports never re-call.
+      let review = null;
+      try {
+        const { text } = await transcribeAudio(rec.blob);
+        review = scoreAttempt(item.text, text, rec.secs);
+        saveReview(key, review);
+      } catch (e) {
+        review = null;
+      }
+      items.push({ key, kind: item.kind, text: item.text, secs: rec.secs, review });
+      setScoring((s) => ({ ...s, done: s.done + 1 }));
+    }
+    const rep = speakingReportFromItems(
+      { userId: userId!, username: profile?.username || (email ? email.split('@')[0] : 'friend') },
+      items
+    );
+    setReport(rep);
+    setPhase('report');
+    window.scrollTo({ top: 0 });
+    saveSpeakingReport(rep)
+      .then(() => listSpeakingReports(userId).then(setHistory).catch(() => {}))
+      .catch(() => {});
+    if (userId) bumpQuota('speaking', userId).catch(() => {});
+    refreshQuota();
+    bump({ done: readStats().done + 1 });
+    setStats(readStats());
+  }
+
+  function openHistory(r: SpeakingReport) {
+    setReport(r);
+    setPhase('report');
+    window.scrollTo({ top: 0 });
+  }
+
+  async function remove(id: string) {
+    const ok = await ask({
+      title: 'Delete this speaking report?',
+      description: 'Its marks and sheet will be removed. This cannot be undone.',
+      actionLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    await deleteSpeakingReport(id);
+    setHistory((h) => h.filter((x) => x.id !== id));
+  }
+
+  const item = SESSION_ITEMS[stepIdx];
+  const recordedCount = Object.keys(recs).length;
 
   return (
     <div>
       <div className="page-hero">
         <h2>Speaking & listening lab</h2>
-        <p>SVAR-style practice on your own voice server — listen, read aloud, repeat. Nothing is auto-graded; your ears are the examiner.</p>
+        <p>SVAR-style speaking sessions on your own voice server — read aloud and repeat, each on a fixed timer. Finish the session for one marks report with pronunciation feedback.</p>
         <div style={{ marginTop: 10 }}>
-          <span className="chip ghost">🔊 {stats.plays} plays</span>{' '}
-          <span className="chip ghost">🎙 {stats.records} recordings</span>{' '}
-          <span className="chip ghost">✅ {stats.done} marked done</span>
+          <span className="chip ghost">🎙 {SESSION_ITEMS.length} spoken items</span>{' '}
+          <span className="chip ghost">📄 report + PDF</span>{' '}
+          {tier === 'pro' ? (
+            <span className="chip green">Pro • unlimited</span>
+          ) : (
+            leftS !== null && <span className="chip green">Free • {leftS} of 5 left</span>
+          )}
         </div>
-        {leftS !== null && <p className="hint" style={{ marginTop: 8 }}>{tier === 'pro' ? 'Pro plan: unlimited voice sessions.' : <>Free plan: <b>{leftS} of 5</b> voice sessions left today.</>}</p>}
       </div>
+
       <div className="svar-tabs">
-        {(['listen', 'read', 'repeat'] as Tab[]).map((t) => (
+        {(['listen', 'session'] as Tab[]).map((t) => (
           <button key={t} className={`radio-pill ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'listen' ? '👂 Listen & answer' : t === 'read' ? '🗣 Read aloud' : '🔁 Repeat after me'}
+            {t === 'listen' ? '👂 Listen & answer' : '🎙 Speaking session'}
           </button>
         ))}
       </div>
+
+      {error && (
+        <div className="banner warn" style={{ marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+
       {tab === 'listen' && <ListenTab refresh={refresh} />}
-      {tab === 'read' && <ReadTab refresh={refresh} />}
-      {tab === 'repeat' && <RepeatTab refresh={refresh} />}
+
+      {tab === 'session' && phase === 'lobby' && (
+        <div className="card" style={{ textAlign: 'center', padding: '32px 24px' }}>
+          <div style={{ fontSize: 40 }}>🎙️</div>
+          <h3 style={{ margin: '12px 0 6px' }}>Ready for a speaking session?</h3>
+          <p className="hint">
+            {READ_BANK.length} read-aloud ({SPEAK_LIMITS.read}s each) + {REPEAT_BANK.length} repeat-after-me ({SPEAK_LIMITS.repeat}s each).
+            Recordings stop at the limit automatically — finish early and your actual time is what counts. One report with marks at the end.
+          </p>
+          <div className="btnrow" style={{ justifyContent: 'center' }}>
+            <button className="btn-big" disabled={loading} onClick={() => { setLoading(true); startSession().finally(() => setLoading(false)); }}>
+              {loading ? 'Checking…' : 'Start speaking session →'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === 'session' && phase === 'running' && item && (
+        <>
+          <div className="card" style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+              <b>Item {stepIdx + 1} of {SESSION_ITEMS.length} • {recordedCount} recorded</b>
+              <span className="hint">{Math.round(((stepIdx + 1) / SESSION_ITEMS.length) * 100)}%</span>
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: '#e7ecf5', marginTop: 8, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${((stepIdx + 1) / SESSION_ITEMS.length) * 100}%`, background: 'linear-gradient(90deg,#4d7cfe,#38bdf8)', borderRadius: 999 }} />
+            </div>
+            <div className="btnrow" style={{ marginBottom: 0 }}>
+              <button className="btn-ghost" disabled={stepIdx === 0} onClick={() => { setStepIdx((i) => i - 1); window.scrollTo({ top: 0 }); }}>← Back</button>
+              {stepIdx < SESSION_ITEMS.length - 1 && (
+                <button className="btn-primary" onClick={() => { setStepIdx((i) => i + 1); window.scrollTo({ top: 0 }); }}>Next →</button>
+              )}
+            </div>
+          </div>
+
+          <div className="svar-card">
+            <span className="topic">{item.kind === 'read' ? `Read aloud • ${item.limit}s max` : `Repeat after me • ${item.limit}s max`}</span>
+            {item.kind === 'repeat' && (
+              <div style={{ marginTop: 8 }}>
+                <PlayButton text={item.text} label="Hear it" onPlayed={() => bump({ plays: readStats().plays + 1 })} />
+              </div>
+            )}
+            <div className="svar-sentence">“{item.text}”</div>
+            {item.tip && <div className="svar-tip"><b>Coach tip:</b> {item.tip}</div>}
+            <SessionRecorder key={item.key} limit={item.limit} existing={recs[item.key]} onDone={(r) => setRec(item.key, r)} />
+          </div>
+
+          <div className="card" style={{ textAlign: 'center' }}>
+            <button className="btn-big" onClick={finishSession}>
+              Finish & get my report ✓ ({recordedCount}/{SESSION_ITEMS.length})
+            </button>
+            <p className="hint">Unrecorded items stay unscored. Leaving now counts one voice session.</p>
+          </div>
+        </>
+      )}
+
+      {tab === 'session' && phase === 'scoring' && (
+        <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
+          <div style={{ fontSize: 40 }}>⭐</div>
+          <h3>Scoring your session…</h3>
+          <p className="hint">Transcribing {scoring.done} of {scoring.total} recordings, then marking each one.</p>
+          <div style={{ height: 8, borderRadius: 99, background: '#e7ecf5', marginTop: 12, overflow: 'hidden', maxWidth: 320, marginLeft: 'auto', marginRight: 'auto' }}>
+            <div style={{ height: '100%', width: scoring.total ? `${(scoring.done / scoring.total) * 100}%` : '0%', borderRadius: 99, background: 'linear-gradient(90deg,#4d7cfe,#38bdf8)' }} />
+          </div>
+        </div>
+      )}
+
+      {tab === 'session' && phase === 'report' && report && (
+        <>
+          <div className="card" style={{ textAlign: 'center', background: 'linear-gradient(135deg,#0b1e4b,#1b4fa0)', color: '#fff', border: 'none' }}>
+            <div style={{ fontSize: 13, opacity: 0.85 }}>{new Date(report.at).toLocaleString()} • {report.items.length} items</div>
+            <div style={{ fontSize: 52, fontWeight: 800 }}>{report.marks}/10</div>
+            <div className="btnrow" style={{ justifyContent: 'center', marginTop: 12, marginBottom: 0 }}>
+              <button className="btn-ghost" onClick={() => downloadSpeakingReport(report)}>
+                ⬇ Download report PDF
+              </button>
+              <button className="btn-big" onClick={() => { setPhase('lobby'); setReport(null); }}>
+                New session →
+              </button>
+            </div>
+          </div>
+          {report.items.map((it, i) => (
+            <div className="svar-card" key={it.key}>
+              <span className="topic">Item {i + 1} • {it.kind === 'read' ? 'Read aloud' : 'Repeat'} • {it.secs}s</span>
+              <div className="svar-sentence">“{it.text}”</div>
+              {it.review ? <ReviewCard review={it.review} /> : <p className="hint">Couldn’t score this one — transcription failed. Your other marks stand.</p>}
+            </div>
+          ))}
+        </>
+      )}
+
+      <h3>
+        Past speaking reports {history.length > 0 && <span className="hint">• {history.length} saved</span>}
+      </h3>
+      {!history.length && <p className="hint">No reports yet — finish a session above and it lands here. Opening a saved report never re-calls the AI.</p>}
+      {history.map((h) => (
+        <div className="t-row" key={h.id}>
+          <div className="ring" style={{ '--p': h.marks * 10 } as any}><span>{h.marks}</span></div>
+          <div className="meta">
+            <div style={{ fontWeight: 700 }}>{h.marks}/10 • {h.items.length} items</div>
+            <div className="hint">{new Date(h.at).toLocaleString()}</div>
+          </div>
+          <div className="btnrow" style={{ marginTop: 0 }}>
+            <button className="btn-ghost" onClick={() => openHistory(h)}>View report</button>
+            <button className="btn-ghost" onClick={() => downloadSpeakingReport(h)}>PDF</button>
+            <button className="btn-ghost" onClick={() => remove(h.id)}>Delete</button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

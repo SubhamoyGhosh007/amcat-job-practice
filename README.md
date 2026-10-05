@@ -160,6 +160,25 @@ create policy "own_math_write" on math_sessions for insert to authenticated
   with check ((auth.jwt() ->> 'sub') = user_id);
 create policy "own_math_delete" on math_sessions for delete to authenticated
   using ((auth.jwt() ->> 'sub') = user_id);
+create table if not exists speaking_reports (
+  id text primary key,
+  user_id text not null,
+  username text not null default '',
+  created_at timestamptz not null default now(),
+  marks numeric not null default 0,
+  items jsonb not null default '[]'
+);
+create index if not exists speaking_user_idx on speaking_reports(user_id);
+alter table speaking_reports enable row level security;
+drop policy if exists "own_speaking_read" on speaking_reports;
+drop policy if exists "own_speaking_write" on speaking_reports;
+drop policy if exists "own_speaking_delete" on speaking_reports;
+create policy "own_speaking_read" on speaking_reports for select to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id);
+create policy "own_speaking_write" on speaking_reports for insert to authenticated
+  with check ((auth.jwt() ->> 'sub') = user_id);
+create policy "own_speaking_delete" on speaking_reports for delete to authenticated
+  using ((auth.jwt() ->> 'sub') = user_id);
 ```
 
 ### Backup codes + daily quotas (2FA recovery, free-tier limits)

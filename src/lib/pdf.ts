@@ -3,6 +3,7 @@ import { SECTIONS } from '../types';
 import { MATH_TOPICS, mathTopicName } from '../data/mathTopics';
 import type { ScoreSheet } from './store';
 import type { MathSession } from './mathStore';
+import type { SpeakingReport } from './speakingStore';
 
 type RGB = [number, number, number];
 
@@ -368,4 +369,78 @@ export function downloadMathSheet(s: MathSession) {
 
   footer(doc);
   doc.save(`amcat-maths-${new Date(s.at).toISOString().slice(0, 10)}.pdf`);
+}
+
+/** Speaking session report: overall marks, per-item transcripts + marks + improvements. */
+export function downloadSpeakingReport(r: SpeakingReport) {
+  const doc = new jsPDF();
+  paintPage(doc);
+  let y = header(doc, 'Speaking Lab — Session Report', `${r.username} • ${new Date(r.at).toLocaleString()} • ${r.items.length} items`);
+
+  const heroH = 26;
+  y = ensureSpace(doc, y, heroH + 4);
+  doc.setDrawColor(...BORDER);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(PM, y, PW, heroH, 3, 3, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(24);
+  doc.setTextColor(...INK);
+  doc.text(`${r.marks}/10`, PM + 6, y + 16);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED);
+  const scored = r.items.filter((i) => i.review).length;
+  doc.text(`${scored} of ${r.items.length} items scored`, PM + 34, y + 11);
+  doc.setFontSize(9);
+  doc.text('clarity = pronunciation proxy, not an accent classifier', PM + 34, y + 17.5);
+  y += heroH + 6;
+
+  r.items.forEach((it, n) => {
+    const rev = it.review;
+    const head = `Item ${n + 1} • ${it.kind === 'read' ? 'Read aloud' : 'Repeat'} • ${it.secs}s${rev ? ` • ${rev.marks}/10` : ' • not scored'}`;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    const headLines = doc.splitTextToSize(head, PW) as string[];
+    const targetLines = doc.splitTextToSize(`Target: ${it.text}`, PW) as string[];
+    const heardLines = doc.splitTextToSize(rev ? `Heard: ${rev.transcript}` : 'Heard: — (no recording submitted)', PW) as string[];
+    const impLines = rev
+      ? rev.improvements.slice(0, 3).flatMap((im) => doc.splitTextToSize(`• ${im}`, PW - 6) as string[])
+      : [];
+    const need = 6 + headLines.length * 5 + targetLines.length * 5 + heardLines.length * 5 + (impLines.length ? 6 + impLines.length * 5 : 0) + 8;
+    y = ensureSpace(doc, y, Math.min(need, 140));
+    const top = y;
+    doc.setDrawColor(...BORDER);
+    doc.setFillColor(255, 255, 255);
+    // draw now, fill exact height after measuring (approx via need)
+    doc.setFontSize(10);
+    doc.setTextColor(...DARK);
+    doc.text(headLines, PM + 5, y + 5);
+    y += 5 + headLines.length * 5;
+    doc.setFont('helvetica', 'normal');
+    doc.text(targetLines, PM + 5, y);
+    y += targetLines.length * 5 + 2;
+    doc.setTextColor(...MUTED);
+    doc.text(heardLines, PM + 5, y);
+    y += heardLines.length * 5 + 2;
+    if (impLines.length) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...BLUE);
+      doc.text('Improve:', PM + 5, y);
+      y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...DARK);
+      doc.text(impLines, PM + 5, y);
+      y += impLines.length * 5;
+    }
+    const h = y - top + 4;
+    doc.setDrawColor(...BORDER);
+    doc.roundedRect(PM, top, PW, h, 3, 3, 'D');
+    doc.setFillColor(...(rev && rev.marks >= 7 ? GREEN : rev ? RED : FAINT));
+    doc.rect(PM, top + 3, 1.8, h - 6, 'F');
+    y += 6;
+  });
+
+  footer(doc);
+  doc.save(`amcat-speaking-${new Date(r.at).toISOString().slice(0, 10)}.pdf`);
 }
