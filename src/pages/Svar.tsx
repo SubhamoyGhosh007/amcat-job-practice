@@ -146,10 +146,10 @@ function ReviewCard({ review }: { review: SpeechReview }) {
         <div>Coverage {bar(review.completeness)} {review.completeness}%</div>
         <div>Fluency {bar(review.fluency)} {review.fluency}%</div>
       </div>
-      <div className="exp">
+      <div className="exp" style={{ overflowWrap: 'anywhere' }}>
         <b>Heard:</b> “{review.transcript}”
       </div>
-      <div style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.9 }}>
+      <div style={{ marginTop: 6, fontSize: 13.5, lineHeight: 1.9, display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: '100%' }}>
         {review.words.map((w, i) => (
           <span
             key={i}
@@ -157,7 +157,7 @@ function ReviewCard({ review }: { review: SpeechReview }) {
             style={{
               padding: '1px 5px',
               borderRadius: 6,
-              marginRight: 3,
+              overflowWrap: 'anywhere',
               background: w.status === 'correct' ? '#e9f7ef' : w.status === 'substituted' ? '#fef4e2' : '#fdeeee',
               borderBottom: w.status === 'correct' ? 'none' : `2px solid ${w.status === 'substituted' ? '#f5a623' : '#d64545'}`,
             }}
