@@ -8,8 +8,8 @@ export type VoiceTier = 'free' | 'pro';
 let noTable = false;
 function isMissingTable(error: any): boolean {
   if (noTable) return true;
-  const msg = String(error?.message || '') + String(error?.code || '');
-  if (/PGRST205|could not find the table/i.test(msg)) {
+  const msg = String(error?.message || '') + String(error?.code || '') + String(error?.status || '') + String(error?.details || '');
+  if (/PGRST205|could not find the table|404|not found/i.test(msg) || error?.code === '404' || error?.status === 404) {
     noTable = true;
     return true;
   }

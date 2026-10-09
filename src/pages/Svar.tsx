@@ -1108,9 +1108,10 @@ export default function Svar() {
     }
     setPhase('scoring');
     setScoring({ done: 0, total: keys.length });
-    const items: SpeakingReport['items'] = [];
+    const reportItems: SpeakingReport['items'] = [];
     for (const key of keys) {
-      const item = items.find((i) => i.key === key)!;
+      const item = items.find((i) => i.key === key);
+      if (!item) continue;
       const rec = recs[key];
       // Fresh recordings are always transcribed fresh; saved reports never re-call.
       let review = null;
@@ -1121,12 +1122,12 @@ export default function Svar() {
       } catch (e) {
         review = null;
       }
-      items.push({ key, kind: item.kind, text: item.text, secs: rec.secs, review, poolId: item.poolId });
+      reportItems.push({ key, kind: item.kind, text: item.text, secs: rec.secs, review, poolId: item.poolId });
       setScoring((s) => ({ ...s, done: s.done + 1 }));
     }
     const rep = speakingReportFromItems(
       { userId: userId!, username: profile?.username || (email ? email.split('@')[0] : 'friend') },
-      items
+      reportItems
     );
     setReport(rep);
     setPhase('report');
@@ -1135,7 +1136,7 @@ export default function Svar() {
     // unfinished old ones keep coming back until done.
     recordSampleCompletions(
       userId,
-      items.filter((i) => i.poolId && i.review).map((i) => i.poolId as string)
+      reportItems.filter((i) => i.poolId && i.review).map((i) => i.poolId as string)
     ).catch(() => {});
     saveSpeakingReport(rep)
       .then(() => listSpeakingReports(userId).then(setHistory).catch(() => {}))
