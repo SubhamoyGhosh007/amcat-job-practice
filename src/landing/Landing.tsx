@@ -144,6 +144,63 @@ const NAV_LINKS = [
   { id: 'faq', label: 'FAQ' },
 ];
 
+function Waitlist() {
+  const [email, setEmail] = useState('');
+  const [state, setState] = useState<'idle' | 'ok' | 'err'>('idle');
+  async function join() {
+    const v = email.trim().toLowerCase();
+    if (!/^\S+@\S+\.\S+$/.test(v)) {
+      setState('err');
+      return;
+    }
+    try {
+      const { apiToken } = await import('../lib/store');
+      const { sb } = await import('../lib/supabase');
+      const token = await apiToken();
+      const db = sb(token);
+      if (db && token) {
+        const { error } = await db.from('waitlist').insert({ email: v });
+        if (error) throw error;
+      } else {
+        const prev: string[] = JSON.parse(localStorage.getItem('amcat_waitlist') || '[]');
+        if (!prev.includes(v)) localStorage.setItem('amcat_waitlist', JSON.stringify([...prev, v]));
+      }
+      setState('ok');
+    } catch {
+      try {
+        const prev: string[] = JSON.parse(localStorage.getItem('amcat_waitlist') || '[]');
+        if (!prev.includes(v)) localStorage.setItem('amcat_waitlist', JSON.stringify([...prev, v]));
+        setState('ok');
+      } catch {
+        setState('err');
+      }
+    }
+  }
+  return (
+    <div>
+      <div className="rv-wait">
+        <input
+          type="email"
+          value={email}
+          placeholder="you@example.com"
+          aria-label="Email for Pro launch alerts"
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setState('idle');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') join();
+          }}
+        />
+        <button onClick={join}>Notify me</button>
+      </div>
+      {state === 'ok' && <div className="rv-wait-ok">You're on the list — one email at Pro launch.</div>}
+      {state === 'err' && <div className="rv-wait-err">Enter a valid email address.</div>}
+      <div className="rv-reassure">Pro launch alerts only. No spam, ever — read the <a href="/privacy" style={{ color: 'inherit' }}>privacy policy</a>.</div>
+    </div>
+  );
+}
+
 export default function Landing() {
   const navigate = useNavigate();
   const userId = useSession((s) => s.userId);
@@ -617,14 +674,46 @@ export default function Landing() {
 
       {/* 10. footer */}
       <footer className="rv-footer">
-        <div>© 2026 Concentrix AMCAT Practice • unofficial practice project, not affiliated with Concentrix, AMCAT, or SHL</div>
-        <nav>
-          <a href="/guides/amcat-pattern">Pattern guide</a>
-          <a href="/guides/svar-round">SVAR guide</a>
-          <a href="/guides/typing-test">Typing guide</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
-        </nav>
+        <div className="rv-foot-grid">
+          <div>
+            <div className="rv-foot-brand">
+              <img src="/logo.jpg" alt="Concentrix AMCAT Practice logo" />
+              AMCAT Practice
+            </div>
+            <p className="rv-foot-blurb">
+              Free Concentrix AMCAT prep — timed sets, typing, voice rounds and answer scripts that teach.
+            </p>
+            <Waitlist />
+          </div>
+          <div className="rv-foot-cols">
+            <h4>Practice</h4>
+            <a href="/app/instructions">New set</a>
+            <a href="/app/typing">Typing arena</a>
+            <a href="/app/speaking">Speaking lab</a>
+            <a href="/app/interview">Mock interview</a>
+            <a href="/app/maths">Maths practice</a>
+          </div>
+          <div className="rv-foot-cols">
+            <h4>Guides</h4>
+            <a href="/guides/amcat-pattern">AMCAT pattern</a>
+            <a href="/guides/svar-round">SVAR round</a>
+            <a href="/guides/typing-test">Typing test</a>
+          </div>
+          <div className="rv-foot-cols">
+            <h4>Account</h4>
+            <a href="/login">Log in</a>
+            <a href="/app/sheets">My sheets</a>
+            <a href="/app/settings">Settings</a>
+          </div>
+        </div>
+        <div className="rv-legal">
+          <span>© 2026 Concentrix AMCAT Practice • unofficial, not affiliated with Concentrix, AMCAT, or SHL</span>
+          <nav>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
+          </nav>
+          <span className="status"><i /> All systems normal</span>
+        </div>
       </footer>
     </div>
   );

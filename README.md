@@ -210,6 +210,13 @@ begin
   update voice_samples set times_used = times_used + 1 where id = sample_id;
 end; $$;
 grant execute on function increment_voice_usage(text) to authenticated;
+create table if not exists waitlist (
+  email text primary key,
+  created_at timestamptz not null default now()
+);
+alter table waitlist enable row level security;
+drop policy if exists "waitlist_write" on waitlist;
+create policy "waitlist_write" on waitlist for insert to authenticated with check (true);
 ```
 
 ### Backup codes + daily quotas (2FA recovery, free-tier limits)
