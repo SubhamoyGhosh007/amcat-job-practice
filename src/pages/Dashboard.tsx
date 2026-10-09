@@ -121,23 +121,23 @@ export default function Dashboard() {
 
         <div className="wv-kpis">
           <div className="wv-card">
-            <div className="k-label"><Zap size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Sets taken</div>
+            <div className="k-label"><Zap size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#3157d8' }} />Sets taken</div>
             <div className="k-value cyan">{stats.count}</div>
             <div className="k-sub">graded sessions</div>
           </div>
           <div className="wv-card">
-            <div className="k-label"><Gauge size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Average score</div>
+            <div className="k-label"><Gauge size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#3157d8' }} />Average score</div>
             <div className="k-value">{stats.avg !== null ? `${stats.avg}%` : '—'}</div>
             <div className="k-sub">{stats.count ? `across ${stats.count} sets` : 'no data yet'}</div>
           </div>
           <div className="wv-card">
-            <div className="k-label"><Target size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Best score</div>
-            <div className="k-value" style={{ color: '#32d74b' }}>{stats.best !== null ? `${stats.best}%` : '—'}</div>
+            <div className="k-label"><Target size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#3157d8' }} />Best score</div>
+            <div className="k-value" style={{ color: '#1e9e62' }}>{stats.best !== null ? `${stats.best}%` : '—'}</div>
             <div className="k-sub">personal record</div>
           </div>
           <div className="wv-card">
-            <div className="k-label"><Flame size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Day streak</div>
-            <div className="k-value" style={{ color: stats.streak >= 2 ? '#32d74b' : '#ffffff' }}>{stats.streak}</div>
+            <div className="k-label"><Flame size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#3157d8' }} />Day streak</div>
+            <div className="k-value" style={{ color: stats.streak >= 2 ? '#1e9e62' : '#111111' }}>{stats.streak}</div>
             <div className="k-sub">{stats.streak >= 2 ? 'keep it burning' : 'practice today to start one'}</div>
           </div>
         </div>
@@ -196,7 +196,7 @@ export default function Dashboard() {
                 <div className="wv-secbar" key={sec.id}>
                   <div className="row">
                     <b>{sec.name}</b>
-                    <span className="pct" style={{ color: pct === null ? '#98989d' : pct >= 70 ? '#32d74b' : pct >= 50 ? '#00E5FF' : '#ff453a' }}>
+                    <span className="pct" style={{ color: pct === null ? '#6b7280' : pct >= 70 ? '#1e9e62' : pct >= 50 ? '#3157d8' : '#d64545' }}>
                       {pct === null ? '—' : `${pct}%`}
                     </span>
                   </div>
@@ -230,7 +230,7 @@ export default function Dashboard() {
                     <td>{new Date(s.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
                     <td className={`mono ${s.pct >= 70 ? 'green' : s.pct >= 50 ? 'cyan' : 'red'}`}>{s.pct}%</td>
                     <td className="mono">{s.correct}/{s.total}</td>
-                    <td style={{ color: '#98989d' }}>{s.difficulty || 'medium'}{s.origin === 'pyq' ? ' • PYQ' : ''}</td>
+                    <td style={{ color: '#6b7280' }}>{s.difficulty || 'medium'}{s.origin === 'pyq' ? ' • PYQ' : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -247,11 +247,11 @@ export default function Dashboard() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={() => navigate('/app/instructions')}
-            style={{ background: '#00E5FF', color: '#121212', fontWeight: 800, border: 'none', borderRadius: 10, padding: '13px 30px', fontSize: 15, cursor: 'pointer' }}
+            style={{ background: '#3157d8', color: '#ffffff', fontWeight: 800, border: 'none', borderRadius: 10, padding: '13px 30px', fontSize: 15, cursor: 'pointer' }}
           >
             Start a new set →
           </button>
-          {tier === 'pro' ? <span style={{ fontSize: 12, fontWeight: 800, color: '#32d74b' }}>PRO • unlimited</span> : null}
+          {tier === 'pro' ? <span style={{ fontSize: 12, fontWeight: 800, color: '#1e9e62' }}>PRO • unlimited</span> : null}
         </div>
       </div>
 
@@ -277,7 +277,7 @@ export default function Dashboard() {
                   <td style={{ textAlign: 'right' }}>
                     <button
                       onClick={() => downloadSpeakingReport(r)}
-                      style={{ background: 'transparent', border: '1px solid #2C2C2E', color: '#00E5FF', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}
+                      style={{ background: 'transparent', border: '1px solid #e7e9ed', color: '#3157d8', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}
                     >
                       PDF
                     </button>

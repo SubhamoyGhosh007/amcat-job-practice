@@ -25,17 +25,17 @@ export function ScoreChart({ values }: { values: number[] }) {
               <stop offset="100%" stopColor="#30D158" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#2C2C2E" strokeWidth={1} vertical={false} />
+          <CartesianGrid stroke="#e7e9ed" strokeWidth={1} vertical={false} />
           <XAxis
             dataKey="i"
-            tick={{ fill: '#98989D', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+            tick={{ fill: '#6b7280', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
             axisLine={false}
             tickLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
             domain={[0, 100]}
-            tick={{ fill: '#98989D', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
+            tick={{ fill: '#6b7280', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}
             axisLine={false}
             tickLine={false}
             width={44}
@@ -46,15 +46,16 @@ export function ScoreChart({ values }: { values: number[] }) {
               return (
                 <div
                   style={{
-                    background: '#1E1E1E',
-                    border: '1px solid #2C2C2E',
+                    background: '#ffffff',
+                    border: '1px solid #e7e9ed',
                     borderRadius: 10,
                     padding: '8px 12px',
                     fontSize: 13,
                     fontWeight: 700,
+                    boxShadow: '0 6px 18px rgba(17,17,17,0.08)',
                   }}
                 >
-                  <span style={{ color: '#00E5FF', fontFamily: 'JetBrains Mono, monospace' }}>{payload[0].value}%</span>
+                  <span style={{ color: '#3157d8', fontFamily: 'JetBrains Mono, monospace' }}>{payload[0].value}%</span>
                 </div>
               );
             }}
@@ -62,11 +63,11 @@ export function ScoreChart({ values }: { values: number[] }) {
           <Area
             type="monotone"
             dataKey="v"
-            stroke="#00E5FF"
+            stroke="#3157d8"
             strokeWidth={2.5}
             fill="url(#wvScoreArea)"
             dot={false}
-            activeDot={{ r: 4.5, fill: '#00E5FF', stroke: '#121212', strokeWidth: 2 }}
+            activeDot={{ r: 4.5, fill: '#3157d8', stroke: '#ffffff', strokeWidth: 2 }}
             isAnimationActive={!reduced}
             animationDuration={1400}
           />
