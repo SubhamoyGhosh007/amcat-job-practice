@@ -2,7 +2,17 @@ import { Skeleton } from './primitives';
 import './shadcn.css';
 
 /** Full-page shadcn skeletons, shaped per page. */
-export function PageSkeleton({ variant }: { variant: 'app' | 'list' }) {
+export function PageSkeleton({ variant }: { variant: 'app' | 'list' | 'page' }) {
+  if (variant === 'page') {
+    // In-shell loading: mirrors a page-hero + content card, never a fake shell.
+    return (
+      <div>
+        <Skeleton style={{ height: 120, borderRadius: 18, marginBottom: 12 }} />
+        <Skeleton style={{ height: 220, borderRadius: 18, marginBottom: 12 }} />
+        <Skeleton style={{ height: 64, borderRadius: 14 }} />
+      </div>
+    );
+  }
   if (variant === 'list') {
     return (
       <div>

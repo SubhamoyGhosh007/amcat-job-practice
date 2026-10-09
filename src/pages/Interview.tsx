@@ -8,6 +8,7 @@ import { speak, ttsConfigured } from '../lib/tts';
 import { useSession } from '../stores/session';
 import {
   MOCK_TEST_01,
+  STATIC_MOCK_TESTS,
   deleteMockSession,
   fetchTodayRun,
   fetchUnattemptedMockTest,
@@ -367,7 +368,12 @@ export default function Interview() {
       const pooled = await fetchUnattemptedMockTest(userId, tier);
       if (!live) return;
       if (pooled) setMockTest(pooled);
-      else publishMockTest(MOCK_TEST_01, tier).catch(() => {});
+      else {
+        const sessions = listMockSessions();
+        const fallbackTest = STATIC_MOCK_TESTS[sessions.length % STATIC_MOCK_TESTS.length] || MOCK_TEST_01;
+        setMockTest(fallbackTest);
+        publishMockTest(fallbackTest, tier).catch(() => {});
+      }
     })();
     return () => {
       live = false;
@@ -549,7 +555,7 @@ export default function Interview() {
   }
 
   if (locked === null) {
-    return <PageSkeleton variant="app" />;
+    return <PageSkeleton variant="page" />;
   }
 
   if (locked) {
