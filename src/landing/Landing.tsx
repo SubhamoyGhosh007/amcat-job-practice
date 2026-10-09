@@ -1,32 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../stores/session';
-import { SECTIONS, totalMinutes, totalQuestions } from '../types';
-import { Counter, HoverCard, MovingCta, Reveal, TopicMarquee } from './aceternity';
-import { CanvasText, CloudShader, Depth, FloatingPointer, Magnetic, RippleCanvas, Squiggle, Typewriter, scrollToId, useParallax } from './fx';
-import Navbar from './Navbar';
-import Keyboard from './Keyboard';
-import Footer from './Footer';
-import './landing.css';
-
-const DEMO = {
-  topic: 'Customer situation',
-  prompt: 'A caller is shouting about a late delivery. What do you say first?',
-  options: [
-    '“Calm down, it is not our fault.”',
-    '“I understand this delay upset you. Let me track it right now.”',
-    '“There is nothing I can do.”',
-  ],
-  answer: 1,
-  why: 'Acknowledge the feeling, take ownership, state the next step. That is the Concentrix way.',
-};
-
-const TOPICS = [
-  'Percentages', 'Blood relations', 'Email etiquette', 'Time–speed–distance',
-  'Coding–decoding', 'Angry callers', 'Profit & loss', 'Number series',
-  'Hold etiquette', 'Averages', 'Direction sense', 'Escalation',
-  'Synonyms', 'Ratios', 'Prioritisation', 'Data privacy',
-];
+import { Reveal } from './aceternity';
+import { scrollToId } from './fx';
+import './revamp.css';
 
 const FAQS = [
   {
@@ -51,57 +28,126 @@ const FAQS = [
   },
 ];
 
-function DemoCard() {
-  const [pick, setPick] = useState<number | null>(null);
-  return (
-    <div className="demo-card">
-      <span className="topic">{DEMO.topic} • try it</span>
-      <div className="qprompt" style={{ fontSize: 16 }}>{DEMO.prompt}</div>
-      {DEMO.options.map((op, i) => (
-        <div
-          key={i}
-          className={`demo-opt${pick !== null && i === DEMO.answer ? ' right' : ''}${pick === i && i !== DEMO.answer ? ' wrongpick' : ''}`}
-          onClick={() => setPick(i)}
-        >
-          <b>{'ABC'[i]}.</b> {op}
-        </div>
-      ))}
-      {pick !== null && (
-        <div className="rev correct" style={{ margin: '10px 0 0' }}>
-          <div className="exp"><b>Why:</b> {DEMO.why}</div>
-        </div>
-      )}
-      {pick === null && <p className="hint" style={{ margin: '6px 0 0' }}>Tap an option — every question in the app explains itself like this.</p>}
-    </div>
-  );
-}
+const FLOAT_CARDS = [
+  { cls: 'rv-fc1', emoji: '📘', bg: '#e8f1fe', title: 'English Ability', cap: '8 Q • 8 min' },
+  { cls: 'rv-fc2', emoji: '📗', bg: '#e6f7ee', title: 'Quantitative', cap: '8 Q • 9 min' },
+  { cls: 'rv-fc3', emoji: '🎙️', bg: '#f3e8fd', title: 'SVAR Voice', cap: '7 parts • timed' },
+  { cls: 'rv-fc4', emoji: '📙', bg: '#fef3e2', title: 'Logical', cap: '7 Q • 8 min' },
+];
 
-function HeroVisual() {
-  const { sx, sy, onMove, onLeave } = useParallax(12);
-  return (
-    <div className="hero-visual" onMouseMove={onMove} onMouseLeave={onLeave}>
-      <Depth x={sx} y={sy} depth={0.45}>
-        <DemoCard />
-      </Depth>
-      <Depth x={sx} y={sy} depth={1.4} className="glass-chip" style={{ top: -18, right: 12 }}>
-        ⏱ 07:32 left
-      </Depth>
-      <Depth x={sx} y={sy} depth={1.9} className="glass-chip" style={{ bottom: 52, left: -14 }}>
-        🔥 4-correct streak
-      </Depth>
-      <Depth x={sx} y={sy} depth={1.1} className="glass-chip" style={{ bottom: -16, right: 32 }}>
-        ✅ answer script ready
-      </Depth>
-    </div>
-  );
-}
+const BOOKS = [
+  { title: 'English Ability', meta: '8 Q • 8 min', bg: '#3b82f6', to: '/login' },
+  { title: 'Quantitative Ability', meta: '8 Q • 9 min', bg: '#22c55e', to: '/login' },
+  { title: 'Logical Reasoning', meta: '7 Q • 8 min', bg: '#f59e0b', to: '/login' },
+  { title: 'Customer Service', meta: '7 Q • 7 min', bg: '#8b5cf6', to: '/login' },
+  { title: 'AMCAT pattern guide', meta: 'Free guide', bg: '#20a9e0', to: '/guides/amcat-pattern' },
+  { title: 'SVAR round guide', meta: 'Free guide', bg: '#ef4444', to: '/guides/svar-round' },
+  { title: 'Typing test guide', meta: 'Free guide', bg: '#14b8a6', to: '/guides/typing-test' },
+];
+
+const QUIZ_TABS = [
+  {
+    id: 'english',
+    label: 'English',
+    topic: 'Preposition • fill in the blank',
+    q: 'The team has been working ___ morning.',
+    options: ['since', 'for', 'from', 'at'],
+    answer: 0,
+    why: '“Since” pairs with a point in time (morning); “for” needs a duration like “three hours”.',
+  },
+  {
+    id: 'quant',
+    label: 'Quant',
+    topic: 'Percentages • shortcut',
+    q: 'What is 12.5% of 800?',
+    answer: 1,
+    options: ['96', '100', '110', '125'],
+    why: '12.5% is exactly 1/8, and 800 ÷ 8 = 100. Learn the fraction table and these fall instantly.',
+  },
+  {
+    id: 'logical',
+    label: 'Logical',
+    topic: 'Direction sense',
+    q: 'Face north, turn right, then right again, then left. Which way now?',
+    answer: 2,
+    options: ['North', 'South', 'East', 'West'],
+    why: 'North → East → South → East. Track it turn by turn instead of visualising the whole map.',
+  },
+];
+
+const ROADMAP = [
+  {
+    id: 'english',
+    name: 'English Ability',
+    meta: '8 Q • 8 min',
+    color: '#3b82f6',
+    emoji: '📘',
+    blurb: 'Comprehension, vocabulary in context, grammar rules, sentence ordering.',
+    lessons: [
+      ['Reading comprehension', '12 min'],
+      ['Vocabulary in context', '9 min'],
+      ['Grammar rules that repeat', '10 min'],
+      ['Sentence ordering', '8 min'],
+    ],
+  },
+  {
+    id: 'quant',
+    name: 'Quantitative Ability',
+    meta: '8 Q • 9 min',
+    color: '#22c55e',
+    emoji: '📗',
+    blurb: 'Percentages, profit & loss, time–speed–distance, averages.',
+    lessons: [
+      ['Percentages & profit–loss', '14 min'],
+      ['Time–speed–distance', '12 min'],
+      ['Averages & ratios', '10 min'],
+      ['Number system', '9 min'],
+    ],
+  },
+  {
+    id: 'logical',
+    name: 'Logical Reasoning',
+    meta: '7 Q • 8 min',
+    color: '#f59e0b',
+    emoji: '📙',
+    blurb: 'Coding–decoding, blood relations, series, puzzles.',
+    lessons: [
+      ['Coding–decoding', '10 min'],
+      ['Blood relations', '9 min'],
+      ['Series & patterns', '11 min'],
+      ['Puzzles', '12 min'],
+    ],
+  },
+  {
+    id: 'csat',
+    name: 'Customer Service',
+    meta: '7 Q • 7 min',
+    color: '#8b5cf6',
+    emoji: '📞',
+    blurb: 'Angry callers, hold etiquette, escalation, email tone.',
+    lessons: [
+      ['Angry callers', '10 min'],
+      ['Hold & escalation', '8 min'],
+      ['Email tone', '7 min'],
+      ['Prioritisation', '8 min'],
+    ],
+  },
+];
+
+const NAV_LINKS = [
+  { id: 'pattern', label: 'Pattern' },
+  { id: 'demo', label: 'Demo' },
+  { id: 'quiz', label: 'Quiz' },
+  { id: 'roadmap', label: 'Roadmap' },
+  { id: 'faq', label: 'FAQ' },
+];
 
 export default function Landing() {
   const navigate = useNavigate();
   const userId = useSession((s) => s.userId);
   const profile = useSession((s) => s.profile);
   const onEnter = () => navigate(userId ? '/app' : '/login');
-  // Skill texts-reveal: play the hero stagger once on mount.
+
   const heroRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = heroRef.current;
@@ -109,222 +155,339 @@ export default function Landing() {
     const t = requestAnimationFrame(() => el.classList.add('is-shown'));
     return () => cancelAnimationFrame(t);
   }, []);
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
-  return (
-    <div className="landing" id="top">
-      <FloatingPointer />
-      <Navbar onLogin={onEnter} />
 
-      {/* HERO */}
-      <header className="hero">
-        <div className="hero-grid" />
-        <CloudShader className="shader-layer" />
-        <RippleCanvas className="shader-layer" />
-        <div className="hero-inner">
-          <div ref={heroRef} className="t-stagger">
-            <span className="pill t-stagger-line t-stagger-line--1"><span className="livedot" /> Concentrix hiring prep</span>
-            <h1 className="display t-stagger-line t-stagger-line--2">
-              Walk into the test hall{' '}
-              <span className="squig">already warmed up.<Squiggle className="" /></span>
-            </h1>
-            <div className="type-line">
-              Practice with <Typewriter words={['timed sets.', 'fresh questions.', 'explained answers.', 'zero surprises.']} />
-              <span className="type-caret" />
-            </div>
-            <p className="lede t-stagger-line t-stagger-line--3">
-              Free Concentrix AMCAT mock test practice shaped exactly like the real hiring test — four timed sections
-              (English Ability, Quantitative Ability, Logical Reasoning, Customer Service), a fresh set of questions
-              every attempt, and an answer script that teaches you after every test. Move your mouse: the hall reacts.
-            </p>
-            <div className="t-stagger-line t-stagger-line--4" style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Magnetic>
-                <MovingCta onClick={onEnter}>{userId ? `Continue as @${profile?.username || '…'}` : 'Log in and start Set 1'}</MovingCta>
-              </Magnetic>
-              <button className="ghost-cta" onClick={() => scrollToId('pattern')}>See the pattern</button>
-            </div>
-            <div className="hero-stats">
-              <div className="stat"><b><Counter to={totalQuestions} /></b><span>questions per set</span></div>
-              <div className="stat"><b><Counter to={4} /></b><span>timed sections</span></div>
-              <div className="stat"><b><Counter to={100} suffix="%" /></b><span>explained answers</span></div>
-            </div>
+  const [activeNav, setActiveNav] = useState('');
+  useEffect(() => {
+    const fn = () => {
+      const y = window.scrollY + 160;
+      let cur = '';
+      for (const l of NAV_LINKS) {
+        const el = document.getElementById(l.id);
+        if (el && el.offsetTop <= y) cur = l.id;
+      }
+      setActiveNav(cur);
+    };
+    fn();
+    window.addEventListener('scroll', fn, { passive: true });
+    return () => window.removeEventListener('scroll', fn);
+  }, []);
+
+  const [quizTab, setQuizTab] = useState(QUIZ_TABS[0].id);
+  const [picked, setPicked] = useState<number | null>(null);
+  const quiz = QUIZ_TABS.find((t) => t.id === quizTab)!;
+  const pickQuiz = (i: number) => {
+    if (picked !== null) return;
+    setPicked(i);
+  };
+  const switchQuiz = (id: string) => {
+    setQuizTab(id);
+    setPicked(null);
+  };
+
+  const [openRoad, setOpenRoad] = useState(ROADMAP[0].id);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  return (
+    <div className="rv landing" id="top">
+      {/* 1. slim top nav */}
+      <div className="rv-nav">
+        <div className="rv-nav-inner">
+          <button className="rv-brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <img src="/logo.jpg" alt="Concentrix AMCAT Practice logo" />
+            AMCAT Practice
+          </button>
+          {NAV_LINKS.map((l) => (
+            <button
+              key={l.id}
+              className={`rv-nav-link${activeNav === l.id ? ' active' : ''}`}
+              onClick={() => scrollToId(l.id)}
+            >
+              {l.label}
+            </button>
+          ))}
+          <button className="rv-nav-cta" onClick={onEnter}>Start free</button>
+        </div>
+      </div>
+
+      {/* 2. hero with floating subject cards */}
+      <header className="rv-hero">
+        {FLOAT_CARDS.slice(0, 2).map((c) => (
+          <div key={c.title} className={`rv-float-card ${c.cls}`} aria-hidden="true">
+            <div className="swatch" style={{ background: c.bg }}>{c.emoji}</div>
+            <b>{c.title}</b>
+            <small>{c.cap}</small>
           </div>
-          <HeroVisual />
+        ))}
+        <div ref={heroRef} className="t-stagger">
+          <span className="rv-eyebrow t-stagger-line t-stagger-line--1">
+            <span className="pulse-dot" /> Concentrix hiring prep
+          </span>
+          <h1 className="t-stagger-line t-stagger-line--2">
+            Walk into the test hall <em>already warmed up.</em>
+          </h1>
+          <p className="lede t-stagger-line t-stagger-line--3">
+            Free Concentrix AMCAT mock test practice shaped exactly like the real hiring test — four timed sections,
+            fresh questions every attempt, and an answer script that teaches you after every test.
+          </p>
+          <div className="t-stagger-line t-stagger-line--4">
+            <button className="btn-pill" onClick={onEnter}>
+              {userId ? `Continue as @${profile?.username || '…'}` : 'Log in and start Set 1'}
+            </button>
+          </div>
+        </div>
+        <div className="rv-trust">
+          <span className="avatars" aria-hidden="true">
+            <span style={{ background: '#3b82f6' }}>A</span>
+            <span style={{ background: '#22c55e' }}>R</span>
+            <span style={{ background: '#f59e0b' }}>S</span>
+            <span style={{ background: '#8b5cf6' }}>+</span>
+          </span>
+          <span>Practised by job aspirants across India • 120+ questions • Free forever</span>
+        </div>
+        {FLOAT_CARDS.slice(2).map((c) => (
+          <div key={c.title} className={`rv-float-card ${c.cls}`} aria-hidden="true">
+            <div className="swatch" style={{ background: c.bg }}>{c.emoji}</div>
+            <b>{c.title}</b>
+            <small>{c.cap}</small>
+          </div>
+        ))}
+        <div className="rv-float-row" aria-hidden="true">
+          {FLOAT_CARDS.map((c) => (
+            <div key={c.title} className="rv-float-card">
+              <div className="swatch" style={{ background: c.bg }}>{c.emoji}</div>
+              <b>{c.title}</b>
+              <small>{c.cap}</small>
+            </div>
+          ))}
         </div>
       </header>
 
-      {/* STATS */}
-      <div className="band-ink">
-        <div className="section">
-          <div className="stats-band">
-            <div className="stat-card"><b><Counter to={totalQuestions} /></b><span>questions per set</span></div>
-            <div className="stat-card"><b><Counter to={totalMinutes} /></b><span>minutes of pressure</span></div>
-            <div className="stat-card"><b><Counter to={100} suffix="%" /></b><span>answers explained</span></div>
-            <div className="stat-card"><b><Counter to={16} /></b><span>avatars to pick from</span></div>
+      {/* 3. course bookshelf */}
+      <div id="pattern" className="rv-shelf-wrap">
+        <Reveal>
+          <div className="wrap-narrow" style={{ marginBottom: 34 }}>
+            <span className="eyebrow-pill">One shelf, everything tested</span>
+            <h2 className="sec-title">Four sections, three guides</h2>
+            <p className="sec-sub">Pick a book — sections drop you into timed practice, guides teach the method first.</p>
           </div>
+        </Reveal>
+        <div className="rv-shelf">
+          {BOOKS.map((b, i) => (
+            <a key={b.title} href={b.to} className="rv-book" style={{ background: b.bg, height: 150 + ((i * 37) % 3) * 14 }}>
+              <span className="bnum">{String(i + 1).padStart(2, '0')}</span>
+              <b>{b.title}</b>
+              <small>{b.meta}</small>
+            </a>
+          ))}
         </div>
+        <div className="rv-plank" />
+        <p className="rv-shelf-cap">30 questions • 32 minutes • no negative marking</p>
       </div>
 
-      {/* PATTERN */}
-      <div className="band-ink bg-dots">
-        <div className="section" id="pattern">
+      {/* 4. explainer + dark demo panel */}
+      <section id="demo" className="block">
+        <div className="wrap-narrow" style={{ marginBottom: 34 }}>
+          <div style={{ textAlign: 'center' }}>
+            <span className="eyebrow-pill">How it works</span>
+            <h2 className="sec-title">Practice like it's the real hall</h2>
+            <p className="sec-sub">Timed sets, instant answer scripts, typing and voice rounds — the whole drive, rehearsed.</p>
+          </div>
+        </div>
+        <div className="wrap-narrow">
           <Reveal>
-            <h2 className="display">The exact pattern, zero surprises</h2>
-            <p className="sub">Same sections, same pressure of a ticking clock, same no-negative-marking rule as the real drive. Finish one set and the next one is already new.</p>
+            <div className="rv-demo">
+              <div className="rv-tile">
+                <div className="t-label">Timed set • English Ability</div>
+                <div className="t-q">The customer insisted ___ speaking to a supervisor.</div>
+                <div className="t-opt">for</div>
+                <div className="t-opt right">on ✓</div>
+                <div className="t-meta">Q11 of 30 <span className="rv-timer-chip">⏱ 07:32</span></div>
+                <div className="rv-bar"><span style={{ width: '36%' }} /></div>
+              </div>
+              <div className="rv-tile">
+                <div className="t-label">Answer script • why, not just wrong</div>
+                <div className="t-q">Bought for Rs. 800, sold for Rs. 920. Profit %?</div>
+                <div className="t-opt right">15% ✓ <span style={{ opacity: 0.7 }}>— profit 120 on 800</span></div>
+                <div className="t-opt wrong">18% ✗ <span style={{ opacity: 0.7 }}>— you picked this</span></div>
+                <div className="t-meta">Saved as PDF <span className="rv-timer-chip">⬇ script</span></div>
+              </div>
+              <div className="rv-tile">
+                <div className="t-label">Typing arena • live</div>
+                <div className="t-q" style={{ fontSize: 26, fontWeight: 800 }}>42 <span style={{ fontSize: 13, fontWeight: 600, color: '#8b8b98' }}>WPM • 96% acc</span></div>
+                <div className="rv-bar"><span style={{ width: '72%' }} /></div>
+                <div className="t-meta">Consistency 88% <span className="rv-timer-chip">10 tests/day free</span></div>
+              </div>
+              <div className="rv-tile">
+                <div className="t-label">Speaking lab • SVAR</div>
+                <div className="t-q">Repeat once, then record — clarity, coverage, pace scored /10.</div>
+                <div className="t-opt right">Clarity 92% ✓</div>
+                <div className="t-opt">Pace 138 wpm ✓</div>
+                <div className="t-meta">Whisper transcription <span className="rv-timer-chip">⭐ 8/10</span></div>
+              </div>
+            </div>
           </Reveal>
-          <div className="hover-grid">
-            {SECTIONS.map((s) => (
-              <HoverCard key={s.id}>
-                <span className="tag">{s.count} Q • {s.minutes} min</span>
-                <div className="big display">{s.count}</div>
-                <h3>{s.name}</h3>
-                <p>{s.description}</p>
-              </HoverCard>
+        </div>
+      </section>
+
+      {/* 5. games + knowledge check */}
+      <section id="quiz" className="block" style={{ paddingTop: 20 }}>
+        <div className="wrap-narrow">
+          <div style={{ textAlign: 'center' }}>
+            <span className="eyebrow-pill">Warm up in 30 seconds</span>
+            <h2 className="sec-title">Try one question right now</h2>
+            <p className="sec-sub">No login, no setup — pick a subject, answer, and see the explanation instantly.</p>
+          </div>
+          <div className="rv-tabs" role="tablist">
+            {QUIZ_TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={quizTab === t.id}
+                className={`rv-tab${quizTab === t.id ? ' active' : ''}`}
+                onClick={() => switchQuiz(t.id)}
+              >
+                {t.label}
+              </button>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* MARQUEE */}
-      <div className="band-ink band-pad">
-        <TopicMarquee topics={TOPICS} dark />
-      </div>
-
-      {/* HOW IT WORKS */}
-      <div className="band-ink">
-        <div className="section" id="how">
-          <Reveal>
-            <h2 className="display">Three sittings to test-ready</h2>
-            <p className="sub">Most people loop this three or four times. Scores climb because the answer script shows its working.</p>
-          </Reveal>
-          <div className="steps">
-            <div className="step"><h3>Log in with Google</h3><p>One account keeps all your score sheets together — even if you switch between Google and GitHub later.</p></div>
-            <div className="step"><h3>Take a timed set</h3><p>Four sections, palette navigation, mark-for-review — the hall feel, minus the hall.</p></div>
-            <div className="step"><h3>Read your script</h3><p>Every answer explained. Download the report and the study sheet as PDF, then take a brand-new set.</p></div>
-          </div>
-        </div>
-      </div>
-
-      {/* TYPING TEASER */}
-      <div className="band-ink bg-aurora">
-        <div className="section" id="typing" style={{ position: 'relative' }}>
-          <Reveal>
-            <h2 className="display">The typing arena is open</h2>
-            <p className="sub">Concentrix typing rounds, monkeytype-style — live WPM, accuracy, consistency, and every test saved to your history.</p>
-          </Reveal>
-          <Keyboard />
-          <div style={{ textAlign: 'center', marginTop: 24, position: 'relative' }}>
-            <Magnetic>
-              <MovingCta onClick={onEnter}>Open the typing arena</MovingCta>
-            </Magnetic>
+          <div className="rv-quiz">
+            <div className="q-label">{quiz.topic}</div>
+            <div className="q-text">{quiz.q}</div>
+            {quiz.options.map((op, i) => {
+              const answered = picked !== null;
+              const cls = !answered ? '' : i === quiz.answer ? ' right' : i === picked ? ' wrong' : '';
+              return (
+                <button key={i} className={`q-opt${cls}`} disabled={answered} onClick={() => pickQuiz(i)}>
+                  <span className="k">{'ABCD'[i]}</span> {op}
+                  {answered && i === quiz.answer && <span style={{ marginLeft: 'auto' }}>✓</span>}
+                  {answered && i === picked && i !== quiz.answer && <span style={{ marginLeft: 'auto' }}>✗</span>}
+                </button>
+              );
+            })}
+            {picked !== null && <div className="q-why"><b>Why:</b> {quiz.why}</div>}
+            <div className="rv-quiz-foot">
+              <span className="dots" aria-hidden="true">
+                {QUIZ_TABS.map((t) => (
+                  <i key={t.id} className={t.id === quizTab ? 'on' : ''} />
+                ))}
+              </span>
+              <button className={picked !== null ? 'live' : ''} onClick={onEnter}>
+                {picked !== null ? 'That was 1 of 120+ →' : 'Full 30-question set →'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* SCRIPT PREVIEW + CTA */}
-      <div className="band-ink">
-        <div className="section">
-          <Reveal>
-            <h2 className="display">Never just “wrong”. Always “why”.</h2>
-            <p className="sub">This is what waits at the end of every set — yours to keep as a PDF.</p>
-          </Reveal>
-          <div className="script-preview">
-            <div className="rev correct">
-              <div className="qnum">Q4 • Quantitative Ability • Profit &amp; loss • ✅ Correct</div>
-              <div style={{ fontWeight: 600 }}>Bought for Rs. 800, sold for Rs. 920. Profit %?</div>
-              <div className="exp"><b>Why:</b> Profit 120 on 800 = 120/800 = 15%.</div>
-            </div>
-            <div className="rev wrong">
-              <div className="qnum">Q11 • English Ability • Preposition • ❌ Wrong</div>
-              <div style={{ fontWeight: 600 }}>The customer insisted ___ speaking to a supervisor.</div>
-              <div className="exp"><b>Why:</b> Correct collocation is “insist on doing something”.</div>
-            </div>
+      {/* 6-7. roadmap */}
+      <section id="roadmap" className="block">
+        <div className="wrap-narrow">
+          <div style={{ textAlign: 'center' }}>
+            <span className="eyebrow-pill">Roadmap</span>
+            <h2 className="sec-title">The syllabus, in small chunks</h2>
+            <p className="sec-sub">
+              Each section splits into short lessons with realistic timings. Finish a chunk, practise it immediately —
+              scores climb because every mistake comes back with its working shown.
+            </p>
           </div>
-
-          <div className="cta-band">
-            <CanvasText text="READY?" className="cta-canvas" />
-            <div style={{ position: 'relative' }}>
-              <h2 className="display">Your hall ticket is practice.</h2>
-              <p>No fees, no coaching-centre timing, no repeated question papers. Just you, a timer, and a fresh set.</p>
-              <Magnetic strength={24}>
-                <MovingCta onClick={onEnter}>{userId ? 'Jump back into practice' : 'Claim your first set'}</MovingCta>
-              </Magnetic>
-            </div>
+          <div className="rv-road-pick">
+            {ROADMAP.map((m) => (
+              <button key={m.id} className={openRoad === m.id ? 'active' : ''} onClick={() => setOpenRoad(m.id)}>
+                <div className="sw" style={{ background: m.color }} />
+                <b>{m.name}</b>
+                <small>{m.meta}</small>
+              </button>
+            ))}
           </div>
-
-          {/* FREE GUIDES */}
-          <div style={{ marginTop: 44 }}>
-            <Reveal>
-              <h2 className="display">Read the playbook first</h2>
-              <p className="sub">Three free guides — the pattern, the spoken round, the typing test. Original notes, no copied content.</p>
-            </Reveal>
-            <div className="hover-grid" style={{ marginTop: 18 }}>
-              {[
-                { to: '/guides/amcat-pattern', tag: 'Pattern', title: 'AMCAT pattern explained', text: 'Four sections, the clock, and the order of attack that wastes the least time.' },
-                { to: '/guides/svar-round', tag: 'Speaking', title: 'SVAR round decoded', text: 'All seven spoken parts, what each measures, and the three mistakes that sink scores.' },
-                { to: '/guides/typing-test', tag: 'Typing', title: 'Typing test guide', text: 'The WPM to aim for and a two-week drill that builds speed without wrecking accuracy.' },
-              ].map((g) => (
-                <a key={g.to} href={g.to} className="hover-card" style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <div className="glow" />
-                  <span className="tag">{g.tag} • free guide</span>
-                  <h3>{g.title}</h3>
-                  <p>{g.text}</p>
-                </a>
-              ))}
-            </div>
-          </div>
-          <div id="faq" style={{ marginTop: 44 }}>
-            <Reveal>
-              <h2 className="display">Questions aspirants ask</h2>
-              <p className="sub">Straight answers about the pattern, the SVAR round, typing, and what this site is.</p>
-            </Reveal>
-            <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
-              {FAQS.map((f, i) => {
-                const open = openFaq === i;
-                return (
-                  <div key={f.q} className="t-acc faq-item" data-open={String(open)}>
-                    <button
-                      className="t-acc-head faq-head"
-                      aria-expanded={open}
-                      onClick={() => setOpenFaq(open ? null : i)}
-                    >
-                      <span>{f.q}</span>
-                      <span className="t-acc-chevron" aria-hidden="true">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M4 6.5L8 10.5L12 6.5" />
-                        </svg>
-                      </span>
-                    </button>
-                    <div className="t-acc-panel">
-                      <div className="t-acc-panel-inner">
-                        <p className="sub faq-answer" style={{ margin: '8px 0 2px' }}>{f.a}</p>
-                      </div>
+          <div className="rv-modules">
+            {ROADMAP.map((m) => {
+              const open = openRoad === m.id;
+              return (
+                <div key={m.id} className="t-acc rv-module" data-open={String(open)}>
+                  <button className="t-acc-head rv-mod-head" aria-expanded={open} onClick={() => setOpenRoad(m.id)}>
+                    <span className="thumb" style={{ background: `${m.color}1f` }}>{m.emoji}</span>
+                    <span>
+                      <span className="num">MODULE {ROADMAP.indexOf(m) + 1}</span>
+                      <b>{m.name}</b>
+                      <small>{m.meta} • {m.blurb}</small>
+                    </span>
+                    <span className="t-acc-chevron chev" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 6.5L8 10.5L12 6.5" />
+                      </svg>
+                    </span>
+                  </button>
+                  <div className="t-acc-panel">
+                    <div className="t-acc-panel-inner">
+                      <ul className="rv-mod-lessons">
+                        {m.lessons.map(([title, dur]) => (
+                          <li key={title}>
+                            <button className="rv-play" onClick={onEnter} aria-label={`Practise ${title}`}>▶</button>
+                            {title}
+                            <span className="dur">{dur}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
         </div>
+      </section>
+
+      {/* 8. FAQ */}
+      <section id="faq" className="block" style={{ paddingTop: 20 }}>
+        <div className="wrap-narrow">
+          <h2 className="sec-title">Questions aspirants ask</h2>
+          <p className="sec-sub">Straight answers about the pattern, the SVAR round, typing, and what this site is.</p>
+          <div className="rv-faq">
+            {FAQS.map((f, i) => {
+              const open = openFaq === i;
+              return (
+                <div key={f.q} className="t-acc faq-item" data-open={String(open)}>
+                  <button className="t-acc-head faq-head" aria-expanded={open} onClick={() => setOpenFaq(open ? null : i)}>
+                    <span>{f.q}</span>
+                    <span className="t-acc-chevron" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 6.5L8 10.5L12 6.5" />
+                      </svg>
+                    </span>
+                  </button>
+                  <div className="t-acc-panel">
+                    <div className="t-acc-panel-inner">
+                      <div className="faq-answer"><p>{f.a}</p></div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* 9. final CTA */}
+      <div className="rv-final">
+        <img src="/logo.jpg" alt="Concentrix AMCAT Practice logo" className="mark" />
+        <h2>Your hall ticket is practice. Ready?</h2>
+        <p>No fees, no coaching-centre timing. Just you, a timer, and a fresh set.</p>
+        <button className="btn-pill" onClick={onEnter}>
+          {userId ? 'Jump back into practice' : 'Claim your first set — free'}
+        </button>
       </div>
 
-      {/* LOGIN */}
-      {/* <div className="band-ink bg-beams">
-        <div className="login-band" id="login" style={{ position: 'relative' }}>
-          <Reveal>
-            <div className="login-card">
-              <h2 className="display" style={{ margin: '0 0 8px' }}>Create your free account</h2>
-              <p className="hint">One login holds every score sheet, streak and PDF — on every device. Google, GitHub or plain email on the next screen. Twenty seconds, then Set 1.</p>
-              <Magnetic strength={24}>
-                <button className="btn-big" onClick={onEnter}>
-                  {userId ? 'Continue practising →' : 'Get started — it’s free'}
-                </button>
-              </Magnetic>
-            </div>
-          </Reveal>
-        </div>
-      </div> */}
-
-      <Footer onEnter={onEnter} />
+      {/* 10. footer */}
+      <footer className="rv-footer">
+        <div>© 2026 Concentrix AMCAT Practice • unofficial practice project, not affiliated with Concentrix, AMCAT, or SHL</div>
+        <nav>
+          <a href="/guides/amcat-pattern">Pattern guide</a>
+          <a href="/guides/svar-round">SVAR guide</a>
+          <a href="/guides/typing-test">Typing guide</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+        </nav>
+      </footer>
     </div>
   );
 }
