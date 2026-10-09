@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSession } from '../stores/session';
 import { Reveal } from './aceternity';
 import { scrollToId } from './fx';
+import { IconBook, IconCalc, IconChat, IconMic, IconPuzzle } from './icons';
 import './revamp.css';
 
 const FAQS = [
@@ -29,10 +30,10 @@ const FAQS = [
 ];
 
 const FLOAT_CARDS = [
-  { cls: 'rv-fc1', emoji: '📘', bg: '#e8f1fe', title: 'English Ability', cap: '8 Q • 8 min' },
-  { cls: 'rv-fc2', emoji: '📗', bg: '#e6f7ee', title: 'Quantitative', cap: '8 Q • 9 min' },
-  { cls: 'rv-fc3', emoji: '🎙️', bg: '#f3e8fd', title: 'SVAR Voice', cap: '7 parts • timed' },
-  { cls: 'rv-fc4', emoji: '📙', bg: '#fef3e2', title: 'Logical', cap: '7 Q • 8 min' },
+  { cls: 'rv-fc1', Icon: IconBook, color: '#3b82f6', bg: '#e8f1fe', title: 'English Ability', cap: '8 Q • 8 min' },
+  { cls: 'rv-fc2', Icon: IconCalc, color: '#22c55e', bg: '#e6f7ee', title: 'Quantitative', cap: '8 Q • 9 min' },
+  { cls: 'rv-fc3', Icon: IconMic, color: '#8b5cf6', bg: '#f3e8fd', title: 'SVAR Voice', cap: '7 parts • timed' },
+  { cls: 'rv-fc4', Icon: IconPuzzle, color: '#f59e0b', bg: '#fef3e2', title: 'Logical', cap: '7 Q • 8 min' },
 ];
 
 const BOOKS = [
@@ -81,7 +82,7 @@ const ROADMAP = [
     name: 'English Ability',
     meta: '8 Q • 8 min',
     color: '#3b82f6',
-    emoji: '📘',
+    Icon: IconBook,
     blurb: 'Comprehension, vocabulary in context, grammar rules, sentence ordering.',
     lessons: [
       ['Reading comprehension', '12 min'],
@@ -95,7 +96,7 @@ const ROADMAP = [
     name: 'Quantitative Ability',
     meta: '8 Q • 9 min',
     color: '#22c55e',
-    emoji: '📗',
+    Icon: IconCalc,
     blurb: 'Percentages, profit & loss, time–speed–distance, averages.',
     lessons: [
       ['Percentages & profit–loss', '14 min'],
@@ -109,7 +110,7 @@ const ROADMAP = [
     name: 'Logical Reasoning',
     meta: '7 Q • 8 min',
     color: '#f59e0b',
-    emoji: '📙',
+    Icon: IconPuzzle,
     blurb: 'Coding–decoding, blood relations, series, puzzles.',
     lessons: [
       ['Coding–decoding', '10 min'],
@@ -123,7 +124,7 @@ const ROADMAP = [
     name: 'Customer Service',
     meta: '7 Q • 7 min',
     color: '#8b5cf6',
-    emoji: '📞',
+    Icon: IconChat,
     blurb: 'Angry callers, hold etiquette, escalation, email tone.',
     lessons: [
       ['Angry callers', '10 min'],
@@ -213,7 +214,7 @@ export default function Landing() {
       <header className="rv-hero">
         {FLOAT_CARDS.slice(0, 2).map((c) => (
           <div key={c.title} className={`rv-float-card ${c.cls}`} aria-hidden="true">
-            <div className="swatch" style={{ background: c.bg }}>{c.emoji}</div>
+            <div className="swatch" style={{ background: c.bg, color: c.color }}><c.Icon size={30} /></div>
             <b>{c.title}</b>
             <small>{c.cap}</small>
           </div>
@@ -246,7 +247,7 @@ export default function Landing() {
         </div>
         {FLOAT_CARDS.slice(2).map((c) => (
           <div key={c.title} className={`rv-float-card ${c.cls}`} aria-hidden="true">
-            <div className="swatch" style={{ background: c.bg }}>{c.emoji}</div>
+            <div className="swatch" style={{ background: c.bg, color: c.color }}><c.Icon size={30} /></div>
             <b>{c.title}</b>
             <small>{c.cap}</small>
           </div>
@@ -254,7 +255,7 @@ export default function Landing() {
         <div className="rv-float-row" aria-hidden="true">
           {FLOAT_CARDS.map((c) => (
             <div key={c.title} className="rv-float-card">
-              <div className="swatch" style={{ background: c.bg }}>{c.emoji}</div>
+              <div className="swatch" style={{ background: c.bg, color: c.color }}><c.Icon size={26} /></div>
               <b>{c.title}</b>
               <small>{c.cap}</small>
             </div>
@@ -405,7 +406,7 @@ export default function Landing() {
               return (
                 <div key={m.id} className="t-acc rv-module" data-open={String(open)}>
                   <button className="t-acc-head rv-mod-head" aria-expanded={open} onClick={() => setOpenRoad(m.id)}>
-                    <span className="thumb" style={{ background: `${m.color}1f` }}>{m.emoji}</span>
+                    <span className="thumb" style={{ background: `${m.color}1f`, color: m.color }}><m.Icon size={22} /></span>
                     <span>
                       <span className="num">MODULE {ROADMAP.indexOf(m) + 1}</span>
                       <b>{m.name}</b>
