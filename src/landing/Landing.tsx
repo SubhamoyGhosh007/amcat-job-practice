@@ -140,6 +140,7 @@ const NAV_LINKS = [
   { id: 'demo', label: 'Demo' },
   { id: 'quiz', label: 'Quiz' },
   { id: 'roadmap', label: 'Roadmap' },
+  { id: 'pricing', label: 'Pricing' },
   { id: 'faq', label: 'FAQ' },
 ];
 
@@ -243,7 +244,7 @@ export default function Landing() {
             <span style={{ background: '#f59e0b' }}>S</span>
             <span style={{ background: '#8b5cf6' }}>+</span>
           </span>
-          <span>Practised by job aspirants across India • 120+ questions • Free forever</span>
+          <span>Practised by job aspirants across India • 120+ questions </span>
         </div>
         {FLOAT_CARDS.slice(2).map((c) => (
           <div key={c.title} className={`rv-float-card ${c.cls}`} aria-hidden="true">
@@ -435,6 +436,60 @@ export default function Landing() {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* pricing */}
+      <section id="pricing" className="block" style={{ paddingTop: 20 }}>
+        <div className="wrap-narrow">
+          <h2 className="sec-title">Free to start, pro when you're serious</h2>
+          <p className="sec-sub">
+            Everything you need to clear the drive costs nothing. Pro removes every limit for unstoppable final-week prep.
+          </p>
+          <div className="rv-price-grid">
+            <div className="rv-price-card">
+              <div className="rv-price-top">
+                <b>Free</b>
+                <span className="rv-price-badge live">Available now</span>
+              </div>
+              <p className="rv-price-desc">The full prep loop — new questions every day, scored and explained.</p>
+              <div className="rv-price-value">₹0 <small>forever</small></div>
+              <button className="rv-price-btn dark" onClick={onEnter}>Start free</button>
+              <ul className="rv-price-list">
+                <li>5 fresh practice sets daily</li>
+                <li>Typing arena • 10 tests daily</li>
+                <li>Speaking lab • 5 sessions daily</li>
+                <li>1 mock interview daily</li>
+                <li>Maths arena • every 4 hours</li>
+                <li>Answer scripts + PDFs</li>
+              </ul>
+            </div>
+            <div className="rv-price-card">
+              <div className="rv-price-top">
+                <b>Pro</b>
+                <span className="rv-price-badge soon">Forthcoming</span>
+              </div>
+              <p className="rv-price-desc">Unlimited everything for the final stretch before your drive.</p>
+              <div className="rv-price-value">Coming soon</div>
+              <a
+                className="rv-price-btn ghost"
+                style={{ textDecoration: 'none', textAlign: 'center' }}
+                href="https://github.com/SubhamoyGhosh007/amcat-job-practice"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Request access
+              </a>
+              <ul className="rv-price-list">
+                <li>Unlimited sets, typing & speaking</li>
+                <li>Unlimited mocks & maths</li>
+                <li>Heaviest AI question writers</li>
+                <li>Priority new features</li>
+                <li className="off">Checkout opens at launch</li>
+              </ul>
+            </div>
+          </div>
+          <p className="rv-price-note">Pro accounts are currently granted manually — request access and we’ll set it up.</p>
         </div>
       </section>
 

@@ -547,6 +547,61 @@ a.rv-book .bnum { font-size: 22px; font-weight: 800; opacity: 0.9; }
   background: #fff;
 }
 
+/* ---------- pricing ---------- */
+.rv-price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 400px));
+  gap: 20px;
+  justify-content: center;
+  margin-top: 36px;
+}
+@media (max-width: 760px) { .rv-price-grid { grid-template-columns: minmax(0, 400px); } }
+.rv-price-card {
+  background: #fff;
+  border: 1px solid #dfdfdf;
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(17, 17, 17, 0.07);
+  padding: 24px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+.rv-price-top { display: flex; align-items: center; gap: 10px; }
+.rv-price-top b { font-size: 14px; }
+.rv-price-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+.rv-price-badge.live { background: #e6f7ee; color: #15803d; }
+.rv-price-badge.soon { background: var(--rv-soft); color: var(--rv-gray); }
+.rv-price-desc { font-size: 13px; color: var(--rv-gray); line-height: 1.6; margin: 10px 0 0; min-height: 42px; }
+.rv-price-value { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; margin: 12px 0 2px; }
+.rv-price-value small { font-size: 13px; font-weight: 600; color: var(--rv-gray); }
+.rv-price-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin: 16px 0 20px;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.rv-price-btn.dark { background: var(--rv-ink); color: #fff; box-shadow: 0 8px 20px rgba(17, 17, 17, 0.22); }
+.rv-price-btn.dark:hover { transform: translateY(-2px); }
+.rv-price-btn.ghost { background: #fff; color: var(--rv-ink); border: 1px solid #dfdfdf; }
+.rv-price-btn.ghost:hover { border-color: var(--rv-ink); }
+.rv-price-list { list-style: none; margin: 0; padding: 18px 0 0; border-top: 1px solid var(--rv-line); }
+.rv-price-list li { font-size: 12.5px; line-height: 1.55; color: #374151; padding: 6px 0 6px 26px; position: relative; }
+.rv-price-list li::before { content: '✓'; position: absolute; left: 2px; color: #22c55e; font-weight: 800; }
+.rv-price-list li.off { color: #9ca3af; }
+.rv-price-list li.off::before { content: '–'; color: #cbd5e1; }
+.rv-price-note { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 20px; }
+
 /* ---------- 8. FAQ (light skin on the shared accordion) ---------- */
 .rv-faq { max-width: 720px; margin: 30px auto 0; text-align: left; }
 .rv-faq .faq-item { background: #fff; border: none; border-bottom: 1px solid var(--rv-line); border-radius: 0; }
