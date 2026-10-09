@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flame, Gauge, Zap } from 'lucide-react';
+import { Flame, Gauge, Target, Zap } from 'lucide-react';
 import { SECTIONS } from '../types';
 import { useSession } from '../stores/session';
 import { downloadSpeakingReport } from '../lib/pdf';
@@ -68,8 +68,9 @@ export default function Dashboard() {
         if (!weakest || p < weakest.pct) weakest = { name: sec.name, pct: p };
       }
     }
-    return { count: sheets.length, avg, best, streak: streakOf(sheets), weakest };
+    return { count: sheets.length, avg, best, streak: streakOf(sheets), weakest, per };
   }, [sheets]);
+  const [tab, setTab] = useState<'overview' | 'sections' | 'activity'>('overview');
 
   // Simulated live feed: random-walk extension of the score line, ticking.
   const base = useMemo(() => sheets.slice(-8).map((s) => s.pct), [sheets]);
@@ -104,16 +105,35 @@ export default function Dashboard() {
           <span className="wv-live"><i /> LIVE SIMULATION</span>
         </div>
 
+        <div className="wv-tabs" role="tablist" aria-label="Dashboard views">
+          {(['overview', 'sections', 'activity'] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              aria-selected={tab === t}
+              className={`wv-tab${tab === t ? ' active' : ''}`}
+              onClick={() => setTab(t)}
+            >
+              {t[0].toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+        </div>
+
         <div className="wv-kpis">
           <div className="wv-card">
             <div className="k-label"><Zap size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Sets taken</div>
             <div className="k-value cyan">{stats.count}</div>
-            <div className="k-sub">{stats.best !== null ? `best ${stats.best}%` : 'take your first set ↓'}</div>
+            <div className="k-sub">graded sessions</div>
           </div>
           <div className="wv-card">
             <div className="k-label"><Gauge size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Average score</div>
             <div className="k-value">{stats.avg !== null ? `${stats.avg}%` : '—'}</div>
             <div className="k-sub">{stats.count ? `across ${stats.count} sets` : 'no data yet'}</div>
+          </div>
+          <div className="wv-card">
+            <div className="k-label"><Target size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Best score</div>
+            <div className="k-value" style={{ color: '#32d74b' }}>{stats.best !== null ? `${stats.best}%` : '—'}</div>
+            <div className="k-sub">personal record</div>
           </div>
           <div className="wv-card">
             <div className="k-label"><Flame size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Day streak</div>
@@ -122,6 +142,7 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {tab === 'overview' && (
         <div className="wv-grid">
           <div className="wv-card wv-chart-card">
             <h3>Score trajectory</h3>
@@ -162,7 +183,34 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+        )}
 
+        {tab === 'sections' && (
+          <div className="wv-card">
+            <h3>Accuracy by section</h3>
+            <div className="card-sub">All-time correct answers across graded sets</div>
+            {SECTIONS.map((sec) => {
+              const e = stats.per[sec.id];
+              const pct = e && e.t > 0 ? Math.round((e.c / e.t) * 100) : null;
+              return (
+                <div className="wv-secbar" key={sec.id}>
+                  <div className="row">
+                    <b>{sec.name}</b>
+                    <span className="pct" style={{ color: pct === null ? '#98989d' : pct >= 70 ? '#32d74b' : pct >= 50 ? '#00E5FF' : '#ff453a' }}>
+                      {pct === null ? '—' : `${pct}%`}
+                    </span>
+                  </div>
+                  <div className="track">
+                    <span style={{ width: `${pct ?? 0}%` }} />
+                  </div>
+                  <div className="card-sub" style={{ marginTop: 4 }}>{e ? `${e.c}/${e.t} correct` : 'no attempts yet'}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tab === 'activity' && (
         <div className="wv-card">
           <h3>Recent sessions</h3>
           <div className="card-sub">Latest graded sets on this device</div>
@@ -191,6 +239,7 @@ export default function Dashboard() {
             <div className="card-sub">Nothing graded yet.</div>
           )}
         </div>
+        )}
 
       <div className="wv-card" style={{ marginTop: 16, marginBottom: 0 }}>
         <h3>Start a new set</h3>
