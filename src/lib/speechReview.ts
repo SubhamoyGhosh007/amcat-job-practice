@@ -1,3 +1,6 @@
+import { groqChat, groqConfigured, groqModelsFor } from './groq';
+import { extractJson } from './generator';
+
 /**
  * Pronunciation review: Groq-hosted Whisper (large-v3-turbo, free tier)
  * transcribes the learner's recording; scoring runs 100% client-side.
@@ -160,6 +163,141 @@ export function saveReview(itemId: string, r: SpeechReview) {
     const all = JSON.parse(localStorage.getItem(RKEY) || '{}');
     all[itemId] = r;
     localStorage.setItem(RKEY, JSON.stringify(all));
+  } catch {
+    /* ignore */
+  }
+}
+
+/* ---------------- JAM (extempore) grading ---------------- */
+
+export interface JamGrade {
+  at: number;
+  topic: string;
+  transcript: string;
+  /** 0–10 overall */
+  marks: number;
+  content: number;
+  language: number;
+  delivery: number;
+  wpm: number;
+  fillers: number;
+  feedback: string[];
+  /** true when the LLM was unreachable and heuristics filled in */
+  estimated: boolean;
+}
+
+const FILLER_RE = /\b(um+|uh+|erm+|ah+|er+|hmm+|like|basically|actually|you know|i mean)\b/gi;
+
+function jamDelivery(wpm: number, fillerRate: number): number {
+  const pace = wpm >= 110 && wpm <= 170 ? 100 : Math.max(0, 100 - Math.abs(wpm - 140) * 1.2);
+  const clean = Math.max(0, 100 - fillerRate * 12);
+  return Math.round(pace * 0.6 + clean * 0.4);
+}
+
+/**
+ * Grade a 1-minute extempore: content + language from the LLM judge,
+ * delivery from measured pace + filler rate. Heuristic fallback when the
+ * LLM is unreachable (flagged as estimated in the UI).
+ */
+export async function gradeJam(topic: string, transcript: string, secs: number): Promise<JamGrade> {
+  const words = norm(transcript);
+  const wpm = Math.round((words.length / Math.max(1, secs)) * 60);
+  const fillers = (transcript.match(FILLER_RE) || []).length;
+  const fillerRate = words.length ? (fillers / words.length) * 100 : 0;
+  const delivery = jamDelivery(wpm, fillerRate);
+
+  const prompt =
+    `You grade 1-minute extempore speeches for Concentrix screening (weights: ideas over polish).\n` +
+    `Topic: "${topic}"\nSpeech (${secs}s, ~${words.length} words): "${transcript}"\n` +
+    `Return ONLY JSON: {"content":0-10 (topic relevance, ideas, structure),` +
+    `"language":0-10 (grammar, vocabulary range),` +
+    `"feedback":["exactly 3 short actionable lines, each under 20 words"]}`;
+
+  if (groqConfigured()) {
+    let lastErr = 'No Groq model answered';
+    for (const model of groqModelsFor()) {
+      try {
+        const text = await groqChat(
+          model,
+          'You are a strict but fair SVAR extempore examiner. Always reply with valid JSON only.',
+          prompt + '\n\nReply with valid JSON only.',
+          800
+        );
+        const g = extractJson(text);
+        const content = Math.max(0, Math.min(10, Math.round(Number(g.content) || 0)));
+        const language = Math.max(0, Math.min(10, Math.round(Number(g.language) || 0)));
+        const feedback = Array.isArray(g.feedback) ? g.feedback.map(String).slice(0, 3) : [];
+        const marks = Math.round(content * 0.4 + language * 0.3 + delivery * 0.3);
+        return { at: Date.now(), topic, transcript, marks, content, language, delivery, wpm, fillers, feedback, estimated: false };
+      } catch (e: any) {
+        lastErr = String((e as any)?.message || e);
+        continue;
+      }
+    }
+    void lastErr;
+  }
+
+  // Heuristic fallback: length adequacy + vocabulary spread, honestly flagged.
+  const uniq = new Set(words.filter((w) => w.length > 3)).size;
+  const adequacy = Math.min(1, words.length / 110);
+  const spread = Math.min(1, uniq / 60);
+  const content = Math.round((adequacy * 0.6 + spread * 0.4) * 10);
+  const language = Math.round(Math.min(10, 4 + spread * 6));
+  const marks = Math.round(content * 0.4 + language * 0.3 + delivery * 0.3);
+  const feedback = [
+    `Spoke ~${words.length} words in ${secs}s — aim for 110–170 words in a minute.`,
+    fillers > 3 ? `Cut filler sounds (${fillers} found: um, uh, like) — pause silently instead.` : 'Good control over filler sounds — keep pauses silent.',
+    'AI judge unreachable, so this is an estimated score — retry with connection for full content feedback.',
+  ];
+  return { at: Date.now(), topic, transcript, marks, content, language, delivery, wpm, fillers, feedback, estimated: true };
+}
+
+/** One surprise topic when the bank runs out of surprises (Groq, else random). */
+export async function surpriseTopic(fallback: string[]): Promise<{ topic: string; structure: string }> {
+  const fallbackPick = () => ({
+    topic: fallback[Math.floor(Math.random() * fallback.length)],
+    structure: 'Opening line → 2 points → 1 example → Closing line',
+  });
+  if (!groqConfigured()) return fallbackPick();
+  const prompt =
+    `Give ONE original Just-A-Minute speech topic for Indian fresher job screening (workplace, society, or daily life — never politics or religion).\n` +
+    `Avoid these recent topics: ${fallback.slice(0, 15).join(' | ')}.\n` +
+    `Return ONLY JSON: {"topic":"...","structure":"..."} where structure is a 4-step speaking plan under 15 words.`;
+  for (const model of groqModelsFor()) {
+    try {
+      const text = await groqChat(
+        model,
+        'You invent extempore topics. Always reply with valid JSON only.',
+        prompt + '\n\nReply with valid JSON only.',
+        300
+      );
+      const g = extractJson(text);
+      if (typeof g.topic === 'string' && g.topic.trim().length > 4) {
+        return { topic: g.topic.trim().slice(0, 120), structure: String(g.structure || '').slice(0, 160) || fallbackPick().structure };
+      }
+    } catch {
+      continue;
+    }
+  }
+  return fallbackPick();
+}
+
+const JKEY = 'amcat_jam_grades';
+
+export function readJamGrade(topic: string): JamGrade | null {
+  try {
+    const all = JSON.parse(localStorage.getItem(JKEY) || '{}');
+    return all[topic] || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveJamGrade(topic: string, g: JamGrade) {
+  try {
+    const all = JSON.parse(localStorage.getItem(JKEY) || '{}');
+    all[topic] = g;
+    localStorage.setItem(JKEY, JSON.stringify(all));
   } catch {
     /* ignore */
   }

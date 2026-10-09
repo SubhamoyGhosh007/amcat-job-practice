@@ -1,5 +1,27 @@
 /** Shared generation utilities. Single home — never copy-paste per file. */
 
+/**
+ * Rotating subset: prefer items unseen recently, reshuffle every call, and
+ * remember what was served. Same bank stops feeling identical across visits.
+ */
+export function rotatingSubset<T extends { id: string }>(items: T[], count: number, key: string): T[] {
+  let seen: string[] = [];
+  try {
+    seen = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch {
+    /* ignore */
+  }
+  const unseen = items.filter((i) => !seen.includes(i.id));
+  const pool = unseen.length >= count ? unseen : [...unseen, ...items.filter((i) => seen.includes(i.id))];
+  const picked = shuffle(pool).slice(0, count);
+  try {
+    localStorage.setItem(key, JSON.stringify([...picked.map((p) => p.id), ...seen].slice(0, items.length * 2)));
+  } catch {
+    /* ignore */
+  }
+  return picked;
+}
+
 export const uid = () => Math.random().toString(36).slice(2, 9);
 
 export const shuffle = <T,>(arr: T[]): T[] => {

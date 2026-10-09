@@ -10,12 +10,19 @@ import {
 } from '../data/svar';
 import { ttsConfigured } from '../lib/tts';
 import { bumpQuota, quotaStatus } from '../lib/usage';
+import { rotatingSubset } from '../lib/genUtils';
 import {
+  gradeJam,
+  readJamGrade,
+  saveJamGrade,
   saveReview,
   scoreAttempt,
+  surpriseTopic,
   transcribeAudio,
+  type JamGrade,
   type SpeechReview,
 } from '../lib/speechReview';
+import { friendlyError } from '../lib/friendly';
 import {
   SPEAK_LIMITS,
   deleteSpeakingReport,
@@ -153,17 +160,28 @@ function TtsGate() {
 function ListenTab({ refresh }: { refresh: () => void }) {
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
+  // Rotating subset: 6 fresh items per visit, unseen-first. Same bank, new set.
+  const [order, setOrder] = useState(() => rotatingSubset(LISTEN_BANK, 6, 'amcat_listen_seen'));
   const [plays, setPlays] = useState<Record<string, number>>({});
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [done, setDone] = useState(false);
   const [subErr, setSubErr] = useState('');
+
+  function newSet() {
+    setOrder(rotatingSubset(LISTEN_BANK, 6, 'amcat_listen_seen'));
+    setPlays({});
+    setPicked({});
+    setDone(false);
+    setSubErr('');
+    window.scrollTo({ top: 0 });
+  }
 
   function played(id: string) {
     setPlays((p) => ({ ...p, [id]: (p[id] || 0) + 1 }));
     bump({ plays: readStats().plays + 1 });
   }
 
-  const score = LISTEN_BANK.filter((q) => picked[q.id] === q.answerIndex).length;
+  const score = order.filter((q) => picked[q.id] === q.answerIndex).length;
 
   function submit() {
     setSubErr('');
@@ -189,7 +207,10 @@ function ListenTab({ refresh }: { refresh: () => void }) {
   return (
     <div>
       <TtsGate />
-      {LISTEN_BANK.map((q, i) => {
+      <div className="btnrow" style={{ justifyContent: 'flex-end', marginBottom: 4 }}>
+        <button className="btn-ghost" onClick={newSet}>↻ New listen set (6 fresh)</button>
+      </div>
+      {order.map((q, i) => {
         const mine = picked[q.id];
         const ok = done && mine === q.answerIndex;
         return (
@@ -227,7 +248,7 @@ function ListenTab({ refresh }: { refresh: () => void }) {
         </>
       ) : (
         <div className="card" style={{ textAlign: 'center' }}>
-          <b style={{ fontSize: 20 }}>You scored {score}/{LISTEN_BANK.length}</b>
+          <b style={{ fontSize: 20 }}>You scored {score}/{order.length}</b>
           <p className="hint">Transcripts revealed above — replay any audio and shadow the speaker.</p>
           <div className="btnrow" style={{ justifyContent: 'center' }}>
             <button
@@ -248,8 +269,17 @@ function ListenTab({ refresh }: { refresh: () => void }) {
 
 /* ---------------- tab 3: short answers (Versant / SVAR style) ---------------- */
 function ShortAnswersTab() {
+  // Rotating 8-subset: unseen-first. Same bank, new questions.
+  const [order, setOrder] = useState(() => rotatingSubset(SHORT_ANSWER_BANK, 8, 'amcat_short_seen'));
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+
+  function newSet() {
+    setOrder(rotatingSubset(SHORT_ANSWER_BANK, 8, 'amcat_short_seen'));
+    setAnswers({});
+    setChecked({});
+    window.scrollTo({ top: 0 });
+  }
 
   function check(id: string) {
     setChecked((prev) => ({ ...prev, [id]: true }));
@@ -264,8 +294,11 @@ function ShortAnswersTab() {
           Listen to the question once and give a direct, one-or-two word answer immediately. In actual AI scoring, questions move after 3 to 6 seconds of silence.
         </p>
       </div>
+      <div className="btnrow" style={{ justifyContent: 'flex-end', marginBottom: 4 }}>
+        <button className="btn-ghost" onClick={newSet}>↻ New 8 questions</button>
+      </div>
 
-      {SHORT_ANSWER_BANK.map((item, idx) => {
+      {order.map((item, idx) => {
         const val = answers[item.id] || '';
         const isDone = checked[item.id];
         const normVal = val.toLowerCase().trim();
@@ -275,7 +308,7 @@ function ShortAnswersTab() {
 
         return (
           <div className="svar-card" key={item.id}>
-            <div className="qnum">Question {idx + 1} of {SHORT_ANSWER_BANK.length}</div>
+            <div className="qnum">Question {idx + 1} of {order.length}</div>
             <PlayButton text={item.prompt} label="Play question audio" />
             <div
               style={{
@@ -343,11 +376,21 @@ function ShortAnswersTab() {
 
 /* ---------------- tab 4: sentence builds (jumbled sentences) ---------------- */
 function SentenceBuildsTab() {
+  // Rotating 9-subset: unseen-first, reshuffled on demand. Same bank, new order.
+  const [order, setOrder] = useState(() => rotatingSubset(JUMBLED_SENTENCES_BANK, 9, 'amcat_jumble_seen'));
   const [activeIdx, setActiveIdx] = useState(0);
   const [builtWords, setBuiltWords] = useState<string[]>([]);
   const [checked, setChecked] = useState(false);
 
-  const curr = JUMBLED_SENTENCES_BANK[activeIdx];
+  function newSet() {
+    setOrder(rotatingSubset(JUMBLED_SENTENCES_BANK, 9, 'amcat_jumble_seen'));
+    setActiveIdx(0);
+    setBuiltWords([]);
+    setChecked(false);
+    window.scrollTo({ top: 0 });
+  }
+
+  const curr = order[activeIdx];
   const chips = curr.jumbled.split(' / ');
 
   const remainingChips = chips.filter((c, i) => {
@@ -372,7 +415,7 @@ function SentenceBuildsTab() {
   }
 
   function next() {
-    if (activeIdx < JUMBLED_SENTENCES_BANK.length - 1) {
+    if (activeIdx < order.length - 1) {
       setActiveIdx(activeIdx + 1);
       setBuiltWords([]);
       setChecked(false);
@@ -404,11 +447,14 @@ function SentenceBuildsTab() {
 
       <div className="svar-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span className="qnum">Sentence {activeIdx + 1} of {JUMBLED_SENTENCES_BANK.length}</span>
+          <span className="qnum">Sentence {activeIdx + 1} of {order.length}</span>
           <div style={{ display: 'flex', gap: 6 }}>
             <button className="btn-ghost" disabled={activeIdx === 0} onClick={prev} style={{ padding: '4px 10px', fontSize: 12 }}>← Previous</button>
-            <button className="btn-ghost" disabled={activeIdx === JUMBLED_SENTENCES_BANK.length - 1} onClick={next} style={{ padding: '4px 10px', fontSize: 12 }}>Next →</button>
+            <button className="btn-ghost" disabled={activeIdx === order.length - 1} onClick={next} style={{ padding: '4px 10px', fontSize: 12 }}>Next →</button>
           </div>
+        </div>
+        <div className="btnrow" style={{ justifyContent: 'flex-end', marginTop: 0, marginBottom: 10 }}>
+          <button className="btn-ghost" onClick={newSet} style={{ padding: '4px 10px', fontSize: 12 }}>↻ New 9 (unseen first)</button>
         </div>
 
         <div style={{ fontSize: 14, color: '#9fb0cc', marginBottom: 8 }}>Jumbled components:</div>
@@ -464,7 +510,7 @@ function SentenceBuildsTab() {
               Check Sentence ✓
             </button>
           ) : (
-            <button className="btn-big" onClick={next} disabled={activeIdx === JUMBLED_SENTENCES_BANK.length - 1}>
+            <button className="btn-big" onClick={next} disabled={activeIdx === order.length - 1}>
               Next sentence →
             </button>
           )}
@@ -488,28 +534,95 @@ function SentenceBuildsTab() {
 
 /* ---------------- tab 5: extempore (JAM - Just A Minute) ---------------- */
 function ExtemporeTab() {
-  const [topicIdx, setTopicIdx] = useState(0);
-  const [prepLeft, setPrepLeft] = useState<number | null>(null);
-  const [prepRunning, setPrepRunning] = useState(false);
+  const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
+  // Random topic on arrival; timers fire automatically: 30s prep → 60s speak.
+  const [topicIdx, setTopicIdx] = useState(() => Math.floor(Math.random() * EXTEMPORE_TOPICS.length));
+  const [custom, setCustom] = useState<{ topic: string; structure: string } | null>(null);
+  const [surprising, setSurprising] = useState(false);
+  const [phase, setPhase] = useState<'prep' | 'speak' | 'done'>('prep');
+  const [prepLeft, setPrepLeft] = useState(30);
+  const [grade, setGrade] = useState<JamGrade | null>(null);
+  const [grading, setGrading] = useState(false);
+  const [gradeErr, setGradeErr] = useState('');
   const [showModel, setShowModel] = useState(false);
   const recorder = useRecorder();
 
-  const topic = EXTEMPORE_TOPICS[topicIdx];
+  const topic = custom || EXTEMPORE_TOPICS[topicIdx];
+  const modelAnswer: string | undefined = (topic as { modelAnswer?: string }).modelAnswer;
+  const topicKey = custom ? `ai:${custom.topic}` : `bank:${EXTEMPORE_TOPICS[topicIdx].topic}`;
 
+  function pickRandom() {
+    let n = topicIdx;
+    while (EXTEMPORE_TOPICS.length > 1 && n === topicIdx) n = Math.floor(Math.random() * EXTEMPORE_TOPICS.length);
+    setTopicIdx(n);
+    setCustom(null);
+  }
+
+  async function surprise() {
+    setSurprising(true);
+    try {
+      const s = await surpriseTopic(EXTEMPORE_TOPICS.map((t) => t.topic));
+      setCustom(s);
+    } finally {
+      setSurprising(false);
+    }
+  }
+
+  // New topic (or mount): reset everything, prep countdown fires on its own.
   useEffect(() => {
-    if (!prepRunning) return;
+    recorder.reset();
+    setGrade(readJamGrade(custom ? `ai:${custom.topic}` : `bank:${EXTEMPORE_TOPICS[topicIdx].topic}`));
+    setGradeErr('');
+    setPhase('prep');
     setPrepLeft(30);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicIdx, custom?.topic]);
+
+  // Prep countdown → auto-start recording. No gesture means the browser may
+  // refuse the mic; the manual button below covers that case.
+  useEffect(() => {
+    if (phase !== 'prep') return;
     const end = Date.now() + 30 * 1000;
     const interval = window.setInterval(() => {
       const remaining = Math.max(0, Math.ceil((end - Date.now()) / 1000));
       setPrepLeft(remaining);
       if (remaining <= 0) {
         window.clearInterval(interval);
-        setPrepRunning(false);
+        setPhase('speak');
+        recorder.start(60).catch(() => {});
       }
     }, 250);
     return () => window.clearInterval(interval);
-  }, [prepRunning]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, topicIdx, custom?.topic]);
+
+  // Recording finished (auto-stop at 60s or manual) → ready to grade.
+  useEffect(() => {
+    if (phase === 'speak' && recorder.url) setPhase('done');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.url]);
+
+  async function runGrade() {
+    if (!recorder.blob || grading) return;
+    setGradeErr('');
+    setGrading(true);
+    try {
+      if (userId) {
+        const q = await quotaStatus('speaking', userId, tier);
+        if (!q.allowed && !q.offline) throw new Error(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
+      }
+      const { text } = await transcribeAudio(recorder.blob);
+      const g = await gradeJam(topic.topic, text, recorder.secs);
+      saveJamGrade(topicKey, g);
+      setGrade(g);
+      if (userId) bumpQuota('speaking', userId).catch(() => {});
+    } catch (e) {
+      setGradeErr(friendlyError(e));
+    } finally {
+      setGrading(false);
+    }
+  }
 
   return (
     <div>
@@ -521,26 +634,16 @@ function ExtemporeTab() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        {EXTEMPORE_TOPICS.map((t, idx) => (
-          <button
-            key={idx}
-            className={`radio-pill ${topicIdx === idx ? 'active' : ''}`}
-            onClick={() => {
-              setTopicIdx(idx);
-              setPrepRunning(false);
-              setPrepLeft(null);
-              setShowModel(false);
-              recorder.reset();
-            }}
-          >
-            {t.topic}
-          </button>
-        ))}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+        <button className="btn-primary" onClick={pickRandom}>🎲 New random topic</button>
+        <button className="btn-ghost" disabled={surprising} onClick={surprise}>
+          {surprising ? 'Dreaming one up…' : '✨ AI surprise topic'}
+        </button>
+        <span className="hint">{custom ? 'AI-given topic' : `Topic ${topicIdx + 1} of ${EXTEMPORE_TOPICS.length}`}</span>
       </div>
 
       <div className="svar-card">
-        <span className="topic">Topic #{topicIdx + 1} • Extempore Speech</span>
+        <span className="topic">Extempore Speech • 30s prep → 60s speak (auto)</span>
         <h2 style={{ fontSize: 24, margin: '8px 0 12px', color: '#fff' }}>“{topic.topic}”</h2>
 
         <div style={{ background: '#122550', borderRadius: 10, padding: '14px 18px', margin: '14px 0', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -552,49 +655,65 @@ function ExtemporeTab() {
           </div>
         </div>
 
-        {/* Phase 1: 30s Prep Timer */}
+        {/* Phase 1: 30s prep, fires automatically */}
         <div style={{ margin: '18px 0', padding: '14px 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <div>
               <b>Step 1: 30-Second Thinking Timer</b>
-              <div className="hint">Take 30 seconds to plan your opening, two points, and one example.</div>
+              <div className="hint">Starts on its own — plan your opening, two points, and one example.</div>
             </div>
             <div>
-              {prepLeft === null ? (
-                <button className="btn-primary" onClick={() => setPrepRunning(true)}>
-                  ⏱️ Start 30s Prep Timer
-                </button>
-              ) : prepRunning ? (
-                <span style={{ fontSize: 20, fontWeight: 800, color: '#f5a623' }}>
-                  ⏳ {prepLeft}s thinking...
-                </span>
+              {phase === 'prep' ? (
+                <>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: '#f5a623' }}>⏳ {prepLeft}s thinking…</span>{' '}
+                  <button
+                    className="btn-ghost"
+                    onClick={() => {
+                      setPhase('speak');
+                      recorder.start(60).catch(() => {});
+                    }}
+                  >
+                    Skip prep →
+                  </button>
+                </>
               ) : (
-                <span style={{ fontSize: 15, fontWeight: 700, color: '#38d98a' }}>
-                  ✅ Prep time finished! Now speak.
-                </span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#38d98a' }}>✅ Prep done</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Phase 2: Speech Recorder */}
+        {/* Phase 2: 60s speech, recording auto-starts */}
         <div style={{ margin: '18px 0', padding: '14px 18px', borderRadius: 10, border: '1px solid var(--border)' }}>
-          <b>Step 2: Record Your Speech (45–60 Seconds)</b>
-          <div className="hint" style={{ marginBottom: 12 }}>Speak smoothly at a steady pace. Land word endings clearly.</div>
+          <b>Step 2: Speak for up to 60 Seconds</b>
+          <div className="hint" style={{ marginBottom: 12 }}>Recording starts by itself when prep ends. Speak smoothly, land word endings clearly.</div>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            {!recorder.recording ? (
-              <button className="btn-big" onClick={() => recorder.start(60)}>
-                🎙️ Start speaking ({recorder.url ? 'record again' : 'record'})
-              </button>
-            ) : (
+            {recorder.recording ? (
               <button
                 className="btn-big"
                 onClick={recorder.stop}
                 style={{ background: '#d64545', borderColor: '#d64545' }}
               >
-                ⏹️ Stop recording ({recorder.secs}s / 60s)
+                ⏹️ Stop ({recorder.secs}s / 60s)
               </button>
+            ) : recorder.url ? (
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  recorder.reset();
+                  setPhase('speak');
+                  recorder.start(60).catch(() => {});
+                }}
+              >
+                ↻ Re-record
+              </button>
+            ) : phase === 'speak' ? (
+              <button className="btn-big" onClick={() => recorder.start(60).catch(() => {})}>
+                🎙️ Tap to start speaking
+              </button>
+            ) : (
+              <span className="hint">Waiting for prep to finish…</span>
             )}
 
             {recorder.url && (
@@ -604,7 +723,44 @@ function ExtemporeTab() {
           {recorder.error && <div className="err" style={{ marginTop: 8 }}>{recorder.error}</div>}
         </div>
 
-        {/* Step 3: Model comparison */}
+        {/* Step 3: grading */}
+        {phase === 'done' && recorder.url && (
+          <div style={{ marginTop: 8 }}>
+            {!grade ? (
+              <>
+                <button className="btn-big" disabled={grading} onClick={runGrade}>
+                  {grading ? (<><span className="spinner" /> Transcribing & grading…</>) : ('⭐ Grade my speech')}
+                </button>
+                {gradeErr && <div className="err" style={{ marginTop: 8 }}>{gradeErr}</div>}
+              </>
+            ) : (
+              <div className="rev correct" style={{ marginTop: 4 }}>
+                <div className="qnum">
+                  ⭐ {grade.marks}/10 • content {grade.content} • language {grade.language} • delivery {grade.delivery}
+                  {grade.estimated ? ' • estimated' : ''}
+                </div>
+                <div style={{ fontSize: 13.5, margin: '6px 0' }}>
+                  <div>Content {grade.content}/10 • Language {grade.language}/10 • Delivery {grade.delivery}/10</div>
+                  <div className="hint">Pace {grade.wpm} wpm • {grade.fillers} filler sounds</div>
+                </div>
+                <div className="exp" style={{ overflowWrap: 'anywhere' }}>
+                  <b>You said:</b> “{grade.transcript}”
+                </div>
+                <div className="exp" style={{ marginTop: 6 }}>
+                  <b>Coach feedback:</b>
+                  <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                    {grade.feedback.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 4: Model comparison (bank topics carry a model speech) */}
+        {modelAnswer && (
         <div style={{ marginTop: 20 }}>
           <button className="btn-ghost" onClick={() => setShowModel(!showModel)}>
             {showModel ? 'Hide Model Answer ▲' : 'Show Coach Model Speech ▼'}
@@ -613,12 +769,13 @@ function ExtemporeTab() {
             <div style={{ marginTop: 12, background: 'rgba(77,124,254,0.08)', border: '1px solid rgba(125,160,255,0.25)', borderRadius: 10, padding: '16px 18px' }}>
               <div style={{ fontWeight: 700, color: '#38bdf8', marginBottom: 6 }}>Word-for-Word Concentrix Model Speech:</div>
               <p style={{ margin: '0 0 10px', fontStyle: 'italic', fontSize: 15, color: '#eaf1ff', lineHeight: 1.65 }}>
-                “{topic.modelAnswer}”
+                “{modelAnswer}”
               </p>
-              <PlayButton text={topic.modelAnswer} label="Listen to model delivery" />
+              <PlayButton text={modelAnswer} label="Listen to model delivery" />
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );
