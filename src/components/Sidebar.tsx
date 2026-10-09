@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import type { MouseEvent, ReactNode } from 'react';
-import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react';
+import { Bell, Crown, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Plus, Search, Zap } from 'lucide-react';
 import { useAuthActions } from '../auth/actions';
 import { AvatarFace } from '../components/AuthWidgets';
 import { useConfirm } from '../ui/alert-dialog';
@@ -14,6 +14,11 @@ export interface SideItem {
   end?: boolean;
   label: string;
   Icon: (p: { size?: number }) => ReactNode;
+}
+
+export interface SideGroup {
+  label: string;
+  items: SideItem[];
 }
 
 type AskFn = (o: ConfirmOptions) => Promise<boolean>;
@@ -46,16 +51,27 @@ export async function askLeave(ask: AskFn): Promise<boolean> {
   }
 }
 
+/** Programmatic guarded navigation (footer profile, header bell). */
+export function useGuardedNavigate() {
+  const navigate = useNavigate();
+  const ask = useConfirm();
+  return async (to: string) => {
+    if (await askLeave(ask)) navigate(to);
+  };
+}
+
 function GuardedLink({
   to,
   end,
   title,
+  active,
   onNav,
   children,
 }: {
   to: string;
   end?: boolean;
   title?: string;
+  active?: boolean;
   onNav?: () => void;
   children: ReactNode;
 }) {
@@ -71,7 +87,9 @@ function GuardedLink({
     <NavLink
       to={to}
       end={end}
-      className={({ isActive }) => `wv-link${isActive ? ' active' : ''} t-tt-trigger`}
+      className={({ isActive }) =>
+        `wv-link t-tt-trigger${isActive || active ? ' active' : ''}`
+      }
       data-tooltip={title}
       onClick={onClick}
     >
@@ -112,19 +130,26 @@ function MobileTrigger({ className = 'wv-iconbtn' }: { className?: string }) {
 }
 
 /** shadcn-style sidebar: provider state lives in useUi, tooltips shared per nav. */
-export function Sidebar({ items }: { items: SideItem[] }) {
+export function Sidebar({ groups }: { groups: SideGroup[] }) {
   const profile = useSession((s) => s.profile);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const collapsed = useUi((s) => s.collapsed);
   const mobileOpen = useUi((s) => s.mobileOpen);
   const setMobileOpen = useUi((s) => s.setMobileOpen);
   const { logout } = useAuthActions();
   const navigate = useNavigate();
   const ask = useConfirm();
+  const [query, setQuery] = useState('');
 
   async function doLogout() {
     if (!(await askLeave(ask))) return;
     await logout().catch(() => {});
     navigate('/', { replace: true });
+  }
+
+  async function go(to: string) {
+    setMobileOpen(false);
+    if (await askLeave(ask)) navigate(to);
   }
 
   // Skill tooltip orchestration: one bubble shared by every nav trigger.
@@ -191,7 +216,12 @@ export function Sidebar({ items }: { items: SideItem[] }) {
       cleanups.forEach((fn) => fn());
       group.removeEventListener('pointerleave', hide);
     };
-  }, []);
+  });
+
+  const q = query.trim().toLowerCase();
+  const visible = groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => !q || i.label.toLowerCase().includes(q)) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <>
@@ -207,29 +237,85 @@ export function Sidebar({ items }: { items: SideItem[] }) {
           </span>
           <SidebarTrigger />
         </div>
+        <div className="wv-side-tools">
+          {!collapsed && (
+            <div className="wv-search">
+              <Search size={15} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search…"
+                aria-label="Search menu"
+              />
+            </div>
+          )}
+          <button
+            className="wv-iconbtn wv-bell"
+            onClick={() => go('/app/health')}
+            title="System status"
+          >
+            <Bell size={17} />
+            <i className="wv-dot" />
+          </button>
+        </div>
         <nav className="wv-side-group t-tt-group" ref={navRef}>
-          <div className="wv-side-label">Menu</div>
-          {items.map(({ to, end, label, Icon }) => (
-            <GuardedLink key={to} to={to} end={end} title={label} onNav={() => setMobileOpen(false)}>
-              <Icon size={19} />
-              <span>{label}</span>
-            </GuardedLink>
+          {visible.map((g) => (
+            <div key={g.label}>
+              <div className="wv-side-label">{g.label}</div>
+              {g.items.map(({ to, end, label, Icon }) => (
+                <GuardedLink key={to} to={to} end={end} title={label} onNav={() => setMobileOpen(false)}>
+                  <Icon size={19} />
+                  <span>{label}</span>
+                </GuardedLink>
+              ))}
+            </div>
           ))}
-          <div className="wv-side-label">Quick action</div>
-          <GuardedLink to="/app/instructions" title="New set" onNav={() => setMobileOpen(false)}>
-            <Plus size={19} />
-            <span>New set</span>
-          </GuardedLink>
+          {visible.length === 0 && (
+            <div className="wv-side-empty">No matches for “{query.trim()}”.</div>
+          )}
           <span className="t-tt" data-show="false" aria-hidden="true" role="tooltip">
             <span className="t-tt-text" />
           </span>
         </nav>
+        <div className="wv-side-mid">
+          {tier === 'pro' ? (
+            <div className="wv-procard live">
+              <div className="wv-prohead">
+                <Zap size={17} />
+                <b>Pro active</b>
+              </div>
+              <p>Unlimited everything. Keep the streak burning.</p>
+            </div>
+          ) : (
+            <div className="wv-procard">
+              <div className="wv-prohead">
+                <Crown size={17} />
+                <b>Go Pro</b>
+              </div>
+              <p>Unlimited sets, mocks and voice sessions.</p>
+              <a
+                href="https://github.com/SubhamoyGhosh007/amcat-job-practice"
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => {
+                  if (useUi.getState().leaveGuard) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <Plus size={15} /> Request access
+              </a>
+            </div>
+          )}
+        </div>
         <div className="wv-side-foot">
-          <AvatarFace id={profile?.avatarId ?? 0} size={34} />
-          <span className="wv-side-user">
-            <b>@{profile?.username || '…'}</b>
-            <span>score sheets sync</span>
-          </span>
+          <button className="wv-profile" onClick={() => go('/app/settings')} title="Profile settings">
+            <AvatarFace id={profile?.avatarId ?? 0} size={34} />
+            <span className="wv-side-user">
+              <b>@{profile?.username || '…'}</b>
+              <span>score sheets sync</span>
+            </span>
+          </button>
           <button className="wv-iconbtn logout" onClick={doLogout} title="Log out">
             <LogOut size={17} />
           </button>

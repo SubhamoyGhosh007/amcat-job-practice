@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mic,
+  Plus,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuthActions } from '../auth/actions';
@@ -32,15 +33,26 @@ const TITLES: Record<string, string> = {
   '/app/health': 'Health check',
 };
 
-const NAV = [
-  { to: '/app', end: true, label: 'Practice', Icon: LayoutDashboard },
-  { to: '/app/sheets', end: false, label: 'My sheets', Icon: ClipboardList },
-  { to: '/app/typing', end: false, label: 'Typing arena', Icon: Keyboard },
-  { to: '/app/speaking', end: false, label: 'Speaking lab', Icon: Mic },
-  { to: '/app/interview', end: false, label: 'Mock interview', Icon: Briefcase },
-  { to: '/app/maths', end: false, label: 'Maths practice', Icon: Calculator },
-  { to: '/app/settings', end: false, label: 'Settings', Icon: SettingsIcon },
-  { to: '/app/health', end: false, label: 'Health check', Icon: Activity },
+const GROUPS = [
+  {
+    label: 'Menu',
+    items: [
+      { to: '/app', end: true, label: 'Practice', Icon: LayoutDashboard },
+      { to: '/app/typing', end: false, label: 'Typing arena', Icon: Keyboard },
+      { to: '/app/speaking', end: false, label: 'Speaking lab', Icon: Mic },
+      { to: '/app/interview', end: false, label: 'Mock interview', Icon: Briefcase },
+      { to: '/app/maths', end: false, label: 'Maths practice', Icon: Calculator },
+    ],
+  },
+  {
+    label: 'More',
+    items: [
+      { to: '/app/instructions', end: false, label: 'New set', Icon: Plus },
+      { to: '/app/sheets', end: false, label: 'My sheets', Icon: ClipboardList },
+      { to: '/app/settings', end: false, label: 'Settings', Icon: SettingsIcon },
+      { to: '/app/health', end: false, label: 'Health check', Icon: Activity },
+    ],
+  },
 ];
 
 export default function AppShell() {
@@ -78,7 +90,7 @@ export default function AppShell() {
 
   return (
     <div>
-      <Sidebar items={NAV} />
+      <Sidebar groups={GROUPS} />
 
       <div className={`wv-main${collapsed ? ' wide' : ''}`}>
         <header className="sb-top">
