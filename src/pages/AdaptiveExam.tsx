@@ -8,12 +8,14 @@ import { recordAttempt } from '../lib/bank';
 import { useExam } from '../stores/exam';
 import { useSession } from '../stores/session';
 import { useConfirm } from '../ui/alert-dialog';
+import { AiProctorOverlay } from '../components/AiProctorOverlay';
 
 export default function AdaptiveExam() {
   const navigate = useNavigate();
   const ask = useConfirm();
   const activeSet = useExam((s) => s.activeSet);
   const finish = useExam((s) => s.finish);
+  const proctored = useExam((s) => s.proctored);
   const userId = useSession((s) => s.userId);
   const email = useSession((s) => s.email);
   const profile = useSession((s) => s.profile);
@@ -117,13 +119,24 @@ export default function AdaptiveExam() {
     });
   }
 
+  // In proctored mode, auto-request fullscreen when starting
+  useEffect(() => {
+    if (proctored && activeSet) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, [proctored, activeSet]);
+
   if (!activeSet) return <Navigate to="/app" replace />;
 
   return (
     <div>
+      {proctored && <AiProctorOverlay autoLockdown checkAudio />}
       <div className="topbar">
         <div>
-          <div className="brand">Concentrix AMCAT • Full paper</div>
+          <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            Concentrix AMCAT • Full paper
+            {proctored && <span className="chip amber" style={{ fontSize: 10, margin: 0, padding: '2px 8px' }}>🎥 Monitored</span>}
+          </div>
           <div className="sub">
             {sourceLabel(activeSet.source, activeSet.origin)} • answered {answered}/{total}
           </div>

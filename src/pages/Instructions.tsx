@@ -99,7 +99,27 @@ export default function Instructions() {
               </div>
             </div>
             <div className="field">
-              <span className="hint">Fresh AI questions, newly made for every attempt — the backend picks the fastest available writer automatically.</span>
+              <label>Exam Mode</label>
+              <div className="radio-row">
+                <div
+                  className={`radio-pill ${useExam.getState().proctored ? 'active' : ''}`}
+                  onClick={() => useExam.getState().setProctored(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  🎥 Official AMCAT AI Monitored (Camera + Fullscreen)
+                </div>
+                <div
+                  className={`radio-pill ${!useExam.getState().proctored ? 'active' : ''}`}
+                  onClick={() => useExam.getState().setProctored(false)}
+                >
+                  ⚡ Standard Practice
+                </div>
+              </div>
+              <span className="hint">
+                {useExam.getState().proctored
+                  ? 'Monitored mode mirrors the official AMCAT testing hall: live webcam face-tracking PIP, no tab-switching, fullscreen lock, and audio monitoring.'
+                  : 'Standard mode lets you practice without camera or fullscreen constraints.'}
+              </span>
             </div>
             {error && <div className="err">{error}</div>}
         <div className="btnrow">

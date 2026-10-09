@@ -23,6 +23,7 @@ import {
   type MockTest,
   type PartEItem,
 } from '../data/mockInterview';
+import { AiProctorOverlay } from '../components/AiProctorOverlay';
 import '../svar.css';
 
 /* ---------------- countdown ---------------- */
@@ -657,6 +658,16 @@ export default function Interview() {
         </div>
       ) : (
         <>
+          {!practiceModeRef.current && (
+            <AiProctorOverlay
+              autoLockdown
+              checkAudio
+              onViolation={(type, msg) => {
+                flagsRef.current += 1;
+                console.info(`[AMCAT Proctor Alert] ${type}: ${msg}`);
+              }}
+            />
+          )}
           <div className="card" style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
               <b>{PART_LABEL[part]} • item {stepIdx + 1} of {steps.length}</b>
