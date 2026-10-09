@@ -693,7 +693,7 @@ function MockCallTab() {
 
         {/* Customer bubble */}
         <div style={{ background: '#122550', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '16px 18px', margin: '14px 0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div className="mockcall-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 10 }}>
             <span style={{ color: '#f5a623', fontWeight: 700, fontSize: 13, textTransform: 'uppercase' }}>
               👤 Customer on line
             </span>
@@ -959,6 +959,8 @@ export default function Svar() {
 
   const [phase, setPhase] = useState<Phase>('lobby');
   const [stepIdx, setStepIdx] = useState(0);
+  // Escape hatch: checked between items so scoring can never trap the page.
+  const cancelRef = useRef(false);
   const [items, setItems] = useState<SessionItem[]>(() => staticItems());
   const [recs, setRecs] = useState<Record<string, SessionRec>>({});
   const [report, setReport] = useState<SpeakingReport | null>(null);
@@ -1106,45 +1108,57 @@ export default function Svar() {
       setError('Record at least one item before finishing — empty sessions don’t count.');
       return;
     }
+    cancelRef.current = false;
     setPhase('scoring');
     setScoring({ done: 0, total: keys.length });
     const reportItems: SpeakingReport['items'] = [];
-    for (const key of keys) {
-      const item = items.find((i) => i.key === key);
-      if (!item) continue;
-      const rec = recs[key];
-      // Fresh recordings are always transcribed fresh; saved reports never re-call.
-      let review = null;
-      try {
-        const { text } = await transcribeAudio(rec.blob);
-        review = scoreAttempt(item.text, text, rec.secs);
-        saveReview(key, review);
-      } catch (e) {
-        review = null;
+    // The report ALWAYS builds — per-item race timeouts plus a cancel button
+    // mean a hung transcription can delay scoring but never trap the page.
+    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, rej) => window.setTimeout(() => rej(new Error('Timed out')), ms))]);
+    try {
+      for (const key of keys) {
+        if (cancelRef.current) break;
+        const item = items.find((i) => i.key === key);
+        if (!item) {
+          setScoring((s) => ({ ...s, done: s.done + 1 }));
+          continue;
+        }
+        const rec = recs[key];
+        // Fresh recordings are always transcribed fresh; saved reports never re-call.
+        let review = null;
+        try {
+          const { text } = await withTimeout(transcribeAudio(rec.blob), 75_000);
+          review = scoreAttempt(item.text, text, rec.secs);
+          saveReview(key, review);
+        } catch (e) {
+          review = null;
+        }
+        reportItems.push({ key, kind: item.kind, text: item.text, secs: rec.secs, review, poolId: item.poolId });
+        setScoring((s) => ({ ...s, done: s.done + 1 }));
       }
-      reportItems.push({ key, kind: item.kind, text: item.text, secs: rec.secs, review, poolId: item.poolId });
-      setScoring((s) => ({ ...s, done: s.done + 1 }));
+    } finally {
+      const rep = speakingReportFromItems(
+        { userId: userId!, username: profile?.username || (email ? email.split('@')[0] : 'friend') },
+        reportItems
+      );
+      setReport(rep);
+      setPhase('report');
+      window.scrollTo({ top: 0 });
+      // Pool samples scored in this finished session count as completed —
+      // unfinished old ones keep coming back until done.
+      recordSampleCompletions(
+        userId,
+        reportItems.filter((i) => i.poolId && i.review).map((i) => i.poolId as string)
+      ).catch(() => {});
+      saveSpeakingReport(rep)
+        .then(() => listSpeakingReports(userId).then(setHistory).catch(() => {}))
+        .catch(() => {});
+      if (userId) bumpQuota('speaking', userId).catch(() => {});
+      refreshQuota();
+      bump({ done: readStats().done + 1 });
+      setStats(readStats());
     }
-    const rep = speakingReportFromItems(
-      { userId: userId!, username: profile?.username || (email ? email.split('@')[0] : 'friend') },
-      reportItems
-    );
-    setReport(rep);
-    setPhase('report');
-    window.scrollTo({ top: 0 });
-    // Pool samples scored in this finished session count as completed —
-    // unfinished old ones keep coming back until done.
-    recordSampleCompletions(
-      userId,
-      reportItems.filter((i) => i.poolId && i.review).map((i) => i.poolId as string)
-    ).catch(() => {});
-    saveSpeakingReport(rep)
-      .then(() => listSpeakingReports(userId).then(setHistory).catch(() => {}))
-      .catch(() => {});
-    if (userId) bumpQuota('speaking', userId).catch(() => {});
-    refreshQuota();
-    bump({ done: readStats().done + 1 });
-    setStats(readStats());
   }
 
   function openHistory(r: SpeakingReport) {
@@ -1305,6 +1319,12 @@ export default function Svar() {
           <div style={{ height: 8, borderRadius: 99, background: '#e7ecf5', marginTop: 12, overflow: 'hidden', maxWidth: 320, marginLeft: 'auto', marginRight: 'auto' }}>
             <div style={{ height: '100%', width: scoring.total ? `${(scoring.done / scoring.total) * 100}%` : '0%', borderRadius: 99, background: 'linear-gradient(90deg,#4d7cfe,#38bdf8)' }} />
           </div>
+          <div className="btnrow" style={{ justifyContent: 'center', marginTop: 16, marginBottom: 0 }}>
+            <button className="btn-ghost" onClick={() => { cancelRef.current = true; }}>
+              Cancel scoring — keep what’s done
+            </button>
+          </div>
+          <p className="hint">Slow connection? Cancel builds the report from finished items only.</p>
         </div>
       )}
 

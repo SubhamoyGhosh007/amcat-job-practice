@@ -245,6 +245,7 @@ export default function Landing() {
 
   const [openRoad, setOpenRoad] = useState(ROADMAP[0].id);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [navOpen, setNavOpen] = useState(false);
 
   return (
     <div className="rv landing" id="top">
@@ -255,18 +256,54 @@ export default function Landing() {
             <img src="/logo.jpg" alt="Concentrix AMCAT Practice logo" />
             AMCAT Practice
           </button>
-          {NAV_LINKS.map((l) => (
-            <button
-              key={l.id}
-              className={`rv-nav-link${activeNav === l.id ? ' active' : ''}`}
-              onClick={() => scrollToId(l.id)}
-            >
-              {l.label}
-            </button>
-          ))}
+          <span className="rv-nav-links">
+            {NAV_LINKS.map((l) => (
+              <button
+                key={l.id}
+                className={`rv-nav-link${activeNav === l.id ? ' active' : ''}`}
+                onClick={() => scrollToId(l.id)}
+              >
+                {l.label}
+              </button>
+            ))}
+          </span>
           <button className="rv-nav-cta" onClick={onEnter}>Start free</button>
+          <button className="rv-burger" aria-label="Open menu" onClick={() => setNavOpen(true)}>
+            <span /><span /><span />
+          </button>
         </div>
       </div>
+      {navOpen && <div className="rv-drawer-veil" onClick={() => setNavOpen(false)} />}
+      <nav className={`rv-drawer${navOpen ? ' open' : ''}`} aria-label="Site menu">
+        <div className="rv-drawer-head">
+          <span className="rv-drawer-brand">
+            <img src="/logo.jpg" alt="Concentrix AMCAT Practice logo" />
+            AMCAT Practice
+          </span>
+          <button className="rv-drawer-x" aria-label="Close menu" onClick={() => setNavOpen(false)}>✕</button>
+        </div>
+        {NAV_LINKS.map((l) => (
+          <button
+            key={l.id}
+            className={`rv-drawer-link${activeNav === l.id ? ' active' : ''}`}
+            onClick={() => {
+              setNavOpen(false);
+              scrollToId(l.id);
+            }}
+          >
+            {l.label}
+          </button>
+        ))}
+        <button
+          className="rv-btn-primary rv-drawer-cta"
+          onClick={() => {
+            setNavOpen(false);
+            onEnter();
+          }}
+        >
+          Start free
+        </button>
+      </nav>
 
       {/* 2. hero with floating subject cards */}
       <header className="rv-hero">

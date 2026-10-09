@@ -11,6 +11,13 @@
 .svar-rec .live { width: 10px; height: 10px; border-radius: 50%; background: #d64545; animation: tblink 1s steps(1) infinite; }
 .svar-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 720px) { .svar-duo { grid-template-columns: 1fr; } }
+@media (max-width: 560px) {
+  .svar-card { padding: 16px; }
+  .svar-sentence { font-size: 17px; }
+  .mockcall-head { flex-direction: column; align-items: stretch; }
+  .svar-tabs .radio-pill { flex: 1 1 46%; text-align: center; }
+  .svar-audio audio { min-width: 0; }
+}
 .svar-duo .cell { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
 .svar-duo .cell b { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
 
