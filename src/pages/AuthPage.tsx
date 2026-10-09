@@ -289,7 +289,7 @@ export default function AuthPage() {
                       </div>
                       <div className="au-field">
                         <label>Password</label>
-                        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Minimum 6 characters"
+                        <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Minimum 8 characters"
                           onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
                       </div>
                     </motion.div>

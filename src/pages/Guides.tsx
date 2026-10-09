@@ -338,3 +338,319 @@ export function TypingGuide() {
     </GuideShell>
   );
 }
+
+/* ---------------- guide 4: concentrix master playbook ---------------- */
+
+function InterviewRoundsFlow() {
+  const stages = [
+    { num: '1', title: 'Communication', sub: 'JAM & Intro' },
+    { num: '2', title: 'AMCAT Test', sub: 'Adaptive 30Q' },
+    { num: '3', title: 'OPS 1', sub: 'Mindset & Shifts' },
+    { num: '4', title: 'OPS 2', sub: 'Scenarios & Fit' },
+    { num: '5', title: 'Voice (SVAR)', sub: 'Calls & Accent' },
+    { num: '6', title: 'Typing & WriteX', sub: 'WPM & Emails' },
+  ];
+  return (
+    <svg
+      viewBox="0 0 560 170"
+      role="img"
+      aria-label="Concentrix 6 Selection Rounds Roadmap"
+      style={{ width: '100%', height: 'auto', borderRadius: 14 }}
+    >
+      <rect width="560" height="170" rx="14" fill="#0b1e4b" />
+      <text x="24" y="28" fill="#fff" fontSize="14" fontWeight="800" fontFamily="system-ui, sans-serif">
+        Concentrix Selection Pipeline • 6 Assessment Rounds
+      </text>
+      {stages.map((st, i) => {
+        const x = 16 + i * 88;
+        return (
+          <g key={st.num}>
+            <rect
+              x={x}
+              y="44"
+              width="80"
+              height="106"
+              rx="10"
+              fill={i % 2 === 0 ? '#1b4fa0' : '#223c72'}
+              stroke="rgba(255,255,255,0.12)"
+              strokeWidth="1"
+            />
+            <circle cx={x + 40} cy="68" r="14" fill="#4d7cfe" />
+            <text
+              x={x + 40}
+              y="73"
+              fill="#fff"
+              fontSize="13"
+              fontWeight="800"
+              textAnchor="middle"
+              fontFamily="system-ui, sans-serif"
+            >
+              {st.num}
+            </text>
+            <text
+              x={x + 40}
+              y="100"
+              fill="#fff"
+              fontSize="9.5"
+              fontWeight="700"
+              textAnchor="middle"
+              fontFamily="system-ui, sans-serif"
+            >
+              {st.title}
+            </text>
+            <text
+              x={x + 40}
+              y="120"
+              fill="#9fb0cc"
+              fontSize="8.5"
+              textAnchor="middle"
+              fontFamily="system-ui, sans-serif"
+            >
+              {st.sub}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+export function ConcentrixInterviewGuide() {
+  const path = '/guides/concentrix-interview';
+  const title = 'Concentrix Fresher Interview & Hiring Prep Playbook (2026)';
+  const description =
+    'Comprehensive Concentrix fresher preparation playbook: 6 selection rounds, 5-part self-introduction templates, 4-step customer handling model, OPS 1 & OPS 2 scenarios, and WriteX email guides.';
+  return (
+    <GuideShell
+      title={title}
+      lede="The complete field playbook for Concentrix voice and non-voice fresher hiring drives. From 'Tell me about yourself' word-for-word scripts to operations scenario handling and shift flexibility."
+      path={path}
+      description={description}
+      graphic={<InterviewRoundsFlow />}
+      jsonLd={articleLd(title, description, path)}
+    >
+      <h2>The 6 Concentrix Selection Rounds</h2>
+      <p>
+        Concentrix hiring drives for freshers evaluate candidates across six standard rounds depending on whether the
+        opening is a <b>Voice Process</b> (international/domestic customer support) or a <b>Non-Voice Process</b> (email,
+        chat, back-office data operations).
+      </p>
+
+      <div style={{ margin: '18px 0', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <thead>
+            <tr style={{ background: '#122550', textAlign: 'left' }}>
+              <th style={{ padding: '10px 14px', color: '#fff' }}>Round</th>
+              <th style={{ padding: '10px 14px', color: '#fff' }}>Core Skills Evaluated</th>
+              <th style={{ padding: '10px 14px', color: '#fff' }}>Target Roles</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <td style={{ padding: '10px 14px', fontWeight: 600, color: '#38bdf8' }}>1. Communication</td>
+              <td style={{ padding: '10px 14px' }}>Spoken English, JAM (Just-A-Minute), picture description, fluency & listening</td>
+              <td style={{ padding: '10px 14px', color: '#9fb0cc' }}>All candidates (First filter)</td>
+            </tr>
+            <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+              <td style={{ padding: '10px 14px', fontWeight: 600, color: '#38bdf8' }}>2. AMCAT Test</td>
+              <td style={{ padding: '10px 14px' }}>English grammar, Logical Reasoning, Quantitative aptitude (Adaptive 30-32 min)</td>
+              <td style={{ padding: '10px 14px', color: '#9fb0cc' }}>Voice & Non-voice</td>
+            </tr>
+            <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <td style={{ padding: '10px 14px', fontWeight: 600, color: '#38bdf8' }}>3. OPS 1 (Ops Round 1)</td>
+              <td style={{ padding: '10px 14px' }}>Interview with team leads: attitude, 24/7 rotational shifts, customer mindset</td>
+              <td style={{ padding: '10px 14px', color: '#9fb0cc' }}>Voice & Non-voice</td>
+            </tr>
+            <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+              <td style={{ padding: '10px 14px', fontWeight: 600, color: '#38bdf8' }}>4. OPS 2 (Ops Round 2)</td>
+              <td style={{ padding: '10px 14px' }}>Senior manager round: live customer escalations, long-term stability & commitment</td>
+              <td style={{ padding: '10px 14px', color: '#9fb0cc' }}>Voice & Non-voice</td>
+            </tr>
+            <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <td style={{ padding: '10px 14px', fontWeight: 600, color: '#38bdf8' }}>5. Voice Test (SVAR/Versant)</td>
+              <td style={{ padding: '10px 14px' }}>AI-graded spoken test: repeat sentences, read-aloud, short answers, story retelling</td>
+              <td style={{ padding: '10px 14px', color: '#9fb0cc' }}>Voice roles</td>
+            </tr>
+            <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+              <td style={{ padding: '10px 14px', fontWeight: 600, color: '#38bdf8' }}>6. Typing & WriteX</td>
+              <td style={{ padding: '10px 14px' }}>Typing speed (25–35 WPM @ ≥95% accuracy), WriteX essay & professional emails</td>
+              <td style={{ padding: '10px 14px', color: '#9fb0cc' }}>Non-voice & Chat/Email</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>The 5-Part Self-Introduction Framework</h2>
+      <p>
+        Every interview begins with <i>"Tell me about yourself."</i> Deliver a structured <b>45 to 60-second response</b> (120 to 150 words) that highlights communication, education, strengths, and role alignment without sounding rehearsed.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, margin: '16px 0 24px' }}>
+        <div style={{ background: '#122550', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ color: '#38d98a', fontWeight: 700, fontSize: 13 }}>PART 1</div>
+          <h4 style={{ margin: '4px 0 6px', color: '#fff' }}>Greeting & Name</h4>
+          <p style={{ margin: 0, fontSize: 13, color: '#9fb0cc' }}>"Good morning, sir/ma'am. My name is [Your Name] and I am from [City]."</p>
+        </div>
+        <div style={{ background: '#122550', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ color: '#38d98a', fontWeight: 700, fontSize: 13 }}>PART 2</div>
+          <h4 style={{ margin: '4px 0 6px', color: '#fff' }}>Education & Marks</h4>
+          <p style={{ margin: 0, fontSize: 13, color: '#9fb0cc' }}>"I recently completed my graduation in [Degree] from [College/University] with [Percentage/CGPA]."</p>
+        </div>
+        <div style={{ background: '#122550', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ color: '#38d98a', fontWeight: 700, fontSize: 13 }}>PART 3</div>
+          <h4 style={{ margin: '4px 0 6px', color: '#fff' }}>Skills & Strengths</h4>
+          <p style={{ margin: 0, fontSize: 13, color: '#9fb0cc' }}>"My core strengths are active listening, patient communication, and quick adaptability under pressure."</p>
+        </div>
+        <div style={{ background: '#122550', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ color: '#38d98a', fontWeight: 700, fontSize: 13 }}>PART 4</div>
+          <h4 style={{ margin: '4px 0 6px', color: '#fff' }}>Activities / Experience</h4>
+          <p style={{ margin: 0, fontSize: 13, color: '#9fb0cc' }}>"During college, I coordinated cultural events and handled student queries, which honed my problem-solving skills."</p>
+        </div>
+        <div style={{ background: '#122550', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '14px 16px' }}>
+          <div style={{ color: '#38d98a', fontWeight: 700, fontSize: 13 }}>PART 5</div>
+          <h4 style={{ margin: '4px 0 6px', color: '#fff' }}>Goal & Concentrix Fit</h4>
+          <p style={{ margin: 0, fontSize: 13, color: '#9fb0cc' }}>"I am eager to begin my career in customer service with Concentrix, learn the process thoroughly, and grow into leadership."</p>
+        </div>
+      </div>
+
+      <h3>Word-for-Word Self-Introduction Templates</h3>
+
+      <div style={{ background: 'rgba(77,124,254,0.08)', border: '1px solid rgba(125,160,255,0.25)', borderRadius: 12, padding: '18px 20px', margin: '14px 0' }}>
+        <h4 style={{ margin: '0 0 8px', color: '#38bdf8' }}>Template 1: Fresh Graduate (Anita Rao)</h4>
+        <blockquote style={{ margin: 0, color: '#eaf1ff', fontStyle: 'italic', lineHeight: 1.65 }}>
+          "Good morning. My name is Anita Rao, and I am from Hyderabad. I recently completed my B.Com from Osmania University with 72 percent. During college, I was part of the cultural committee, where I coordinated events and spoke with many people, which improved my communication and teamwork skills. I am a quick learner, patient, and always willing to help others. I am looking for a role where I can use my communication skills and grow professionally, and I believe a customer service role at Concentrix is a great starting point for that. Thank you."
+        </blockquote>
+      </div>
+
+      <div style={{ background: 'rgba(77,124,254,0.08)', border: '1px solid rgba(125,160,255,0.25)', borderRadius: 12, padding: '18px 20px', margin: '14px 0' }}>
+        <h4 style={{ margin: '0 0 8px', color: '#38bdf8' }}>Template 2: Voice Process Role (Rahul Verma)</h4>
+        <blockquote style={{ margin: 0, color: '#eaf1ff', fontStyle: 'italic', lineHeight: 1.65 }}>
+          "Hello, I am Rahul Verma. I completed my B.Sc in Computer Science this year. I enjoy talking to people and have been working on improving my spoken English by practising daily and listening to English podcasts. In college, I conducted presentations and worked as a student coordinator handling queries from juniors and guests. I am patient, adaptable, and completely comfortable with 24/7 rotational shift timings. I would like to begin my career in a voice process at Concentrix, where I can master customer handling and grow into a leadership role over time. Thank you."
+        </blockquote>
+      </div>
+
+      <div style={{ background: 'rgba(77,124,254,0.08)', border: '1px solid rgba(125,160,255,0.25)', borderRadius: 12, padding: '18px 20px', margin: '14px 0' }}>
+        <h4 style={{ margin: '0 0 8px', color: '#38bdf8' }}>Template 3: Non-Voice / Email & Chat Role (Sneha Reddy)</h4>
+        <blockquote style={{ margin: 0, color: '#eaf1ff', fontStyle: 'italic', lineHeight: 1.65 }}>
+          "Good afternoon. I am Sneha Reddy, and I have completed my B.A. in Economics. I have good typing speed, strong attention to detail, and sound knowledge of MS Office. During my final year, I completed a project that involved collecting and organising data, which strengthened my accuracy and time management. I am hardworking, disciplined, and eager to learn. I am interested in a non-voice role at Concentrix where I can apply my written communication skills and develop into a skilled professional. Thank you."
+        </blockquote>
+      </div>
+
+      <div style={{ background: 'rgba(77,124,254,0.08)', border: '1px solid rgba(125,160,255,0.25)', borderRadius: 12, padding: '18px 20px', margin: '14px 0' }}>
+        <h4 style={{ margin: '0 0 8px', color: '#38bdf8' }}>Template 4: Candidate with a Study or Career Gap (Kiran Kumar)</h4>
+        <blockquote style={{ margin: 0, color: '#eaf1ff', fontStyle: 'italic', lineHeight: 1.65 }}>
+          "Good morning. I am Kiran Kumar. I completed my B.Tech in 2023. After graduation, I took a year to take care of a family responsibility, and during that time I completed an online certification in business communication and practiced typing daily. Now I am fully ready to start my career with dedication. I am a dependable, disciplined person who adapts quickly to dynamic environments. I am keen to join Concentrix, learn the customer operations process, and grow with the company. Thank you."
+        </blockquote>
+      </div>
+
+      <h2>The 4-Step Customer Handling Model</h2>
+      <p>
+        In both AMCAT Situational Judgment and OPS 1 & OPS 2 manager rounds, Concentrix interviewers evaluate whether
+        you approach frustrated callers with a systematic, professional mindset:
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, margin: '18px 0' }}>
+        <div style={{ background: '#0b1e4b', border: '1px solid #38bdf8', borderRadius: 10, padding: '14px 18px' }}>
+          <h4 style={{ color: '#38bdf8', margin: '0 0 6px' }}>1. LISTEN</h4>
+          <p style={{ margin: 0, fontSize: 13.5, color: '#c4d0e6' }}>
+            Allow the customer to explain the entire situation without interruption. Do not talk over them, even if they are emotional or repeating themselves.
+          </p>
+        </div>
+        <div style={{ background: '#0b1e4b', border: '1px solid #38d98a', borderRadius: 10, padding: '14px 18px' }}>
+          <h4 style={{ color: '#38d98a', margin: '0 0 6px' }}>2. EMPATHISE</h4>
+          <p style={{ margin: 0, fontSize: 13.5, color: '#c4d0e6' }}>
+            Acknowledge their frustration sincerely: <i>"I completely understand how frustrating this delay has been for you, and I apologise for the trouble."</i>
+          </p>
+        </div>
+        <div style={{ background: '#0b1e4b', border: '1px solid #f5a623', borderRadius: 10, padding: '14px 18px' }}>
+          <h4 style={{ color: '#f5a623', margin: '0 0 6px' }}>3. RESOLVE</h4>
+          <p style={{ margin: 0, fontSize: 13.5, color: '#c4d0e6' }}>
+            Take personal ownership. Propose concrete action: <i>"Let me check your tracking details right now,"</i> or initiate an official escalation ticket with a confirmed timeline.
+          </p>
+        </div>
+        <div style={{ background: '#0b1e4b', border: '1px solid #a855f7', borderRadius: 10, padding: '14px 18px' }}>
+          <h4 style={{ color: '#a855f7', margin: '0 0 6px' }}>4. CONFIRM</h4>
+          <p style={{ margin: 0, fontSize: 13.5, color: '#c4d0e6' }}>
+            Summarise the outcome and verify satisfaction before ending: <i>"I have updated your address and initiated dispatch. Is there anything else I can assist you with today?"</i>
+          </p>
+        </div>
+      </div>
+
+      <h2>Top Operations (OPS 1 & OPS 2) Scenarios & Model Answers</h2>
+
+      <p><b>Q1: A customer is shouting because their issue is still not resolved after multiple calls. What will you do?</b></p>
+      <p>
+        <i>"I will remain calm and maintain a steady, polite tone. I will let the caller finish venting completely without interrupting. Once they are done, I will acknowledge their frustration: 'I sincerely apologise for the inconvenience you experienced on your previous calls. I am taking personal ownership of your case right now.' I will review previous ticket notes, explain the exact next step, and provide a realistic timeline rather than an empty promise."</i>
+      </p>
+
+      <p><b>Q2: What will you do if a customer asks a question you do not know the answer to?</b></p>
+      <p>
+        <i>"I will never guess or provide incorrect information. I will politely place the customer on a brief hold: 'May I place you on a brief two-minute hold while I verify this with our technical desk?' I will consult the internal knowledge base or my team lead, and return with the verified, accurate solution."</i>
+      </p>
+
+      <p><b>Q3: Are you comfortable working night shifts and rotational schedules?</b></p>
+      <p>
+        <i>"Yes, absolutely. I understand that Concentrix provides 24/7 global customer support across international time zones. I have spoken with my family and have no transportation or scheduling constraints regarding rotational or night shifts."</i>
+      </p>
+
+      <p><b>Q4: Your shift is ending, but a customer's complex issue requires another 20 minutes. What do you do?</b></p>
+      <p>
+        <i>"Customer satisfaction and first-call resolution always take priority over logging off on the dot. I will see the customer's issue through to resolution, document comprehensive notes on the ticket, and inform my supervisor afterwards."</i>
+      </p>
+
+      <h2>WriteX Essay & Business Email Blueprints</h2>
+      <p>
+        For non-voice roles, the <b>WriteX round</b> evaluates formal written communication under a 20-minute timer.
+        The AI grading engine scans for paragraph organization, subject-verb agreement, and correct business formatting.
+      </p>
+
+      <div style={{ background: '#122550', borderRadius: 12, padding: '16px 20px', margin: '14px 0' }}>
+        <h4 style={{ color: '#fff', margin: '0 0 8px' }}>The 4-Paragraph Essay Structure (150–250 Words)</h4>
+        <ul style={{ margin: 0, paddingLeft: 20, color: '#c4d0e6', fontSize: 14 }}>
+          <li><b>Introduction (2 sentences):</b> Define the topic and state your perspective clearly.</li>
+          <li><b>Body Paragraph 1 (3-4 sentences):</b> Present your primary argument supported by reasoning.</li>
+          <li><b>Body Paragraph 2 (3-4 sentences):</b> Provide a real-world example or secondary viewpoint.</li>
+          <li><b>Conclusion (2 sentences):</b> Summarize your key takeaway without introducing new arguments.</li>
+          <li><i>Formatting rule:</i> Write in continuous paragraphs only. Never use bullet points or abbreviations in WriteX.</li>
+        </ul>
+      </div>
+
+      <h3>Sample Professional Email: Resignation</h3>
+      <div style={{ background: '#0b1e4b', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '16px 18px', margin: '12px 0', fontFamily: 'monospace', fontSize: 13, color: '#eaf1ff' }}>
+        <p style={{ margin: '0 0 6px', color: '#38bdf8' }}>Subject: Resignation – Anita Rao</p>
+        <p style={{ margin: '0 0 6px' }}>Dear [Manager's Name],</p>
+        <p style={{ margin: '0 0 6px' }}>
+          I am writing to formally resign from my position as Customer Support Associate, effective [Date], in accordance with my notice period.
+        </p>
+        <p style={{ margin: '0 0 6px' }}>
+          Thank you for the guidance and opportunities you have provided during my tenure. I will ensure all pending customer cases and documentation are handed over smoothly before my departure.
+        </p>
+        <p style={{ margin: '0 0 6px' }}>Please let me know if there is anything I can do to facilitate a seamless transition.</p>
+        <p style={{ margin: 0 }}>Regards,<br />Anita Rao</p>
+      </div>
+
+      <h3>Sample Professional Email: Customer Apology for Delayed Delivery</h3>
+      <div style={{ background: '#0b1e4b', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '16px 18px', margin: '12px 0', fontFamily: 'monospace', fontSize: 13, color: '#eaf1ff' }}>
+        <p style={{ margin: '0 0 6px', color: '#38bdf8' }}>Subject: Update on Order #458921 – Expedited Delivery Status</p>
+        <p style={{ margin: '0 0 6px' }}>Dear Mr. Sharma,</p>
+        <p style={{ margin: '0 0 6px' }}>
+          I sincerely apologise for the delay in the delivery of your package (Order #458921). We understand how important this order is to you.
+        </p>
+        <p style={{ margin: '0 0 6px' }}>
+          We have expedited your shipment with our courier partner. Your package is currently in transit and scheduled to reach your registered address by Friday, 12 March. You can track live movement using the link below.
+        </p>
+        <p style={{ margin: '0 0 6px' }}>Thank you for your patience and understanding.</p>
+        <p style={{ margin: 0 }}>Warm regards,<br />Customer Care Team, Concentrix</p>
+      </div>
+
+      <h2>Interview Day Checklist</h2>
+      <ul style={{ color: '#c4d0e6', fontSize: 14.5, lineHeight: 1.8, paddingLeft: 22 }}>
+        <li><b>Mandatory Documents:</b> Updated 1-page resume, government photo ID (Aadhaar / PAN / Passport), marksheets (10th, 12th, graduation degree/provisional), 2 passport-size photographs.</li>
+        <li><b>Equipment for Virtual Drives:</b> Quiet room, stable WiFi, working webcam, and a wired headset with dedicated noise-canceling mic (phone earbuds often cause SVAR volume drops).</li>
+        <li><b>Attire:</b> Formal or smart business casual. First impressions in OPS 1 start the moment you enter the frame.</li>
+        <li><b>Arrival:</b> Join the waiting lobby or report to the venue 20–30 minutes before your scheduled slot.</li>
+      </ul>
+    </GuideShell>
+  );
+}
+

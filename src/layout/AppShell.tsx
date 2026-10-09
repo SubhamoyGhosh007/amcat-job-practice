@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
+  BookOpen,
   Briefcase,
   Calculator,
   ClipboardList,
+  FileText,
   Keyboard,
   LayoutDashboard,
   LogOut,
@@ -27,6 +29,7 @@ const TITLES: Record<string, string> = {
   '/app/sheets': 'My sheets',
   '/app/settings': 'Settings',
   '/app/typing': 'Typing arena',
+  '/app/writex': 'WriteX non-voice arena',
   '/app/speaking': 'Speaking lab',
   '/app/interview': 'Mock interview',
   '/app/maths': 'Maths practice',
@@ -39,6 +42,7 @@ const GROUPS = [
     items: [
       { to: '/app', end: true, label: 'Practice', Icon: LayoutDashboard },
       { to: '/app/typing', end: false, label: 'Typing arena', Icon: Keyboard },
+      { to: '/app/writex', end: false, label: 'WriteX arena', Icon: FileText },
       { to: '/app/speaking', end: false, label: 'Speaking lab', Icon: Mic },
       { to: '/app/interview', end: false, label: 'Mock interview', Icon: Briefcase },
       { to: '/app/maths', end: false, label: 'Maths practice', Icon: Calculator },
@@ -49,6 +53,7 @@ const GROUPS = [
     items: [
       { to: '/app/instructions', end: false, label: 'New set', Icon: Plus },
       { to: '/app/sheets', end: false, label: 'My sheets', Icon: ClipboardList },
+      { to: '/guides/concentrix-interview', end: false, label: 'Prep playbook', Icon: BookOpen },
       { to: '/app/settings', end: false, label: 'Settings', Icon: SettingsIcon },
       { to: '/app/health', end: false, label: 'Health check', Icon: Activity },
     ],

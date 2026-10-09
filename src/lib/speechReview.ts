@@ -86,17 +86,27 @@ export async function transcribeAudio(blob: Blob): Promise<{ text: string }> {
   form.append('file', blob, `attempt.${ext}`);
   form.append('model', 'whisper-large-v3-turbo');
   form.append('response_format', 'json');
-  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${GROQ_KEY}` },
-    body: form,
-  });
-  if (res.status === 429) throw new Error('AI rate limited (429)');
-  if (!res.ok) throw new Error(`Voice review HTTP ${res.status}`);
-  const data = await res.json();
-  const text = String(data?.text || '').trim();
-  if (!text) throw new Error('Empty transcription — try recording a little louder, closer to the mic.');
-  return { text };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${GROQ_KEY}` },
+      body: form,
+    });
+    if (res.status === 429) throw new Error('AI rate limited (429)');
+    if (!res.ok) throw new Error(`Voice review HTTP ${res.status}`);
+    const data = await res.json();
+    const text = String(data?.text || '').trim();
+    if (!text) throw new Error('Empty transcription — try recording a little louder, closer to the mic.');
+    return { text };
+  } catch (err: any) {
+    if (err.name === 'AbortError') throw new Error('Transcription timed out (12s). Try again.');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

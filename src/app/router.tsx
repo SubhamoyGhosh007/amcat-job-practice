@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Landing from '../landing/Landing';
 import Privacy from '../pages/Privacy';
 import Terms from '../pages/Terms';
-import { AmcatPatternGuide, SvarGuide, TypingGuide } from '../pages/Guides';
+import { AmcatPatternGuide, ConcentrixInterviewGuide, SvarGuide, TypingGuide } from '../pages/Guides';
 import AuthPage from '../pages/AuthPage';
 import AppShell from '../layout/AppShell';
 import Dashboard from '../pages/Dashboard';
@@ -10,6 +10,7 @@ import Instructions from '../pages/Instructions';
 import AdaptiveExam from '../pages/AdaptiveExam';
 import Result from '../pages/Result';
 import Sheets from '../pages/Sheets';
+import WriteX from '../pages/WriteX';
 import Settings from '../pages/Settings';
 import Typing from '../pages/Typing';
 import Svar from '../pages/Svar';
@@ -51,6 +52,7 @@ export default function AppRouter() {
         <Route path="/guides/amcat-pattern" element={<AmcatPatternGuide />} />
         <Route path="/guides/svar-round" element={<SvarGuide />} />
         <Route path="/guides/typing-test" element={<TypingGuide />} />
+        <Route path="/guides/concentrix-interview" element={<ConcentrixInterviewGuide />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/app" element={<RequireAuth />}>
           <Route index element={<Dashboard />} />
@@ -59,6 +61,7 @@ export default function AppRouter() {
           <Route path="result" element={<Result />} />
           <Route path="sheets" element={<Sheets />} />
           <Route path="typing" element={<Typing />} />
+          <Route path="writex" element={<WriteX />} />
           <Route path="speaking" element={<Svar />} />
           <Route path="interview" element={<Interview />} />
           <Route path="maths" element={<MathPractice />} />

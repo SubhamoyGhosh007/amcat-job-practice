@@ -144,6 +144,90 @@ export const MOCK_TEST_01: MockTest = {
   },
 };
 
+export const MOCK_TEST_02: MockTest = {
+  test_id: 'concentrix_amcat_mock_02',
+  sections: {
+    part_a: [
+      {
+        id: 'a1_m2',
+        context: 'Your name is Ravi. This morning you missed the bus, so you borrowed your neighbor’s bicycle. On the way to work, the tire burst. A local shopkeeper helped you fix it. You reached the office ten minutes late, apologized to your manager, and promised to leave earlier tomorrow.',
+        questions: [
+          { q: 'Why did Ravi borrow his neighbor’s bicycle?', expected: 'He borrowed it because he missed the morning bus.' },
+          { q: 'What happened on his way to work?', expected: 'The tire burst, and a local shopkeeper helped him fix it.' },
+          { q: 'What did Ravi tell his manager?', expected: 'He apologized for being ten minutes late and promised to leave earlier tomorrow.' },
+        ],
+      },
+      {
+        id: 'a2_m2',
+        context: 'Your name is Anita. You recently completed your B.Com degree and joined Concentrix as a customer service associate. Your training runs from Monday to Friday, and your supervisor’s name is Mr. Sharma.',
+        questions: [
+          { q: 'What degree did Anita complete?', expected: 'She completed her B.Com degree.' },
+          { q: 'What role did she join at Concentrix?', expected: 'She joined as a customer service associate.' },
+          { q: 'Who is her supervisor?', expected: 'Her supervisor is Mr. Sharma.' },
+        ],
+      },
+    ],
+    part_b: [
+      {
+        id: 'b1_m2',
+        context: 'Your name is Meena. You ordered a special gift for your mother’s birthday, but the courier delivered it to the wrong address. You contacted customer support right away. The agent apologized, confirmed the correct address, and arranged for the proper parcel to arrive the next day along with a discount coupon. You thanked the agent for the quick assistance.',
+        questions: [
+          { q: 'Why did Meena order a gift?', expected: 'She ordered a gift for her mother’s birthday.' },
+          { q: 'What was the problem with the delivery?', expected: 'The courier delivered the parcel to the wrong address.' },
+          { q: 'How did the agent resolve the issue?', expected: 'The agent arranged for the correct parcel to arrive the next day with a discount coupon.' },
+        ],
+      },
+      {
+        id: 'b2_m2',
+        context: 'Arjun works at a travel desk in Pune. Every morning he checks customer emails and processes ticket updates. Yesterday, a passenger called to reschedule her flight booking. Arjun verified the schedule, explained the minor fare difference, and completed the revised ticket within ten minutes.',
+        questions: [
+          { q: 'Where does Arjun work?', expected: 'He works at a travel desk in Pune.' },
+          { q: 'Why did the passenger call yesterday?', expected: 'The passenger called to reschedule her flight booking.' },
+          { q: 'How long did it take Arjun to update the ticket?', expected: 'It took him ten minutes.' },
+        ],
+      },
+    ],
+    part_c: [
+      { id: 'c1_m2', text: 'Thank you for calling customer support. How may I assist you today?', tip: 'A warm, upbeat opening greeting sets the tone for the entire interaction.' },
+      { id: 'c2_m2', text: 'I understand your concern, and I will do my best to resolve this as quickly as possible.', tip: 'Pace your empathy statement calmly without rushing.' },
+      { id: 'c3_m2', text: 'The supervisor confirmed that the new training session will begin on Monday morning.', tip: 'Pronounce word endings clearly (-ed in confirmed, -ing in training).' },
+      { id: 'c4_m2', text: 'Our customer service team is available from nine in the morning to six in the evening.', tip: 'Maintain a steady, measured pace across the numbers.' },
+      { id: 'c5_m2', text: 'Could you please confirm your registered email address and phone number for verification?', tip: 'Keep the tone courteous and respectful during account verification.' },
+      { id: 'c6_m2', text: 'The weather has been unpredictable this week, so several regional flights were delayed.', tip: 'Emphasize key operational terms: unpredictable, regional flights, delayed.' },
+    ],
+    part_d: [
+      { id: 'd1_m2', text: 'The class starts at nine o\'clock.' },
+      { id: 'd2_m2', text: 'Could you please send me the details by this evening?' },
+      { id: 'd3_m2', text: 'The customer has requested a refund for the damaged product.' },
+      { id: 'd4_m2', text: 'Although it was raining heavily, the team completed the delivery on time.' },
+      { id: 'd5_m2', text: 'We will review your application and get back to you within three working days.' },
+      { id: 'd6_m2', text: 'Please hold the line while I check your account details.' },
+    ],
+    part_e: [
+      { id: 'e1_m2', topic: 'Why is punctuality important in a customer service role?', prepSec: 30, speakSec: 60 },
+      { id: 'e2_m2', topic: 'How do you handle a customer who is shouting and demanding an immediate refund?', prepSec: 30, speakSec: 60 },
+      { id: 'e3_m2', topic: 'Explain the difference between working from home and working from an office.', prepSec: 30, speakSec: 60 },
+      { id: 'e4_m2', topic: 'Describe a challenge you faced during your college or project work and how you handled it.', prepSec: 30, speakSec: 60 },
+    ],
+    part_f: [
+      { id: 'f1_m2', audio: 'She dash working here since twenty twenty-two.', missing: ['has been'], full: 'She has been working here since 2022.' },
+      { id: 'f2_m2', audio: 'Neither of the answers dash correct.', missing: ['is'], full: 'Neither of the answers is correct.' },
+      { id: 'f3_m2', audio: 'I look forward to dash you tomorrow.', missing: ['meeting'], full: 'I look forward to meeting you tomorrow.' },
+      { id: 'f4_m2', audio: 'He apologised dash being late for the team meeting.', missing: ['for'], full: 'He apologised for being late for the team meeting.' },
+      { id: 'f5_m2', audio: 'If it rains tomorrow, we dash cancel the outdoor session.', missing: ['will'], full: 'If it rains tomorrow, we will cancel the outdoor session.' },
+    ],
+    part_g: [
+      { id: 'g1_m2', audio: 'I am having a doubt regarding the escalation process.', corrected: 'I have a doubt regarding the escalation process.', rule: 'Stative verbs like “have” indicating possession or state do not take continuous -ing: “I have a doubt”.' },
+      { id: 'g2_m2', audio: 'Please return back the borrowed training files by Friday.', corrected: 'Please return the borrowed training files by Friday.', rule: '“Return” already incorporates “back”; saying “return back” is a redundant repetition.' },
+      { id: 'g3_m2', audio: 'Neither of the two candidates were present for the briefing.', corrected: 'Neither of the two candidates was present for the briefing.', rule: '“Neither” is singular and always takes a singular verb: was, not were.' },
+      { id: 'g4_m2', audio: 'The supervisor gave me an advice on ticket prioritisation.', corrected: 'The supervisor gave me advice on ticket prioritisation.', rule: '“Advice” is uncountable — never say “an advice”; use “advice” or “a piece of advice”.' },
+      { id: 'g5_m2', audio: 'Can we prepone the review to tomorrow morning?', corrected: 'Can we reschedule the review to tomorrow morning?', rule: '“Prepone” is informal; professional business English uses “reschedule to an earlier time” or “move forward”.' },
+    ],
+  },
+};
+
+export const STATIC_MOCK_TESTS: MockTest[] = [MOCK_TEST_01, MOCK_TEST_02];
+
 const MKEY = 'amcat_mock';
 export function listMockSessions(): MockSession[] {
   try {

@@ -9,6 +9,7 @@ import {
   newId,
   saveTypingTest,
   typingCloudStatus,
+  CONCENTRIX_PASSAGES,
   type TypingMode,
   type TypingTest,
 } from '../lib/typing';
@@ -301,16 +302,30 @@ export default function Typing() {
       <div className="type-config">
         <button className={`radio-pill ${mode === 'time' ? 'active' : ''}`} onClick={() => restart('time', 30)}>⏱ time</button>
         <button className={`radio-pill ${mode === 'words' ? 'active' : ''}`} onClick={() => restart('words', 25)}>ƒ words</button>
+        <button className={`radio-pill ${mode === 'passage' ? 'active' : ''}`} onClick={() => restart('passage', 0)}>📄 Concentrix passages</button>
         <span className="sep" />
-        {(mode === 'time' ? TIME_OPTS : WORD_OPTS).map((a) => (
-          <button key={a} className={`radio-pill ${amount === a ? 'active' : ''}`} onClick={() => restart(mode, a)}>
-            {a}{mode === 'time' ? 's' : ''}
-          </button>
-        ))}
+        {mode === 'passage' ? (
+          CONCENTRIX_PASSAGES.map((p, i) => (
+            <button key={p.id} className={`radio-pill ${amount === i ? 'active' : ''}`} onClick={() => restart('passage', i)} title={p.description}>
+              Passage {i + 1}
+            </button>
+          ))
+        ) : (
+          (mode === 'time' ? TIME_OPTS : WORD_OPTS).map((a) => (
+            <button key={a} className={`radio-pill ${amount === a ? 'active' : ''}`} onClick={() => restart(mode, a)}>
+              {a}{mode === 'time' ? 's' : ''}
+            </button>
+          ))
+        )}
         <span className="sep" />
         <button className="radio-pill" onClick={() => restart()}>↻ restart (tab)</button>
         {leftT !== null && <span className="hint">{tier === 'pro' ? 'Pro plan: unlimited tests.' : `${leftT} of 10 tests left today`}</span>}
       </div>
+      {mode === 'passage' && (
+        <div style={{ margin: '8px 0', fontSize: 13, color: '#3b82f6', fontWeight: 600 }}>
+          📝 {CONCENTRIX_PASSAGES[amount]?.title} — <span style={{ color: '#64748b', fontWeight: 400 }}>{CONCENTRIX_PASSAGES[amount]?.description}</span>
+        </div>
+      )}
       {blocked && <div className="err" style={{ marginBottom: 10 }}>{blocked}</div>}
 
       {phase !== 'done' ? (

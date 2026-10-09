@@ -2,14 +2,48 @@ import { WORDS } from '../data/words';
 import { apiToken } from './store';
 import { sb } from './supabase';
 
-export type TypingMode = 'time' | 'words';
+export type TypingMode = 'time' | 'words' | 'passage';
+
+export interface ConcentrixPassage {
+  id: string;
+  title: string;
+  description: string;
+  text: string;
+}
+
+export const CONCENTRIX_PASSAGES: ConcentrixPassage[] = [
+  {
+    id: 'passage-1',
+    title: 'Customer Service (Standard)',
+    description: 'Foundational Concentrix support ethos and trust-building.',
+    text: 'Customer service is the support offered to customers before, during and after a purchase. A good agent listens carefully, speaks politely and solves the problem quickly. Every conversation is a chance to build trust. When customers feel valued, they return and recommend the company to others.',
+  },
+  {
+    id: 'passage-2',
+    title: 'Delayed Order Email',
+    description: 'Formal business email format with punctuation and numbers.',
+    text: 'Dear Sir or Madam, I am writing to inform you that my order, number 458921, was supposed to arrive on 12 March but has not been received. I would appreciate it if you could look into this matter and update me at the earliest. Thank you for your time and assistance. Yours sincerely, Anita Rao.',
+  },
+  {
+    id: 'passage-3',
+    title: 'Invoice & Punctuation',
+    description: 'Numeric and financial details: GST, currencies, dates and email addresses.',
+    text: 'Invoice No. 2047-B was generated on 05/09/2025 for a total of Rs. 12,450.75, including 18% GST. Payment is due within 15 days. Please contact accounts@example.com or call 1800-123-4567 for any queries.',
+  },
+  {
+    id: 'passage-4',
+    title: 'Story Typing (Flight Reschedule)',
+    description: 'Real ticketing scenario tested in Concentrix non-voice rounds.',
+    text: 'Arjun works at a travel company in Pune. Every morning, he checks his emails and answers customer queries. Yesterday, a customer called to change her flight booking. Arjun checked the available dates, explained the extra charges and updated the ticket within ten minutes. The customer thanked him for the quick help.',
+  },
+];
 
 export interface TypingTest {
   id: string;
   userId: string;
   createdAt: number;
   mode: TypingMode;
-  amount: number; // seconds (time) or word count (words)
+  amount: number; // seconds (time), word count (words), or passage index (passage)
   durationSec: number; // actual elapsed
   wpm: number;
   raw: number;
@@ -24,6 +58,11 @@ export interface TypingTest {
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 export function genWords(mode: TypingMode, amount: number): string[] {
+  if (mode === 'passage') {
+    const idx = Math.max(0, Math.min(amount, CONCENTRIX_PASSAGES.length - 1));
+    const passage = CONCENTRIX_PASSAGES[idx];
+    return passage.text.split(/\s+/).filter(Boolean);
+  }
   const n = mode === 'time' ? 120 : amount;
   const out: string[] = [];
   for (let i = 0; i < n; i++) out.push(WORDS[Math.floor(Math.random() * WORDS.length)]);

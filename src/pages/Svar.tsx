@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { LISTEN_BANK, READ_BANK, REPEAT_BANK } from '../data/svar';
+import {
+  EXTEMPORE_TOPICS,
+  JUMBLED_SENTENCES_BANK,
+  LISTEN_BANK,
+  MOCK_CALL_SCENARIOS,
+  READ_BANK,
+  REPEAT_BANK,
+  SHORT_ANSWER_BANK,
+} from '../data/svar';
 import { ttsConfigured } from '../lib/tts';
 import { bumpQuota, quotaStatus } from '../lib/usage';
 import {
@@ -25,7 +33,7 @@ import { useConfirm } from '../ui/alert-dialog';
 import { TTSVoicePlayer as PlayButton, VoicePlayer } from '../components/VoicePlayer';
 import '../svar.css';
 
-type Tab = 'listen' | 'session';
+type Tab = 'session' | 'listen' | 'short' | 'jumbled' | 'extempore' | 'mockcall';
 
 interface SvarStats {
   plays: number;
@@ -234,6 +242,526 @@ function ListenTab({ refresh }: { refresh: () => void }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------------- tab 3: short answers (Versant / SVAR style) ---------------- */
+function ShortAnswersTab() {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+
+  function check(id: string) {
+    setChecked((prev) => ({ ...prev, [id]: true }));
+  }
+
+  return (
+    <div>
+      <TtsGate />
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ margin: '0 0 6px' }}>Short Answer Questions (Versant & SVAR)</h3>
+        <p className="hint" style={{ margin: 0 }}>
+          Listen to the question once and give a direct, one-or-two word answer immediately. In actual AI scoring, questions move after 3 to 6 seconds of silence.
+        </p>
+      </div>
+
+      {SHORT_ANSWER_BANK.map((item, idx) => {
+        const val = answers[item.id] || '';
+        const isDone = checked[item.id];
+        const normVal = val.toLowerCase().trim();
+        const normAns = item.answer.toLowerCase().trim();
+        const words = normAns.replace(/[^a-z0-9 ]/g, '').split(' ');
+        const isMatch = normVal.length > 0 && words.some((w) => w.length > 2 && normVal.includes(w));
+
+        return (
+          <div className="svar-card" key={item.id}>
+            <div className="qnum">Question {idx + 1} of {SHORT_ANSWER_BANK.length}</div>
+            <PlayButton text={item.prompt} label="Play question audio" />
+            <div
+              style={{
+                fontSize: 14.5,
+                fontWeight: 500,
+                color: isDone ? '#fff' : '#9fb0cc',
+                margin: '10px 0 14px',
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: isDone ? 'rgba(77,124,254,0.08)' : 'rgba(255,255,255,0.02)',
+                border: '1px dashed var(--border)',
+              }}
+            >
+              {isDone ? (
+                <><b>Spoken question:</b> “{item.prompt}”</>
+              ) : (
+                <>🎧 <b>Listening mode:</b> Play the question audio above and respond without reading text on screen.</>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                placeholder="Type your answer (e.g. marker, cold)..."
+                value={val}
+                disabled={isDone}
+                onChange={(e) => setAnswers({ ...answers, [item.id]: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isDone) check(item.id);
+                }}
+                style={{
+                  flex: 1,
+                  minWidth: 220,
+                  padding: '9px 14px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  fontSize: 14,
+                }}
+              />
+              {!isDone ? (
+                <button className="btn-primary" onClick={() => check(item.id)}>
+                  Check answer ✓
+                </button>
+              ) : (
+                <button className="btn-ghost" onClick={() => setChecked({ ...checked, [item.id]: false })}>
+                  Retry ↻
+                </button>
+              )}
+            </div>
+
+            {isDone && (
+              <div className={`rev ${isMatch ? 'correct' : 'wrong'}`} style={{ marginTop: 12 }}>
+                <div className="qnum">{isMatch ? '✅ Correct' : '💡 Model Answer'}</div>
+                <div className="exp" style={{ fontSize: 15, fontWeight: 700 }}>
+                  Expected: <span style={{ color: '#38bdf8' }}>{item.answer}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------- tab 4: sentence builds (jumbled sentences) ---------------- */
+function SentenceBuildsTab() {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const [builtWords, setBuiltWords] = useState<string[]>([]);
+  const [checked, setChecked] = useState(false);
+
+  const curr = JUMBLED_SENTENCES_BANK[activeIdx];
+  const chips = curr.jumbled.split(' / ');
+
+  const remainingChips = chips.filter((c, i) => {
+    const countInBuilt = builtWords.filter((w) => w === c).length;
+    const countInChipsSoFar = chips.slice(0, i + 1).filter((w) => w === c).length;
+    return countInChipsSoFar > countInBuilt;
+  });
+
+  function addWord(word: string) {
+    if (checked) return;
+    setBuiltWords([...builtWords, word]);
+  }
+
+  function undo() {
+    if (checked) return;
+    setBuiltWords(builtWords.slice(0, -1));
+  }
+
+  function reset() {
+    setBuiltWords([]);
+    setChecked(false);
+  }
+
+  function next() {
+    if (activeIdx < JUMBLED_SENTENCES_BANK.length - 1) {
+      setActiveIdx(activeIdx + 1);
+      setBuiltWords([]);
+      setChecked(false);
+    }
+  }
+
+  function prev() {
+    if (activeIdx > 0) {
+      setActiveIdx(activeIdx - 1);
+      setBuiltWords([]);
+      setChecked(false);
+    }
+  }
+
+  const builtSentence = builtWords.join(' ');
+  const cleanBuilt = builtSentence.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanSol = curr.solution.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const isCorrect = cleanBuilt === cleanSol;
+
+  return (
+    <div>
+      <TtsGate />
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ margin: '0 0 6px' }}>Sentence Builds & Jumbled Drills</h3>
+        <p className="hint" style={{ margin: 0 }}>
+          Rearrange the jumbled segments to form a grammatically correct sentence. In Versant & SVAR, you hear jumbled phrases and speak the complete sentence.
+        </p>
+      </div>
+
+      <div className="svar-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <span className="qnum">Sentence {activeIdx + 1} of {JUMBLED_SENTENCES_BANK.length}</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn-ghost" disabled={activeIdx === 0} onClick={prev} style={{ padding: '4px 10px', fontSize: 12 }}>← Previous</button>
+            <button className="btn-ghost" disabled={activeIdx === JUMBLED_SENTENCES_BANK.length - 1} onClick={next} style={{ padding: '4px 10px', fontSize: 12 }}>Next →</button>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 14, color: '#9fb0cc', marginBottom: 8 }}>Jumbled components:</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+          {chips.map((chip, idx) => {
+            const isUsed = !remainingChips.includes(chip);
+            return (
+              <button
+                key={idx}
+                disabled={isUsed || checked}
+                onClick={() => addWord(chip)}
+                className={`radio-pill ${isUsed ? '' : 'active'}`}
+                style={{
+                  opacity: isUsed ? 0.4 : 1,
+                  cursor: isUsed || checked ? 'default' : 'pointer',
+                  padding: '7px 14px',
+                  fontSize: 14,
+                }}
+              >
+                {chip}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ fontSize: 14, color: '#9fb0cc', marginBottom: 6 }}>Your constructed sentence:</div>
+        <div
+          style={{
+            minHeight: 52,
+            padding: '12px 16px',
+            borderRadius: 10,
+            background: 'rgba(77,124,254,0.06)',
+            border: '1px dashed var(--border)',
+            fontSize: 17,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: 14,
+          }}
+        >
+          {builtSentence || <span style={{ color: '#6b7280', fontWeight: 400, fontStyle: 'italic' }}>Click the phrase chips above in order...</span>}
+        </div>
+
+        <div className="btnrow" style={{ marginTop: 0 }}>
+          <button className="btn-ghost" disabled={!builtWords.length || checked} onClick={undo}>
+            ↶ Undo
+          </button>
+          <button className="btn-ghost" disabled={!builtWords.length} onClick={reset}>
+            ↻ Reset
+          </button>
+          {!checked ? (
+            <button className="btn-primary" disabled={remainingChips.length > 0} onClick={() => setChecked(true)}>
+              Check Sentence ✓
+            </button>
+          ) : (
+            <button className="btn-big" onClick={next} disabled={activeIdx === JUMBLED_SENTENCES_BANK.length - 1}>
+              Next sentence →
+            </button>
+          )}
+        </div>
+
+        {checked && (
+          <div className={`rev ${isCorrect ? 'correct' : 'wrong'}`} style={{ marginTop: 16 }}>
+            <div className="qnum">{isCorrect ? '✅ Well done! Sentence is correct.' : '❌ Incorrect word order'}</div>
+            <div className="exp" style={{ marginTop: 6 }}>
+              <b>Model Answer:</b> “{curr.solution}”
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <PlayButton text={curr.solution} label="Hear correct pronunciation" />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- tab 5: extempore (JAM - Just A Minute) ---------------- */
+function ExtemporeTab() {
+  const [topicIdx, setTopicIdx] = useState(0);
+  const [prepLeft, setPrepLeft] = useState<number | null>(null);
+  const [prepRunning, setPrepRunning] = useState(false);
+  const [showModel, setShowModel] = useState(false);
+  const recorder = useRecorder();
+
+  const topic = EXTEMPORE_TOPICS[topicIdx];
+
+  useEffect(() => {
+    if (!prepRunning) return;
+    setPrepLeft(30);
+    const end = Date.now() + 30 * 1000;
+    const interval = window.setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      setPrepLeft(remaining);
+      if (remaining <= 0) {
+        window.clearInterval(interval);
+        setPrepRunning(false);
+      }
+    }, 250);
+    return () => window.clearInterval(interval);
+  }, [prepRunning]);
+
+  return (
+    <div>
+      <TtsGate />
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ margin: '0 0 6px' }}>Extempore & Just-A-Minute (JAM) Practice</h3>
+        <p className="hint" style={{ margin: 0 }}>
+          30 seconds to structure your thoughts, then 45 to 60 seconds to speak without freezing. Follow the proven Concentrix 4-step framework.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        {EXTEMPORE_TOPICS.map((t, idx) => (
+          <button
+            key={idx}
+            className={`radio-pill ${topicIdx === idx ? 'active' : ''}`}
+            onClick={() => {
+              setTopicIdx(idx);
+              setPrepRunning(false);
+              setPrepLeft(null);
+              setShowModel(false);
+              recorder.reset();
+            }}
+          >
+            {t.topic}
+          </button>
+        ))}
+      </div>
+
+      <div className="svar-card">
+        <span className="topic">Topic #{topicIdx + 1} • Extempore Speech</span>
+        <h2 style={{ fontSize: 24, margin: '8px 0 12px', color: '#fff' }}>“{topic.topic}”</h2>
+
+        <div style={{ background: '#122550', borderRadius: 10, padding: '14px 18px', margin: '14px 0', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ color: '#38d98a', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Recommended 4-Step Framework
+          </div>
+          <div style={{ fontSize: 14.5, color: '#eaf1ff', marginTop: 6, fontWeight: 500 }}>
+            {topic.structure}
+          </div>
+        </div>
+
+        {/* Phase 1: 30s Prep Timer */}
+        <div style={{ margin: '18px 0', padding: '14px 18px', borderRadius: 10, border: '1px solid var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <b>Step 1: 30-Second Thinking Timer</b>
+              <div className="hint">Take 30 seconds to plan your opening, two points, and one example.</div>
+            </div>
+            <div>
+              {prepLeft === null ? (
+                <button className="btn-primary" onClick={() => setPrepRunning(true)}>
+                  ⏱️ Start 30s Prep Timer
+                </button>
+              ) : prepRunning ? (
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#f5a623' }}>
+                  ⏳ {prepLeft}s thinking...
+                </span>
+              ) : (
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#38d98a' }}>
+                  ✅ Prep time finished! Now speak.
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Phase 2: Speech Recorder */}
+        <div style={{ margin: '18px 0', padding: '14px 18px', borderRadius: 10, border: '1px solid var(--border)' }}>
+          <b>Step 2: Record Your Speech (45–60 Seconds)</b>
+          <div className="hint" style={{ marginBottom: 12 }}>Speak smoothly at a steady pace. Land word endings clearly.</div>
+
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            {!recorder.recording ? (
+              <button className="btn-big" onClick={() => recorder.start(60)}>
+                🎙️ Start speaking ({recorder.url ? 'record again' : 'record'})
+              </button>
+            ) : (
+              <button
+                className="btn-big"
+                onClick={recorder.stop}
+                style={{ background: '#d64545', borderColor: '#d64545' }}
+              >
+                ⏹️ Stop recording ({recorder.secs}s / 60s)
+              </button>
+            )}
+
+            {recorder.url && (
+              <audio controls src={recorder.url} style={{ height: 38 }} />
+            )}
+          </div>
+          {recorder.error && <div className="err" style={{ marginTop: 8 }}>{recorder.error}</div>}
+        </div>
+
+        {/* Step 3: Model comparison */}
+        <div style={{ marginTop: 20 }}>
+          <button className="btn-ghost" onClick={() => setShowModel(!showModel)}>
+            {showModel ? 'Hide Model Answer ▲' : 'Show Coach Model Speech ▼'}
+          </button>
+          {showModel && (
+            <div style={{ marginTop: 12, background: 'rgba(77,124,254,0.08)', border: '1px solid rgba(125,160,255,0.25)', borderRadius: 10, padding: '16px 18px' }}>
+              <div style={{ fontWeight: 700, color: '#38bdf8', marginBottom: 6 }}>Word-for-Word Concentrix Model Speech:</div>
+              <p style={{ margin: '0 0 10px', fontStyle: 'italic', fontSize: 15, color: '#eaf1ff', lineHeight: 1.65 }}>
+                “{topic.modelAnswer}”
+              </p>
+              <PlayButton text={topic.modelAnswer} label="Listen to model delivery" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- tab 6: mock call roleplay simulator ---------------- */
+function MockCallTab() {
+  const [scenarioIdx, setScenarioIdx] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
+  const [feedback, setFeedback] = useState<{ isCorrect: boolean; text: string } | null>(null);
+
+  const scenario = MOCK_CALL_SCENARIOS[scenarioIdx];
+  const step = scenario.steps[currentStep];
+
+  function handleSelect(idx: number) {
+    if (feedback?.isCorrect) return;
+    setSelectedOpt(idx);
+    setFeedback(null);
+  }
+
+  function submitChoice() {
+    if (selectedOpt === null) return;
+    const opt = step.agentOptions[selectedOpt];
+    setFeedback({ isCorrect: opt.isCorrect, text: opt.feedback });
+  }
+
+  function nextStep() {
+    setSelectedOpt(null);
+    setFeedback(null);
+    if (currentStep < scenario.steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  }
+
+  function resetScenario(idx: number) {
+    setScenarioIdx(idx);
+    setCurrentStep(0);
+    setSelectedOpt(null);
+    setFeedback(null);
+  }
+
+  const isComplete = currentStep === scenario.steps.length - 1 && feedback?.isCorrect;
+
+  return (
+    <div>
+      <TtsGate />
+      <div className="card" style={{ marginBottom: 14 }}>
+        <h3 style={{ margin: '0 0 6px' }}>Interactive Customer Mock Call Simulation</h3>
+        <p className="hint" style={{ margin: 0 }}>
+          Real Concentrix support call scenarios. Practice applying the 4-step model (Listen, Empathise, Resolve, Confirm) under live customer interactions.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        {MOCK_CALL_SCENARIOS.map((sc, idx) => (
+          <button
+            key={sc.id}
+            className={`radio-pill ${scenarioIdx === idx ? 'active' : ''}`}
+            onClick={() => resetScenario(idx)}
+          >
+            {sc.title}
+          </button>
+        ))}
+      </div>
+
+      <div className="svar-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span className="qnum">Step {currentStep + 1} of {scenario.steps.length}</span>
+          <span className="chip ghost">{scenario.title}</span>
+        </div>
+
+        {/* Customer bubble */}
+        <div style={{ background: '#122550', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '16px 18px', margin: '14px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ color: '#f5a623', fontWeight: 700, fontSize: 13, textTransform: 'uppercase' }}>
+              👤 Customer on line
+            </span>
+            <PlayButton text={step.customer} label="Hear customer voice" />
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: '#fff', lineHeight: 1.5 }}>
+            “{step.customer}”
+          </div>
+        </div>
+
+        {/* Agent options */}
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#9fb0cc', marginBottom: 10 }}>
+            🎧 Your response as Concentrix Support Agent (Choose the most professional):
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {step.agentOptions.map((opt, i) => (
+              <label
+                key={i}
+                className={`opt ${selectedOpt === i ? 'selected' : ''}`}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  cursor: feedback?.isCorrect ? 'default' : 'pointer',
+                  fontSize: 14.5,
+                  lineHeight: 1.55,
+                }}
+              >
+                <input
+                  type="radio"
+                  name="agent-opt"
+                  checked={selectedOpt === i}
+                  disabled={feedback?.isCorrect}
+                  onChange={() => handleSelect(i)}
+                />
+                <span>{opt.text}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="btnrow" style={{ marginTop: 16 }}>
+            {!feedback?.isCorrect ? (
+              <button className="btn-primary" disabled={selectedOpt === null} onClick={submitChoice}>
+                Submit Agent Response ✓
+              </button>
+            ) : isComplete ? (
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <span style={{ color: '#38d98a', fontWeight: 800 }}>🎉 Call successfully resolved!</span>
+                <button className="btn-big" onClick={() => resetScenario((scenarioIdx + 1) % MOCK_CALL_SCENARIOS.length)}>
+                  Next Scenario →
+                </button>
+              </div>
+            ) : (
+              <button className="btn-big" onClick={nextStep}>
+                Customer continues → Next Turn
+              </button>
+            )}
+          </div>
+
+          {feedback && (
+            <div className={`rev ${feedback.isCorrect ? 'correct' : 'wrong'}`} style={{ marginTop: 16 }}>
+              <div className="qnum">{feedback.isCorrect ? '✅ Excellent Response' : '⚠ Coaching Feedback'}</div>
+              <div className="exp" style={{ marginTop: 4, fontSize: 14 }}>{feedback.text}</div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -656,9 +1184,23 @@ export default function Svar() {
       </div>
 
       <div className="svar-tabs">
-        {(['listen', 'session'] as Tab[]).map((t) => (
-          <button key={t} className={`radio-pill ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
-            {t === 'listen' ? '👂 Listen & answer' : '🎙 Speaking session'}
+        {(
+          [
+            ['session', '🎙️ Read & Repeat (Graded)'],
+            ['listen', '👂 Listen & Answer'],
+            ['short', '⚡ Short Answers'],
+            ['jumbled', '🧩 Sentence Builds'],
+            ['extempore', '⏱️ Extempore (JAM)'],
+            ['mockcall', '📞 Customer Mock Call'],
+          ] as Array<[Tab, string]>
+        ).map(([t, label]) => (
+          <button
+            key={t}
+            className={`radio-pill ${tab === t ? 'active' : ''}`}
+            onClick={() => setTab(t)}
+            style={{ fontWeight: 600, padding: '8px 14px' }}
+          >
+            {label}
           </button>
         ))}
       </div>
@@ -670,6 +1212,10 @@ export default function Svar() {
       )}
 
       {tab === 'listen' && <ListenTab refresh={refresh} />}
+      {tab === 'short' && <ShortAnswersTab />}
+      {tab === 'jumbled' && <SentenceBuildsTab />}
+      {tab === 'extempore' && <ExtemporeTab />}
+      {tab === 'mockcall' && <MockCallTab />}
 
       {tab === 'session' && phase === 'lobby' && (
         <div className="card" style={{ textAlign: 'center', padding: '32px 24px' }}>
@@ -707,14 +1253,37 @@ export default function Svar() {
           </div>
 
           <div className="svar-card">
-            <span className="topic">{item.kind === 'read' ? `Read aloud • ${item.limit}s max` : `Repeat after me • ${item.limit}s max`}</span>
-            {item.kind === 'repeat' && (
-              <div style={{ marginTop: 8 }}>
-                <PlayButton text={item.text} label="Hear it" onPlayed={() => bump({ plays: readStats().plays + 1 })} />
-              </div>
+            <span className="topic">
+              {item.kind === 'read' ? `Read aloud • ${item.limit}s max` : `Repeat after me • ${item.limit}s max`}
+            </span>
+            {item.kind === 'read' ? (
+              <>
+                <div className="svar-sentence">“{item.text}”</div>
+                {item.tip && <div className="svar-tip"><b>Coach tip:</b> {item.tip}</div>}
+              </>
+            ) : (
+              <>
+                <div style={{ marginTop: 8 }}>
+                  <PlayButton text={item.text} label="Play sentence audio" onPlayed={() => bump({ plays: readStats().plays + 1 })} />
+                </div>
+                <div
+                  className="svar-sentence"
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 500,
+                    color: '#9fb0cc',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px dashed var(--border)',
+                    borderRadius: 10,
+                    padding: '14px 18px',
+                    margin: '12px 0',
+                  }}
+                >
+                  🎧 <b>Auditory retention mode:</b> The sentence text is hidden to simulate official SVAR testing. Listen to the audio above, then repeat the exact sentence verbatim into your microphone.
+                </div>
+                {item.tip && <div className="svar-tip"><b>Coach tip:</b> {item.tip}</div>}
+              </>
             )}
-            <div className="svar-sentence">“{item.text}”</div>
-            {item.tip && <div className="svar-tip"><b>Coach tip:</b> {item.tip}</div>}
             <SessionRecorder key={item.key} limit={item.limit} existing={recs[item.key]} onDone={(r) => setRec(item.key, r)} />
           </div>
 

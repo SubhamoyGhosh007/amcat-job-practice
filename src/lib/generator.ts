@@ -25,43 +25,48 @@ export function describeSource(): string {
   return 'offline bank';
 }
 
-function buildPrompt(seed: number, avoid: string[], difficulty: Difficulty, source: BankSource, adaptive = false): string {
+function buildPrompt(
+  seed: number,
+  avoid: string[],
+  difficulty: Difficulty,
+  source: BankSource,
+  adaptive = false,
+  sectionsToInclude?: SectionId[]
+): string {
+  const activeSections = sectionsToInclude ? SECTIONS.filter((s) => sectionsToInclude.includes(s.id)) : SECTIONS;
   const spec = adaptive
-    ? SECTIONS.map((s) => `- ${s.id}: 3 easy + 3 medium + 3 hard questions (${s.description})`).join('\n')
-    : SECTIONS.map((s) => `- ${s.id}: ${s.count} questions (${s.description})`).join('\n');
+    ? activeSections.map((s) => `- ${s.id}: 3 easy + 3 medium + 3 hard (${s.description})`).join('\n')
+    : activeSections.map((s) => `- ${s.id}: ${s.count} questions (${s.description})`).join('\n');
   const mix = difficulty === 'easy' ? '70% easy, 20% medium, 10% hard' : difficulty === 'hard' ? '20% easy, 30% medium, 50% hard' : '40% easy, 40% medium, 20% hard';
   const mixLine = adaptive
-    ? 'Label EVERY question with its true difficulty ("difficulty":"easy|medium|hard") — exactly 3 of each per section. Sections always start at medium difficulty.'
-    : 'Difficulty mix: ' + mix + '.';
+    ? 'Label each question with "difficulty":"easy|medium|hard".'
+    : 'Difficulty: ' + mix + '.';
   const style =
     source === 'pyq'
-      ? 'Style: previous-year AMCAT / Concentrix-drive questions as asked in 2021–2024 papers (recalled from training knowledge, exam-realistic; vary names and numbers slightly so no two sets repeat).'
-      : 'Style: fresh original questions in the exact AMCAT pattern and difficulty curve.';
-  return `You generate a Concentrix AMCAT-style practice set. Fresh seed ${seed}.
-Sections and counts:
+      ? 'Style: AMCAT / Concentrix-drive PYQ questions (2021–2024 patterns).'
+      : 'Style: realistic AMCAT Concentrix test pattern.';
+  return `Generate Concentrix AMCAT practice test. Seed ${seed}.
+Sections:
 ${spec}
-Avoid repeating these recent questions/topics: ${avoid.slice(0, 20).join(' | ') || 'none'}.
+Avoid recent topics: ${avoid.slice(0, 15).join(' | ') || 'none'}.
 Rules:
-- Multiple choice, exactly 4 options each, exactly 1 correct.
+- 4 options each, exactly 1 correct (answerIndex 0-3).
 - ${mixLine}
 - ${style}
-- Quant: use NEW numbers each time, show working in explanation.
-- English: new sentences/vocabulary each time.
-- Logical: new names/numbers each time.
-- csat: realistic Concentrix customer-support situations (angry caller, holds, escalation, email tone, privacy, prioritisation).
-- explanation: 1-2 lines, teaches the shortcut/rule.
-Return ONLY a JSON object: {"questions":[{"section":"english|quant|logical|csat","topic":"...","prompt":"...","options":["a","b","c","d"],"answerIndex":0,"explanation":"..."${adaptive ? ',"difficulty":"easy|medium|hard"' : ''}}]}
-No markdown fences, no extra text. Total questions must be ${adaptive ? 36 : SECTIONS.reduce((a, s) => a + s.count, 0)}.`;
+- csat: Concentrix voice/non-voice customer service scenarios (tone, escalations, holds, empathetic communication).
+- explanation: concise 1-2 lines only (max 25 words).
+JSON ONLY: {"questions":[{"section":"${activeSections.map((s) => s.id).join('|')}","topic":"...","prompt":"...","options":["a","b","c","d"],"answerIndex":0,"explanation":"..."${adaptive ? ',"difficulty":"easy|medium|hard"' : ''}}]}
+No markdown, no commentary. Total questions: ${adaptive ? activeSections.length * 9 : activeSections.reduce((a, s) => a + s.count, 0)}.`;
 }
 
 function validDiff(d: any): 'easy' | 'medium' | 'hard' {
   return d === 'easy' || d === 'hard' ? d : 'medium';
 }
 
-function sanitise(parsed: any, trim = true): Question[] {
+function sanitise(parsed: any, trim = true, allowedSections?: SectionId[]): Question[] {
   const list: any[] = Array.isArray(parsed) ? parsed : parsed?.questions;
   if (!Array.isArray(list)) throw new Error('AI returned no questions array');
-  const validSections: SectionId[] = ['english', 'quant', 'logical', 'csat'];
+  const validSections: SectionId[] = allowedSections || ['english', 'quant', 'logical', 'csat'];
   const out: Question[] = [];
   for (const q of list) {
     if (!q || typeof q.prompt !== 'string' || !Array.isArray(q.options) || q.options.length !== 4) continue;
@@ -78,20 +83,22 @@ function sanitise(parsed: any, trim = true): Question[] {
       difficulty: validDiff(q.difficulty),
     });
   }
-  if (out.length < 10) throw new Error('AI returned too few valid questions');
+  const minRequired = allowedSections ? Math.max(3, allowedSections.reduce((acc, sId) => acc + (SECTIONS.find((s) => s.id === sId)?.count || 0), 0) - 4) : 10;
+  if (out.length < minRequired) throw new Error('AI returned too few valid questions');
   if (!trim) return out;
+  const sectionsToCheck = allowedSections ? SECTIONS.filter((s) => allowedSections.includes(s.id)) : SECTIONS;
   const grouped = new Map<SectionId, Question[]>();
-  for (const s of SECTIONS) grouped.set(s.id, []);
-  for (const q of out) grouped.get(q.section)!.push(q);
+  for (const s of sectionsToCheck) grouped.set(s.id, []);
+  for (const q of out) if (grouped.has(q.section)) grouped.get(q.section)!.push(q);
   const final: Question[] = [];
-  for (const s of SECTIONS) final.push(...grouped.get(s.id)!.slice(0, s.count));
+  for (const s of sectionsToCheck) final.push(...grouped.get(s.id)!.slice(0, s.count));
   return final;
 }
 
-function geminiBody(prompt: string, maxTokens = 6000) {
+function geminiBody(prompt: string, maxTokens = 4500) {
   return {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.9, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0.7, maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
   };
 }
 
@@ -103,8 +110,8 @@ function geminiText(data: any): string {
 const GEMINI_FALLBACKS = ['gemini-3.6-flash', 'gemini-3.8-flash'];
 
 /** Direct Google Gemini API. Falls back through live models if the configured id is unknown. */
-async function callGemini(prompt: string, adaptive = false): Promise<Question[]> {
-  const maxTokens = adaptive ? 9000 : 6000;
+async function callGemini(prompt: string, adaptive = false, allowedSections?: SectionId[]): Promise<Question[]> {
+  const maxTokens = adaptive ? 6000 : 4500;
   const models = [GEMINI_MODEL, ...GEMINI_FALLBACKS.filter((m) => m !== GEMINI_MODEL)];
   const viaProxy = ttsConfigured();
   let lastErr = '';
@@ -115,7 +122,7 @@ async function callGemini(prompt: string, adaptive = false): Promise<Question[]>
         const body = geminiBody(prompt, maxTokens);
         const text = geminiText(await geminiViaProxy(m, body.contents, body.generationConfig));
         if (!text) throw new Error('Empty Gemini response');
-        return sanitise(extractJson(text), !adaptive);
+        return sanitise(extractJson(text), !adaptive, allowedSections);
       } catch (e: any) {
         lastErr = `Gemini proxy (${m}): ${e?.message || e}`;
         if (/429/.test(lastErr)) break; // throttled — retrying siblings would 429 too
@@ -126,18 +133,27 @@ async function callGemini(prompt: string, adaptive = false): Promise<Question[]>
       lastErr = 'No Gemini key and no proxy configured';
       continue;
     }
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(geminiBody(prompt, adaptive ? 9000 : 6000)),
-    });
-    if (res.ok) {
-      const text = geminiText(await res.json());
-      if (!text) throw new Error('Empty Gemini response');
-      return sanitise(extractJson(text), !adaptive);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 14000);
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiBody(prompt, maxTokens)),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const text = geminiText(await res.json());
+        if (!text) throw new Error('Empty Gemini response');
+        return sanitise(extractJson(text), !adaptive, allowedSections);
+      }
+      lastErr = `Gemini HTTP ${res.status} (${m})`;
+    } catch (fetchErr: any) {
+      clearTimeout(timeout);
+      lastErr = `Gemini call failed (${m}): ${fetchErr?.message || fetchErr}`;
     }
-    lastErr = `Gemini HTTP ${res.status} (${m})`;
   }
   throw new Error(lastErr);
 }
@@ -164,7 +180,7 @@ function extractResponsesText(data: any): string {
 }
 
 /** Groq rotation: first 200 wins; dead (404) or exhausted (429) models fall through. */
-async function callGroq(prompt: string, adaptive = false): Promise<Question[]> {
+async function callGroq(prompt: string, adaptive = false, allowedSections?: SectionId[]): Promise<Question[]> {
   let lastErr = 'Groq unavailable';
   for (const model of groqModelsFor()) {
     try {
@@ -172,9 +188,9 @@ async function callGroq(prompt: string, adaptive = false): Promise<Question[]> {
         model,
         'You are an AMCAT exam setter. Always reply with valid JSON only.',
         prompt + '\n\nReply with valid JSON only.',
-        adaptive ? 9000 : 6000
+        adaptive ? 6000 : 4500
       );
-      return sanitise(extractJson(text), !adaptive);
+      return sanitise(extractJson(text), !adaptive, allowedSections);
     } catch (e: any) {
       lastErr = `Groq (${model}): ${e?.message || e}`;
       continue;
@@ -200,7 +216,7 @@ function throwIfZenError(data: any, fallback: string): void {
 }
 
 async function callZen(prompt: string, adaptive = false): Promise<Question[]> {
-  const maxTokens = adaptive ? 9000 : 6000;
+  const maxTokens = adaptive ? 6000 : 4500;
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${ZEN_KEY}` };
 
   if (ZEN_MODEL.startsWith('gemini')) {
@@ -235,7 +251,7 @@ async function callZen(prompt: string, adaptive = false): Promise<Question[]> {
       headers,
       body: JSON.stringify({
         model: ZEN_MODEL,
-        temperature: 0.9,
+        temperature: 0.7,
         max_tokens: maxTokens,
         response_format: { type: 'json_object' },
         messages: [
@@ -277,6 +293,22 @@ export function offlineSet(difficulty: Difficulty = 'medium', adaptive = false):
   return { id: uid(), createdAt: Date.now(), source: 'offline-bank', difficulty, origin: 'offline', adaptive, questions: adaptive ? shuffle(picked) : shuffle(picked) };
 }
 
+/** Helper to call provider for a subset of sections or all sections. */
+async function callProviderForSections(
+  provider: 'groq' | 'gemini' | 'zen',
+  seed: number,
+  avoid: string[],
+  difficulty: Difficulty,
+  source: BankSource,
+  adaptive: boolean,
+  sections?: SectionId[]
+): Promise<Question[]> {
+  const prompt = buildPrompt(seed, avoid, difficulty, source, adaptive, sections);
+  if (provider === 'groq') return callGroq(prompt, adaptive, sections);
+  if (provider === 'gemini') return callGemini(prompt, adaptive, sections);
+  return callZen(prompt, adaptive);
+}
+
 /** Generate a fresh set: shared pool first, then AI (published back), then offline bank. */
 export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolean; adaptive?: boolean }): Promise<ExamSet> {
   const difficulty: Difficulty = opts?.difficulty || 'medium';
@@ -285,7 +317,7 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
   const userId = useSession.getState().userId;
   const tier = useSession.getState().profile?.tier ?? 'free';
   const seed = Math.floor(Math.random() * 1_000_000);
-  const prompt = buildPrompt(seed, recentAvoid(), difficulty, source, adaptive);
+  const avoid = recentAvoid();
 
   // 1. serve a set this learner hasn't attempted yet (same tier only)
   const shared = await fetchUnattempted(userId, difficulty, source, tier);
@@ -301,31 +333,37 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
   // then the configured providers, then the offline bank.
   const rest = PROVIDER === 'gemini' ? (['gemini', 'zen'] as const) : (['zen', 'gemini'] as const);
   const order = groqConfigured() ? (['groq', ...rest] as const) : rest;
+
   for (const p of order) {
+    if (p === 'gemini' && !GEMINI_KEY && !ttsConfigured()) continue;
+    if (p === 'zen' && !ZEN_KEY) continue;
+
     try {
-      if (p === 'groq') {
-        const qs = await callGroq(prompt, adaptive);
-        const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-groq', difficulty, origin: source, adaptive, questions: qs };
-        rememberAvoid(qs);
-        await publishSet(set, userId, difficulty, source, tier);
-        return set;
+      // Parallel section batching (English+CSAT vs Quant+Logical) for non-adaptive sets cuts generation time in half
+      if (!adaptive && (p === 'groq' || p === 'gemini')) {
+        try {
+          const [batchA, batchB] = await Promise.all([
+            callProviderForSections(p, seed, avoid, difficulty, source, false, ['english', 'csat']),
+            callProviderForSections(p, seed + 1, avoid, difficulty, source, false, ['quant', 'logical']),
+          ]);
+          const qs = [...batchA, ...batchB];
+          if (qs.length >= 24) {
+            const set: ExamSet = { id: uid(), createdAt: Date.now(), source: `ai-${p}`, difficulty, origin: source, adaptive, questions: qs };
+            rememberAvoid(qs);
+            await publishSet(set, userId, difficulty, source, tier);
+            return set;
+          }
+        } catch (parallelErr) {
+          console.info(`Parallel call with ${p} skipped or failed, trying full set:`, parallelErr);
+        }
       }
-      // Gemini works keyless through the self-hosted proxy — only skip it when
-      // neither a direct key nor the proxy is configured.
-      if (p === 'gemini' && (GEMINI_KEY || ttsConfigured())) {
-        const qs = await callGemini(prompt, adaptive);
-        const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-gemini', difficulty, origin: source, adaptive, questions: qs };
-        rememberAvoid(qs);
-        await publishSet(set, userId, difficulty, source, tier);
-        return set;
-      }
-      if (p === 'zen' && ZEN_KEY) {
-        const qs = await callZen(prompt, adaptive);
-        const set: ExamSet = { id: uid(), createdAt: Date.now(), source: 'ai-zen', difficulty, origin: source, adaptive, questions: qs };
-        rememberAvoid(qs);
-        await publishSet(set, userId, difficulty, source, tier);
-        return set;
-      }
+
+      // Single prompt fallback
+      const qs = await callProviderForSections(p, seed, avoid, difficulty, source, adaptive);
+      const set: ExamSet = { id: uid(), createdAt: Date.now(), source: `ai-${p}`, difficulty, origin: source, adaptive, questions: qs };
+      rememberAvoid(qs);
+      await publishSet(set, userId, difficulty, source, tier);
+      return set;
     } catch (e) {
       if (e instanceof TypeError) console.info(`AI provider ${p} unreachable from browser — trying next.`);
       else console.warn(`AI provider ${p} failed, trying next:`, e);

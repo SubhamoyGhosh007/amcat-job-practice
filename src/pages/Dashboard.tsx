@@ -241,17 +241,147 @@ export default function Dashboard() {
         </div>
         )}
 
-      <div className="wv-card" style={{ marginTop: 16, marginBottom: 0 }}>
-        <h3>Start a new set</h3>
-        <div className="card-sub">Ready when you are, @{profile?.username || '…'} — 30 fresh questions, 4 timed sections, every answer explained.</div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
+      <div className="wv-card" style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Concentrix Assessment Facilities</h3>
+            <div className="card-sub" style={{ margin: 0 }}>All rounds from the official Concentrix recruitment pattern</div>
+          </div>
+          <span className="chip green">Full Test Suite</span>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          {/* Card 1: Adaptive AMCAT */}
+          <div
             onClick={() => navigate('/app/instructions')}
-            style={{ background: '#3157d8', color: '#ffffff', fontWeight: 800, border: 'none', borderRadius: 10, padding: '13px 30px', fontSize: 15, cursor: 'pointer' }}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '16px',
+              cursor: 'pointer',
+              background: 'rgba(49,87,216,0.04)',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
           >
-            Start a new set →
-          </button>
-          {tier === 'pro' ? <span style={{ fontSize: 12, fontWeight: 800, color: '#1e9e62' }}>PRO • unlimited</span> : null}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 22 }}>📝</span>
+              <span className="chip" style={{ background: '#e0e7ff', color: '#3730a3', fontSize: 11 }}>30 Q • 32 Min</span>
+            </div>
+            <h4 style={{ margin: '0 0 4px', fontSize: 16 }}>AMCAT Practice Sets</h4>
+            <p style={{ margin: 0, fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+              Adaptive test covering English, Quantitative, Logical, and Customer Service.
+            </p>
+          </div>
+
+          {/* Card 2: Speaking & SVAR */}
+          <div
+            onClick={() => navigate('/app/speaking')}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '16px',
+              cursor: 'pointer',
+              background: 'rgba(56,189,248,0.04)',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 22 }}>🎙️</span>
+              <span className="chip green" style={{ fontSize: 11 }}>SVAR AI Graded</span>
+            </div>
+            <h4 style={{ margin: '0 0 4px', fontSize: 16 }}>Speaking Lab (SVAR)</h4>
+            <p style={{ margin: 0, fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+              Read aloud, repeat sentences, short answers, jumbled builds, and JAM extempore.
+            </p>
+          </div>
+
+          {/* Card 3: Mock Interview */}
+          <div
+            onClick={() => navigate('/app/interview')}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '16px',
+              cursor: 'pointer',
+              background: 'rgba(30,158,98,0.04)',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 22 }}>💼</span>
+              <span className="chip" style={{ background: '#fef3c7', color: '#92400e', fontSize: 11 }}>7 Parts • Monitored</span>
+            </div>
+            <h4 style={{ margin: '0 0 4px', fontSize: 16 }}>Mock Interview (Mocks 1 & 2)</h4>
+            <p style={{ margin: 0, fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+              Full proctored interview simulation with audio-once playback and camera checks.
+            </p>
+          </div>
+
+          {/* Card 4: Typing Arena */}
+          <div
+            onClick={() => navigate('/app/typing')}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '16px',
+              cursor: 'pointer',
+              background: 'rgba(245,166,35,0.04)',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 22 }}>⌨️</span>
+              <span className="chip" style={{ background: '#f3e8ff', color: '#6b21a8', fontSize: 11 }}>Target ≥ 35 WPM</span>
+            </div>
+            <h4 style={{ margin: '0 0 4px', fontSize: 16 }}>Typing Arena</h4>
+            <p style={{ margin: 0, fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+              Official support passages, delayed order emails, invoices, and story typing drills.
+            </p>
+          </div>
+
+          {/* Card 5: WriteX Non-Voice */}
+          <div
+            onClick={() => navigate('/app/writex')}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '16px',
+              cursor: 'pointer',
+              background: 'rgba(168,85,247,0.04)',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 22 }}>✍️</span>
+              <span className="chip green" style={{ fontSize: 11 }}>AI Essay & Email</span>
+            </div>
+            <h4 style={{ margin: '0 0 4px', fontSize: 16 }}>WriteX Arena</h4>
+            <p style={{ margin: 0, fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+              20-min timed essays, formal business emails, and behavioral situational survey.
+            </p>
+          </div>
+
+          {/* Card 6: Maths Practice */}
+          <div
+            onClick={() => navigate('/app/maths')}
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '16px',
+              cursor: 'pointer',
+              background: 'rgba(239,68,68,0.04)',
+              transition: 'transform 0.15s, border-color 0.15s',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <span style={{ fontSize: 22 }}>🧮</span>
+              <span className="chip" style={{ background: '#fee2e2', color: '#991b1b', fontSize: 11 }}>40 Q • 4 Pages</span>
+            </div>
+            <h4 style={{ margin: '0 0 4px', fontSize: 16 }}>Maths Arena</h4>
+            <p style={{ margin: 0, fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+              Aptitude speed arithmetic with step-by-step trick sheets and answer script PDFs.
+            </p>
+          </div>
         </div>
       </div>
 

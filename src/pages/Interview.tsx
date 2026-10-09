@@ -347,11 +347,9 @@ export default function Interview() {
   const [camTick, setCamTick] = useState(0);
   const flagsRef = useRef(0);
   const dialogOpen = useRef(false);
-  // Set once the user confirms leaving (via sidebar/logout/back) so the
-  // follow-up popstate from our own history juggling is ignored.
   const leavingRef = useRef(false);
-  // savedRef makes the final save once-only no matter which exit fires first.
   const savedRef = useRef(false);
+  const practiceModeRef = useRef(false);
   const setLeaveGuard = useUi((s) => s.setLeaveGuard);
   const finalizeRef = useRef(() => {});
 
@@ -481,11 +479,14 @@ export default function Interview() {
   // Tab close / reload is covered by AppShell's beforeunload guard, which
   // submits the session via the same finalize path (local-first, always lands).
 
-  async function startInterview() {
-    try {
-      await document.documentElement.requestFullscreen();
-    } catch {
-      /* unsupported/denied — the run still starts monitored */
+  async function startInterview(practice = false) {
+    practiceModeRef.current = practice;
+    if (!practice) {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch {
+        /* unsupported/denied — the run still starts monitored */
+      }
     }
     flagsRef.current = 0;
     savedRef.current = false;
@@ -498,6 +499,7 @@ export default function Interview() {
 
   async function handleViolationLeave(kind: 'tab' | 'fullscreen' | 'back') {
     if (dialogOpen.current || phase !== 'running') return;
+    if (practiceModeRef.current && (kind === 'tab' || kind === 'fullscreen')) return;
     dialogOpen.current = true;
     flagsRef.current += 1;
     const ok = await ask({
@@ -537,9 +539,11 @@ export default function Interview() {
       testId: mockTest.test_id,
     };
     setHistory(saveMockSession(s));
-    recordRun(userId, answers, durationSec).catch(() => {});
-    recordMockAttempt(userId, mockTest.test_id).catch(() => {});
-    setLocked(true);
+    if (!practiceModeRef.current) {
+      recordRun(userId, answers, durationSec).catch(() => {});
+      recordMockAttempt(userId, mockTest.test_id).catch(() => {});
+      setLocked(true);
+    }
     setPhase('idle');
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }
@@ -558,7 +562,7 @@ export default function Interview() {
     return <PageSkeleton variant="page" />;
   }
 
-  if (locked) {
+  if (locked && phase === 'idle') {
     return (
       <div>
         <div className="page-hero">
@@ -566,9 +570,23 @@ export default function Interview() {
           <p>Seven spoken parts, exam rules: scenario audio plays <b>once</b>, every answer on a timer, full sentences only.</p>
         </div>
         <div className="card" style={{ textAlign: 'center', marginTop: 6 }}>
-          <h3 style={{ marginTop: 0 }}>Today’s mock is done ✓</h3>
-          <p className="hint">One full interview per day keeps it exam-real. Next unlocks in <b>{untilMidnight(now)}</b>.</p>
-          <p className="hint">Paid plans with extra categories are coming — your streak keeps counting meanwhile.</p>
+          <h3 style={{ marginTop: 0 }}>Today’s monitored mock is done ✓</h3>
+          <p className="hint">One full proctored interview per day keeps it exam-real. Next unlocks in <b>{untilMidnight(now)}</b>.</p>
+          <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {STATIC_MOCK_TESTS.map((t) => (
+              <button
+                key={t.test_id}
+                className={`radio-pill ${mockTest.test_id === t.test_id ? 'active' : ''}`}
+                onClick={() => setMockTest(t)}
+                style={{ padding: '8px 16px', fontWeight: 600 }}
+              >
+                {t.test_id === 'concentrix_amcat_mock_02' ? '⭐ Concentrix Mock 02' : '📝 Standard AMCAT Mock 01'}
+              </button>
+            ))}
+          </div>
+          <button className="btn-big" onClick={() => startInterview(true)}>
+            ⚡ Launch Practice Drill Mode (Unmonitored) →
+          </button>
         </div>
         <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
         <HistoryList history={history} remove={remove} testId={mockTest.test_id} />
@@ -596,6 +614,20 @@ export default function Interview() {
           <div style={{ fontSize: 44 }}>🎙️</div>
           <h2 style={{ margin: '12px 0 6px' }}>Ready for your mock interview?</h2>
           <p className="hint">42 screens • all 7 parts • one item at a time • Back works, audio plays once</p>
+
+          <div style={{ margin: '14px 0', display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {STATIC_MOCK_TESTS.map((t) => (
+              <button
+                key={t.test_id}
+                className={`radio-pill ${mockTest.test_id === t.test_id ? 'active' : ''}`}
+                onClick={() => setMockTest(t)}
+                style={{ padding: '8px 16px', fontWeight: 600 }}
+              >
+                {t.test_id === 'concentrix_amcat_mock_02' ? '⭐ Concentrix Special Mock 02' : '📝 Standard AMCAT Mock 01'}
+              </button>
+            ))}
+          </div>
+
           <div className="banner warn" style={{ textAlign: 'left', maxWidth: 540, margin: '16px auto' }}>
             <b>⚠ Monitored conditions —</b> your camera must stay connected, this tab stays in focus,
             and the test runs fullscreen. Leaving the tab or exiting fullscreen pauses with a warning:
@@ -611,11 +643,16 @@ export default function Interview() {
               </>
             )}
           </div>
-          <button className="btn-big" disabled={cam !== 'ok'} onClick={startInterview}>
-            Start mock interview →
-          </button>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 12 }}>
+            <button className="btn-big" disabled={cam !== 'ok'} onClick={() => startInterview(false)}>
+              Start Monitored Full Mock →
+            </button>
+            <button className="btn-ghost" onClick={() => startInterview(true)} style={{ padding: '12px 20px', borderRadius: 10, fontWeight: 700 }}>
+              ⚡ Practice Drill Mode (No Fullscreen)
+            </button>
+          </div>
           {cam !== 'ok' && cam !== 'checking' && (
-            <p className="hint">Start unlocks once a camera is detected.</p>
+            <p className="hint">Monitored start unlocks once a camera is detected. Practice Drill works anytime.</p>
           )}
         </div>
       ) : (

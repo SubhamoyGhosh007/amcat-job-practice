@@ -28,25 +28,35 @@ export function groqModelsFor(): string[] {
 }
 
 export async function groqChat(model: string, system: string, user: string, maxTokens: number): Promise<string> {
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
-    body: JSON.stringify({
-      model,
-      temperature: 0.9,
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-    }),
-  });
-  if (res.status === 429) throw new Error('Groq rate limited (429)');
-  if (!res.ok) throw new Error(`Groq HTTP ${res.status} (${model})`);
-  const data = await res.json();
-  const text: string = data?.choices?.[0]?.message?.content || '';
-  if (!text) throw new Error('Empty Groq response');
-  if (/decommissioned|model_not_found|does not exist/i.test(text)) throw new Error(`Groq retired model (${model})`);
-  return text;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
+      body: JSON.stringify({
+        model,
+        temperature: 0.7,
+        max_tokens: maxTokens,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+    });
+    if (res.status === 429) throw new Error('Groq rate limited (429)');
+    if (!res.ok) throw new Error(`Groq HTTP ${res.status} (${model})`);
+    const data = await res.json();
+    const text: string = data?.choices?.[0]?.message?.content || '';
+    if (!text) throw new Error('Empty Groq response');
+    if (/decommissioned|model_not_found|does not exist/i.test(text)) throw new Error(`Groq retired model (${model})`);
+    return text;
+  } catch (err: any) {
+    if (err.name === 'AbortError') throw new Error(`Groq request timed out (12s) for ${model}`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }

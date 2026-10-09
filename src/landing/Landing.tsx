@@ -698,6 +698,7 @@ export default function Landing() {
             <a href="/guides/amcat-pattern">AMCAT pattern</a>
             <a href="/guides/svar-round">SVAR round</a>
             <a href="/guides/typing-test">Typing test</a>
+            <a href="/guides/concentrix-interview">Interview playbook</a>
           </div>
           <div className="rv-foot-cols">
             <h4>Account</h4>
