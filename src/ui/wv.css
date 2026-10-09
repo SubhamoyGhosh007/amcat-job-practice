@@ -1,0 +1,198 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap');
+
+/* WattVision dark system — sidebar shell + /app dashboard.
+   Scoped: .wv-side* for the shell, .wv for the dashboard page. */
+
+:root {
+  --wv-bg: #121212;
+  --wv-card: #1e1e1e;
+  --wv-line: #2c2c2e;
+  --wv-hover: #252525;
+  --wv-cyan: #00e5ff;
+  --wv-red: #ff453a;
+  --wv-green: #32d74b;
+  --wv-text: #ffffff;
+  --wv-muted: #98989d;
+}
+
+/* ---------- shadcn-style sidebar, WattVision theme ---------- */
+.wv-side {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 45;
+  width: 264px;
+  background: #121212;
+  color: #ffffff;
+  border-right: 1px solid #2c2c2e;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 220ms ease, transform 250ms ease;
+}
+.wv-side.collapsed { width: 78px; }
+.wv-side-head { display: flex; align-items: center; gap: 10px; padding: 18px 16px 14px; }
+.wv-side-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.wv-side-brand img { width: 34px; height: 34px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+.wv-side-brand b { display: block; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.wv-side-brand small { display: block; font-size: 11px; color: #98989d; font-weight: 500; white-space: nowrap; }
+.wv-side.collapsed .wv-side-brand div { display: none; }
+.wv-side-trigger {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid #2c2c2e;
+  color: #98989d;
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+.wv-side-trigger:hover { color: #00e5ff; border-color: #00e5ff; }
+.wv-side.collapsed .wv-side-head { flex-direction: column; }
+.wv-side.collapsed .wv-side-trigger { margin-left: 0; }
+.wv-side-group { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 12px; display: flex; flex-direction: column; gap: 2px; }
+.wv-side-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #98989d; padding: 12px 10px 6px; text-transform: uppercase; white-space: nowrap; }
+.wv-side.collapsed .wv-side-label { visibility: hidden; height: 8px; padding: 6px 0 0; }
+.wv-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #b9bcc4;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 9px;
+  white-space: nowrap;
+  border-left: 3px solid transparent;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+.wv-link:hover { background: #252525; color: #ffffff; }
+.wv-link.active { background: rgba(0, 229, 255, 0.1); color: #00e5ff; border-left-color: #00e5ff; }
+.wv-link svg { flex-shrink: 0; }
+.wv-side.collapsed .wv-link { justify-content: center; padding: 10px 0; }
+.wv-side.collapsed .wv-link span { display: none; }
+.wv-side-foot { padding: 12px; border-top: 1px solid #2c2c2e; display: flex; align-items: center; gap: 10px; }
+.wv-side-user { flex: 1; min-width: 0; }
+.wv-side-user b { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wv-side-user span { font-size: 11.5px; color: #98989d; }
+.wv-side.collapsed .wv-side-user { display: none; }
+.wv-iconbtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #b9bcc4;
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+.wv-iconbtn:hover { background: #252525; color: #00e5ff; }
+.wv-side.collapsed .wv-side-foot { justify-content: center; }
+.wv-side.collapsed .wv-side-foot .wv-iconbtn.logout { display: none; }
+.wv-overlay { display: none; }
+.wv-main { margin-left: 264px; min-height: 100vh; transition: margin-left 220ms ease; background: #f6f8fc; }
+.wv-main.wide { margin-left: 78px; }
+@media (max-width: 860px) {
+  .wv-side { transform: translateX(-100%); width: 264px; }
+  .wv-side.open { transform: translateX(0); }
+  .wv-side.collapsed .wv-link { justify-content: flex-start; padding: 10px 12px; }
+  .wv-side.collapsed .wv-link span { display: inline; }
+  .wv-main, .wv-main.wide { margin-left: 0; }
+  .wv-overlay { display: block; position: fixed; inset: 0; z-index: 44; background: rgba(0, 0, 0, 0.55); }
+}
+
+/* ---------- /app dashboard ---------- */
+.wv {
+  background: #121212;
+  color: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.wv-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.wv-top h2 { font-size: 24px; font-weight: 600; margin: 0; }
+.wv-top .date { color: #98989d; font-size: 13px; }
+.wv-live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #32d74b;
+}
+.wv-live i { width: 9px; height: 9px; border-radius: 50%; background: #32d74b; box-shadow: 0 0 0 0 rgba(50, 215, 75, 0.5); animation: wv-ping 2s infinite; }
+@keyframes wv-ping {
+  0% { box-shadow: 0 0 0 0 rgba(50, 215, 75, 0.45); }
+  70% { box-shadow: 0 0 0 9px rgba(50, 215, 75, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(50, 215, 75, 0); }
+}
+.wv-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+@media (max-width: 700px) { .wv-kpis { grid-template-columns: 1fr; } }
+.wv-card {
+  background: #1e1e1e;
+  border: 1px solid #2c2c2e;
+  border-radius: 16px;
+  padding: 20px;
+}
+.wv-card .k-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #98989d; }
+.wv-card .k-value { font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; margin: 8px 0 2px; }
+.wv-card .k-value.cyan { color: #00e5ff; }
+.wv-card .k-sub { font-size: 13px; color: #98989d; }
+.wv-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; margin-bottom: 16px; }
+.wv-chart-card { grid-column: span 8; }
+.wv-alerts-card { grid-column: span 4; }
+@media (max-width: 900px) {
+  .wv-chart-card, .wv-alerts-card { grid-column: span 12; }
+}
+.wv-card h3 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+.wv-card .card-sub { font-size: 13px; color: #98989d; margin-bottom: 12px; }
+.wv-chart { width: 100%; height: auto; display: block; }
+.wv-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: wv-draw 1.4s ease-out forwards;
+}
+@keyframes wv-draw { to { stroke-dashoffset: 0; } }
+.wv-sim { font-size: 11.5px; color: #98989d; margin-top: 8px; }
+.wv-alert {
+  background: #3a1c1c;
+  border-left: 4px solid #ff453a;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.wv-alert .a-title { font-size: 13.5px; font-weight: 700; color: #ff453a; }
+.wv-alert .a-body { font-size: 13px; color: #e8c9c9; margin-top: 3px; line-height: 1.55; }
+.wv-alert.info { background: rgba(0, 229, 255, 0.07); border-left-color: #00e5ff; }
+.wv-alert.info .a-title { color: #00e5ff; }
+.wv-alert.info .a-body { color: #c4d3d8; }
+.wv-alert.ok { background: rgba(50, 215, 75, 0.07); border-left-color: #32d74b; }
+.wv-alert.ok .a-title { color: #32d74b; }
+.wv-alert.ok .a-body { color: #c9d8cc; }
+.wv-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.wv-table th { text-align: left; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #98989d; padding: 8px 10px; }
+.wv-table td { padding: 10px; border-bottom: 1px solid #2c2c2e; }
+.wv-table tbody tr:hover td { background: #252525; }
+.wv-table .mono { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+.wv-table .mono.cyan { color: #00e5ff; }
+.wv-table .mono.green { color: #32d74b; }
+.wv-table .mono.red { color: #ff453a; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wv-side, .wv-main, .wv-link, .wv-iconbtn, .wv-side-trigger { transition: none !important; }
+  .wv-live i { animation: none !important; }
+  .wv-draw { animation: none !important; stroke-dashoffset: 0; }
+}
