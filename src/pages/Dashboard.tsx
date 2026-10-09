@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Flame, Gauge, Zap } from 'lucide-react';
 import { SECTIONS } from '../types';
 import { useSession } from '../stores/session';
 import { downloadSpeakingReport } from '../lib/pdf';
@@ -91,7 +92,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="wv">
+      <div className="wv" style={{ borderRadius: 16 }}>
         <div className="wv-top">
           <div>
             <h2>Practice dashboard</h2>
@@ -105,17 +106,17 @@ export default function Dashboard() {
 
         <div className="wv-kpis">
           <div className="wv-card">
-            <div className="k-label">Sets taken</div>
+            <div className="k-label"><Zap size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Sets taken</div>
             <div className="k-value cyan">{stats.count}</div>
             <div className="k-sub">{stats.best !== null ? `best ${stats.best}%` : 'take your first set ↓'}</div>
           </div>
           <div className="wv-card">
-            <div className="k-label">Average score</div>
+            <div className="k-label"><Gauge size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Average score</div>
             <div className="k-value">{stats.avg !== null ? `${stats.avg}%` : '—'}</div>
             <div className="k-sub">{stats.count ? `across ${stats.count} sets` : 'no data yet'}</div>
           </div>
           <div className="wv-card">
-            <div className="k-label">Day streak</div>
+            <div className="k-label"><Flame size={13} style={{ verticalAlign: '-2px', marginRight: 6, color: '#00E5FF' }} />Day streak</div>
             <div className="k-value" style={{ color: stats.streak >= 2 ? '#32d74b' : '#ffffff' }}>{stats.streak}</div>
             <div className="k-sub">{stats.streak >= 2 ? 'keep it burning' : 'practice today to start one'}</div>
           </div>
@@ -190,35 +191,55 @@ export default function Dashboard() {
             <div className="card-sub">Nothing graded yet.</div>
           )}
         </div>
-      </div>
 
-      <div className="page-hero" style={{ marginTop: 18 }}>
-        <h2>Ready when you are, @{profile?.username || '…'}</h2>
-        <p>Each new set is freshly generated — 30 questions, 4 timed sections, every answer explained.</p>
-        <div className="hero-cta">
-          <button className="btn-big" onClick={() => navigate('/app/instructions')}>Start a new set →</button>
-          {tier === 'pro' ? <span className="chip green">PRO • unlimited</span> : null}
+      <div className="wv-card" style={{ marginTop: 16, marginBottom: 0 }}>
+        <h3>Start a new set</h3>
+        <div className="card-sub">Ready when you are, @{profile?.username || '…'} — 30 fresh questions, 4 timed sections, every answer explained.</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => navigate('/app/instructions')}
+            style={{ background: '#00E5FF', color: '#121212', fontWeight: 800, border: 'none', borderRadius: 10, padding: '13px 30px', fontSize: 15, cursor: 'pointer' }}
+          >
+            Start a new set →
+          </button>
+          {tier === 'pro' ? <span style={{ fontSize: 12, fontWeight: 800, color: '#32d74b' }}>PRO • unlimited</span> : null}
         </div>
       </div>
 
       {speaking.length > 0 && (
-        <>
+        <div className="wv-card" style={{ marginTop: 16 }}>
           <h3>Latest speaking reports</h3>
-          {speaking.map((r) => (
-            <div className="t-row" key={r.id}>
-              <div className="ring" style={{ '--p': r.marks * 10 } as any}><span>{r.marks}</span></div>
-              <div className="meta">
-                <div style={{ fontWeight: 700 }}>{r.marks}/10 • {r.items.length} items</div>
-                <div className="hint">{new Date(r.at).toLocaleString()}</div>
-              </div>
-              <div className="btnrow" style={{ marginTop: 0 }}>
-                <button className="btn-ghost" onClick={() => navigate('/app/speaking')}>Open lab</button>
-                <button className="btn-ghost" onClick={() => downloadSpeakingReport(r)}>PDF</button>
-              </div>
-            </div>
-          ))}
-        </>
+          <div className="card-sub">Marks out of 10 per session</div>
+          <table className="wv-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Marks</th>
+                <th>Items</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {speaking.map((r) => (
+                <tr key={r.id}>
+                  <td>{new Date(r.at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
+                  <td className={`mono ${r.marks >= 7 ? 'green' : r.marks >= 5 ? 'cyan' : 'red'}`}>{r.marks}/10</td>
+                  <td className="mono">{r.items.length}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button
+                      onClick={() => downloadSpeakingReport(r)}
+                      style={{ background: 'transparent', border: '1px solid #2C2C2E', color: '#00E5FF', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      PDF
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
+    </div>
     </div>
   );
 }
