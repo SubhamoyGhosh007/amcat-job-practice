@@ -938,6 +938,7 @@ function MockCallTab() {
     submittedRef.current = null;
     recorder.reset();
     setStatus('user');
+    beep();
     recorder.start(30).catch(() => {});
   }
 
@@ -1160,11 +1161,33 @@ function MockCallTab() {
   }
 
   const mmss = `${String(Math.floor(callSecs / 60)).padStart(2, '0')}:${String(callSecs % 60).padStart(2, '0')}`;
+  const yourTurn = phase === 'live' && status === 'user';
+  // Short beep the moment the mic opens — the audible "your turn" cue.
+  function beep() {
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 880;
+      g.gain.value = 0.15;
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start();
+      window.setTimeout(() => {
+        o.stop();
+        ctx.close().catch(() => {});
+      }, 220);
+    } catch {
+      /* ignore */
+    }
+  }
   const statusText =
     phase !== 'live'
       ? ''
       : status === 'ai'
-        ? 'Customer speaking…'
+        ? 'Customer speaking… listen'
         : status === 'thinking'
           ? 'Waiting for response…'
           : status === 'paused'
@@ -1172,7 +1195,7 @@ function MockCallTab() {
               ? 'On hold — tap Hold to resume'
               : 'Muted — unmute to answer'
             : recorder.recording
-              ? `Listening… ${recorder.secs}s — speak now`
+              ? `🎙 SPEAK NOW (${recorder.secs}s / 30s)`
               : 'Getting your mic…';
   const waving = phase === 'live' && (status === 'ai' || recorder.recording);
 
@@ -1263,11 +1286,21 @@ function MockCallTab() {
             </div>
             <div className="callphone-state">
               {phase === 'live' ? (
-                <>{status === 'thinking' && <span className="callphone-count">{agentTurns + 1}</span>} {statusText}</>
+                <span className={yourTurn && recorder.recording ? 'yourturn' : ''}>
+                  {status === 'thinking' && <span className="callphone-count">{agentTurns + 1}</span>} {statusText}
+                </span>
               ) : (
                 <>Call ended • {mmss}</>
               )}
             </div>
+            {phase === 'live' && yourTurn && recorder.recording && (
+              <div className="callphone-turnbar">
+                <div className="callphone-turnfill" style={{ width: `${Math.min(100, Math.round((recorder.secs / 30) * 100))}%` }} />
+                <button className="callphone-done" onClick={() => recorder.stop()}>
+                  Done answering ✓ ({30 - recorder.secs}s left)
+                </button>
+              </div>
+            )}
             <div className={`callwave${waving ? '' : ' still'}`} aria-hidden="true">
               {[0.5, 0.9, 0.65, 1, 0.75, 0.55, 0.95, 0.6, 0.8, 0.5, 0.7, 0.9].map((h, i) => (
                 <span key={i} style={{ height: `${Math.round(h * 34)}px`, animationDelay: `${(i % 6) * 0.12}s` }} />

@@ -64,6 +64,39 @@
 .callphone-contact b { display: block; font-size: 21px; }
 .callphone-contact small { display: block; font-size: 12px; color: #9a9aa5; margin-top: 3px; }
 .callphone-state { text-align: center; font-size: 14px; color: #d7d7de; margin-top: 10px; min-height: 22px; }
+.callphone-state .yourturn {
+  display: inline-block;
+  color: #4ade80;
+  font-weight: 800;
+  font-size: 16px;
+  animation: yourturn-pulse 1.2s ease-in-out infinite;
+}
+@keyframes yourturn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.callphone-turnbar { margin-top: 10px; }
+.callphone-turnfill {
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #4ade80, #38bdf8);
+  transition: width 0.5s linear;
+  margin-bottom: 10px;
+}
+.callphone-done {
+  width: 100%;
+  background: #4ade80;
+  color: #05240f;
+  font-weight: 800;
+  font-size: 14px;
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .callphone-state .yourturn { animation: none !important; }
+}
 .callphone-count {
   display: inline-block;
   background: rgba(255, 255, 255, 0.12);
