@@ -331,6 +331,62 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* features */}
+      <section id="features" className="block" style={{ paddingTop: 20 }}>
+        <div className="wrap-narrow">
+          <h2 className="sec-title">Everything the drive tests</h2>
+          <p className="sec-sub">
+            Four arenas, one account. Each one grades you instantly and tells you exactly what to fix next.
+          </p>
+          <div className="rv-feat-grid">
+            <Reveal>
+              <div>
+                <div className="rv-feat-visual" aria-hidden="true">
+                  <div className="fv-row">Q11 • The customer insisted ___ speaking…</div>
+                  <div className="fv-row good">B. on ✓ — “insist on doing”</div>
+                  <div className="fv-row dim">Q12 • Time–speed–distance…</div>
+                </div>
+                <h3 className="rv-feat-h">Timed practice sets</h3>
+                <p className="rv-feat-p">30 fresh questions across all four sections on one page, with a hall-style countdown.</p>
+              </div>
+            </Reveal>
+            <Reveal>
+              <div>
+                <div className="rv-feat-visual" aria-hidden="true">
+                  <div className="fv-row bad">18% ✗ — you picked this</div>
+                  <div className="fv-row good">15% ✓ — profit 120 on 800</div>
+                  <div className="fv-small">Every answer ships with its working.</div>
+                </div>
+                <h3 className="rv-feat-h">Answer scripts that teach</h3>
+                <p className="rv-feat-p">Your pick vs the actual answer, the shortcut shown step by step, downloadable as PDF.</p>
+              </div>
+            </Reveal>
+            <Reveal>
+              <div>
+                <div className="rv-feat-visual" aria-hidden="true">
+                  <div className="fv-big">42 <span className="fv-small">WPM • 96% accuracy</span></div>
+                  <div className="fv-bar"><span style={{ width: '72%' }} /></div>
+                  <div className="fv-small">Consistency 88% • every test saved</div>
+                </div>
+                <h3 className="rv-feat-h">Typing arena</h3>
+                <p className="rv-feat-p">Live speed, accuracy and consistency with full history — the metric Concentrix screens on.</p>
+              </div>
+            </Reveal>
+            <Reveal>
+              <div>
+                <div className="rv-feat-visual" aria-hidden="true">
+                  <div className="fv-row">🔴 Repeat once, then record…</div>
+                  <div className="fv-row good">Clarity 92% • Pace 138 wpm ✓</div>
+                  <div className="fv-small">Whisper transcription, marks out of 10.</div>
+                </div>
+                <h3 className="rv-feat-h">Speaking lab + mock interview</h3>
+                <p className="rv-feat-p">All seven SVAR parts on exam timers, plus a monitored full mock with session reports.</p>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
       {/* 5. games + knowledge check */}
       <section id="quiz" className="block" style={{ paddingTop: 20 }}>
         <div className="wrap-narrow">
@@ -496,8 +552,10 @@ export default function Landing() {
       {/* 8. FAQ */}
       <section id="faq" className="block" style={{ paddingTop: 20 }}>
         <div className="wrap-narrow">
-          <h2 className="sec-title">Questions aspirants ask</h2>
-          <p className="sec-sub">Straight answers about the pattern, the SVAR round, typing, and what this site is.</p>
+          <div className="rv-faq-head">
+            <h2 className="sec-title">Questions aspirants ask</h2>
+            <p className="sec-sub">Straight answers about the pattern, the SVAR round, typing, and what this site is.</p>
+          </div>
           <div className="rv-faq">
             {FAQS.map((f, i) => {
               const open = openFaq === i;

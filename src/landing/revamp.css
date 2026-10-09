@@ -602,15 +602,57 @@ a.rv-book .bnum { font-size: 22px; font-weight: 800; opacity: 0.9; }
 .rv-price-list li.off::before { content: '–'; color: #cbd5e1; }
 .rv-price-note { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 20px; }
 
-/* ---------- 8. FAQ (light skin on the shared accordion) ---------- */
-.rv-faq { max-width: 720px; margin: 30px auto 0; text-align: left; }
-.rv-faq .faq-item { background: #fff; border: none; border-bottom: 1px solid var(--rv-line); border-radius: 0; }
-.rv-faq .faq-item:first-child { border-top: 1px solid var(--rv-line); }
-.rv-faq .faq-head { padding: 20px 4px; font-size: 15.5px; font-weight: 700; color: var(--rv-ink); }
-.rv-faq .faq-item[data-open="true"] .faq-head { padding-bottom: 8px; }
-.rv-faq .faq-head .t-acc-chevron { color: var(--rv-blue-deep); }
-.rv-faq .faq-answer { padding: 0 4px 20px; }
-.rv-faq .faq-answer p { color: var(--rv-gray); font-size: 14.5px; line-height: 1.7; margin: 0; }
+/* ---------- feature grid ---------- */
+.rv-feat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 36px;
+  row-gap: 56px;
+  max-width: 800px;
+  margin: 48px auto 0;
+}
+@media (max-width: 700px) { .rv-feat-grid { grid-template-columns: 1fr; } }
+.rv-feat-visual {
+  background: #eef0ee;
+  border-radius: 18px;
+  box-shadow: 0 18px 44px rgba(17, 17, 17, 0.1);
+  padding: 22px;
+  margin-bottom: 18px;
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+}
+.rv-feat-visual .fv-row {
+  background: #fff;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(17, 17, 17, 0.05);
+}
+.rv-feat-visual .fv-row.dim { color: #9ca3af; }
+.rv-feat-visual .fv-row.good { border-left: 4px solid #22c55e; }
+.rv-feat-visual .fv-row.bad { border-left: 4px solid #ef4444; }
+.rv-feat-visual .fv-big { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; }
+.rv-feat-visual .fv-small { font-size: 12px; color: #6b7280; font-weight: 600; }
+.rv-feat-visual .fv-bar { height: 8px; border-radius: 99px; background: #dfe3da; overflow: hidden; }
+.rv-feat-visual .fv-bar > span { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--rv-blue), var(--rv-blue-deep)); }
+.rv-feat-h { font-size: 17px; font-weight: 800; margin: 0 0 6px; text-align: left; }
+.rv-feat-p { font-size: 14px; line-height: 1.65; color: #6b7280; margin: 0; text-align: left; }
+
+/* ---------- 8. FAQ: plain divider rows, left-aligned ---------- */
+.rv-faq { max-width: 570px; margin: 26px auto 0; text-align: left; }
+.rv-faq-head { max-width: 570px; margin: 0 auto; text-align: left; }
+.rv-faq-head .sec-title, .rv-faq-head .sec-sub { text-align: left; margin-left: 0; margin-right: 0; }
+.rv-faq .faq-item { background: #fff; border: none; border-bottom: 1px solid #e5e6e4; border-radius: 0; }
+.rv-faq .faq-item:first-child { border-top: 1px solid #e5e6e4; }
+.rv-faq .faq-head { padding: 24px 4px; font-size: 15px; font-weight: 700; color: #202321; }
+.rv-faq .faq-item[data-open="true"] .faq-head { padding-bottom: 10px; }
+.rv-faq .faq-head .t-acc-chevron { color: #9ca3af; }
+.rv-faq .faq-answer { padding: 0 4px 24px; }
+.rv-faq .faq-answer p { color: #6b7280; font-size: 14px; line-height: 1.7; margin: 0; }
 
 /* ---------- 9-10. final CTA + footer ---------- */
 .rv-final { text-align: center; padding: 110px 22px; }
