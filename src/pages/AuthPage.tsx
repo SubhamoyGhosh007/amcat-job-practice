@@ -5,7 +5,7 @@ import { useAuthActions } from '../auth/actions';
 import { redeemBackupCode, sendRecoveryLink } from '../lib/backupCodes';
 import { LoginButtons } from '../components/AuthWidgets';
 import { friendlyError } from '../lib/friendly';
-import '../landing/landing.css';
+import './auth.css';
 
 function friendly(e: any): string {
   const m = String(e?.message || 'Something went wrong. Try again.');
@@ -127,28 +127,31 @@ export default function AuthPage() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="landing">
-        <header className="hero" style={{ minHeight: '100vh', overflow: 'hidden' }}>
-          <div className="hero-grid" />
+      <div className="au-shell">
+        <aside className="au-panel">
+          <div className="au-brand">
+            <img src="/logo.jpg" alt="Concentrix AMCAT Practice logo" />
+            <div>
+              <b>AMCAT Practice</b>
+              <small>Concentrix hiring prep</small>
+            </div>
+          </div>
+          <h2>Walk in test-ready.<br />Clear your AMCAT drive.</h2>
+          <ul className="au-points">
+            <li><span className="tick">✓</span> Fresh AI question sets, daily</li>
+            <li><span className="tick">✓</span> Answer scripts with explanations + PDFs</li>
+            <li><span className="tick">✓</span> Typing, voice and mock interview arenas</li>
+          </ul>
+          <div className="au-fine">Free forever • No card • Unofficial practice project</div>
+        </aside>
+        <div className="au-form-col">
           <motion.div
-            className="orb"
-            style={{ left: '6%', top: '-160px', width: 480, height: 480, background: 'rgba(77,124,254,.28)' }}
-            animate={{ x: [0, 60, 0], y: [0, 40, 0] }}
-            transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            className="orb"
-            style={{ right: '4%', top: '30%', width: 380, height: 380, background: 'rgba(56,189,248,.20)' }}
-            animate={{ x: [0, -50, 0], y: [0, 55, 0] }}
-            transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            style={{ position: 'relative', zIndex: 2, maxWidth: 480, margin: '0 auto', padding: '56px 18px' }}
-            initial={{ opacity: 0, y: 32, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="au-card"
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 120, damping: 18 }}
           >
-            <button onClick={() => navigate('/')} style={{ background: 'transparent', border: 'none', color: '#9fb0cc', fontSize: 14, cursor: 'pointer', padding: 0 }}>
+            <button className="au-back" onClick={() => navigate('/')}>
               ← Back to home
             </button>
             <AnimatePresence mode="wait">
@@ -159,10 +162,10 @@ export default function AuthPage() {
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.25 }}
               >
-                <h1 className="display" style={{ fontSize: 32, margin: '14px 0 6px' }}>
+                <h1>
                   {stage === 'mfa' ? 'Two-factor check' : stage === 'confirm' ? 'Check your email' : mode === 'login' ? 'Welcome back' : 'Create your account'}
                 </h1>
-                <p style={{ color: '#9fb0cc', fontSize: 14.5, margin: '0 0 20px', lineHeight: 1.6 }}>
+                <p className="au-sub">
                   {stage === 'mfa'
                     ? 'This account has 2FA on — open your authenticator app and enter the 6-digit code.'
                     : stage === 'confirm'
@@ -174,8 +177,6 @@ export default function AuthPage() {
               </motion.div>
             </AnimatePresence>
             <motion.div
-              className="demo-card"
-              style={{ textAlign: 'left' }}
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.12, type: 'spring', stiffness: 110, damping: 17 }}
@@ -183,56 +184,52 @@ export default function AuthPage() {
               {stage === 'mfa' ? (
                 recMode ? (
                   <>
-                    <div className="field">
+                    <div className="au-field">
                       <label>Account email</label>
                       <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" inputMode="email" />
                     </div>
-                    <div className="field">
+                    <div className="au-field">
                       <label>Backup code (single use)</label>
                       <input value={recCode} onChange={(e) => setRecCode(e.target.value.toUpperCase().slice(0, 9))} placeholder="AB12-CD34" inputMode="text"
                         onKeyDown={(e) => { if (e.key === 'Enter') submitRecovery(); }} />
                     </div>
                     <AnimatePresence>{msg && (
                       <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                        <div className="err">{msg}</div>
+                        <div className="au-err">{msg}</div>
                       </motion.div>
                     )}</AnimatePresence>
-                    <div className="btnrow">
-                      <motion.button className="btn-primary" style={{ flex: 1 }} disabled={busy} onClick={submitRecovery} whileTap={{ scale: 0.98 }}>
-                        {busy ? 'Checking…' : 'Send me a login link'}
-                      </motion.button>
-                    </div>
-                    <p className="hint" style={{ marginBottom: 0 }}>
+                    <motion.button className="au-submit" disabled={busy} onClick={submitRecovery} whileTap={{ scale: 0.98 }}>
+                      {busy ? 'Checking…' : 'Send me a login link'}
+                    </motion.button>
+                    <p className="au-alt" style={{ marginBottom: 0 }}>
                       Found your authenticator?{' '}
-                      <button onClick={() => { setRecMode(false); setRecCode(''); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                      <button onClick={() => { setRecMode(false); setRecCode(''); setMsg(''); }}>
                         Use a 6-digit code
                       </button>
                     </p>
                   </>
                 ) : (
                 <>
-                  <div className="field">
+                  <div className="au-field">
                     <label>6-digit code</label>
                     <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="123456" inputMode="numeric"
                       onKeyDown={(e) => { if (e.key === 'Enter') submitMfa(); }} />
                   </div>
                   <AnimatePresence>{msg && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                      <div className="err">{msg}</div>
+                      <div className="au-err">{msg}</div>
                     </motion.div>
                   )}</AnimatePresence>
-                  <div className="btnrow">
-                    <motion.button className="btn-primary" style={{ flex: 1 }} disabled={busy} onClick={submitMfa} whileTap={{ scale: 0.98 }}>
-                      {busy ? 'Verifying…' : 'Verify & log in'}
-                    </motion.button>
-                  </div>
-                  <p className="hint" style={{ marginBottom: 0 }}>
+                  <motion.button className="au-submit" disabled={busy} onClick={submitMfa} whileTap={{ scale: 0.98 }}>
+                    {busy ? 'Verifying…' : 'Verify & log in'}
+                  </motion.button>
+                  <p className="au-alt" style={{ marginBottom: 0 }}>
                     Lost your authenticator?{' '}
-                    <button onClick={() => { setRecMode(true); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                    <button onClick={() => { setRecMode(true); setMsg(''); }}>
                       Use a backup code
                     </button>
                     {' '}•{' '}
-                    <button onClick={() => { setStage('form'); setCode(''); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                    <button onClick={() => { setStage('form'); setCode(''); setMsg(''); }}>
                       Back to log in
                     </button>
                   </p>
@@ -240,41 +237,35 @@ export default function AuthPage() {
                 )
               ) : stage === 'confirm' ? (
                 <>
-                  {msg && <div className="err">{msg}</div>}
-                  <div className="btnrow">
-                    <button className="btn-primary" style={{ flex: 1 }} disabled={busy} onClick={resend}>
-                      {busy ? 'Sending…' : 'Resend confirmation email'}
-                    </button>
-                  </div>
-                  <p className="hint" style={{ marginBottom: 0 }}>
+                  {msg && <div className="au-err">{msg}</div>}
+                  <motion.button className="au-submit" disabled={busy} onClick={resend} whileTap={{ scale: 0.98 }}>
+                    {busy ? 'Sending…' : 'Resend confirmation email'}
+                  </motion.button>
+                  <p className="au-alt" style={{ marginBottom: 0 }}>
                     Confirmed already?{' '}
-                    <button onClick={() => { setStage('form'); setMode('login'); setMsg(''); }} style={{ background: 'none', border: 'none', color: '#1b4fa0', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                    <button onClick={() => { setStage('form'); setMode('login'); setMsg(''); }}>
                       Log in
                     </button>
                   </p>
                 </>
               ) : (
                 <>
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 16, position: 'relative' }}>
+                  <div className="au-tabs">
                     {(['login', 'register'] as const).map((m) => (
                       <button
                         key={m}
                         type="button"
+                        className={mode === m ? 'on' : ''}
                         onClick={() => { setMode(m); setMsg(''); }}
-                        style={{
-                          flex: 1, padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 700,
-                          border: 'none', background: 'transparent', color: mode === m ? '#16213a' : '#8a97b3',
-                          position: 'relative',
-                        }}
                       >
                         {mode === m && (
                           <motion.span
                             layoutId="auth-tab"
-                            style={{ position: 'absolute', inset: 0, background: '#eaf0fd', border: '1.5px solid #1b4fa0', borderRadius: 8, zIndex: 0 }}
+                            className="pill-bg"
                             transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                           />
                         )}
-                        <span style={{ position: 'relative', zIndex: 1 }}>{m === 'login' ? 'Log in' : 'Register'}</span>
+                        <span className="lbl">{m === 'login' ? 'Log in' : 'Register'}</span>
                       </button>
                     ))}
                   </div>
@@ -287,16 +278,16 @@ export default function AuthPage() {
                       transition={{ duration: 0.18 }}
                     >
                       {mode === 'register' && (
-                        <div className="field">
+                        <div className="au-field">
                           <label>Your name</label>
                           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" maxLength={40} />
                         </div>
                       )}
-                      <div className="field">
+                      <div className="au-field">
                         <label>Email</label>
                         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" inputMode="email" />
                       </div>
-                      <div className="field">
+                      <div className="au-field">
                         <label>Password</label>
                         <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Minimum 6 characters"
                           onKeyDown={(e) => { if (e.key === 'Enter') submit(); }} />
@@ -305,25 +296,21 @@ export default function AuthPage() {
                   </AnimatePresence>
                   <AnimatePresence>{msg && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                      <div className="err">{msg}</div>
+                      <div className="au-err">{msg}</div>
                     </motion.div>
                   )}</AnimatePresence>
-                  <div className="btnrow">
-                    <motion.button className="btn-primary" style={{ flex: 1 }} disabled={busy} onClick={submit} whileTap={{ scale: 0.98 }}>
-                      {busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
-                    </motion.button>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0 10px' }}>
-                    <div style={{ flex: 1, height: 1, background: '#dfe6f2' }} />
-                    <span className="hint">or continue with</span>
-                    <div style={{ flex: 1, height: 1, background: '#dfe6f2' }} />
+                  <motion.button className="au-submit" disabled={busy} onClick={submit} whileTap={{ scale: 0.98 }}>
+                    {busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
+                  </motion.button>
+                  <div className="au-divider">
+                    <span>or continue with</span>
                   </div>
                   <LoginButtons column />
                 </>
               )}
             </motion.div>
           </motion.div>
-        </header>
+        </div>
       </div>
     </MotionConfig>
   );
