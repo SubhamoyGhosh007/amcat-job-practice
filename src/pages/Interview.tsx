@@ -355,7 +355,8 @@ export default function Interview() {
   const finalizeRef = useRef(() => {});
 
   const steps = useMemo(() => buildSteps(T), [T]);
-  const step = steps[stepIdx];
+  // stepIdx can momentarily outrun a rebuilt step list (pool swap) — never render undefined.
+  const step = steps[Math.min(stepIdx, steps.length - 1)] ?? steps[steps.length - 1];
 
   // Pool: serve an unattempted mock for this tier; self-seed MOCK_TEST_01 into
   // an empty pool so the first-ever deploy populates itself. Never swaps the
