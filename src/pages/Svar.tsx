@@ -1,4 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import {
+  BatteryMedium,
+  LayoutGrid,
+  Mic,
+  MicOff,
+  Pause,
+  PhoneOff,
+  Play,
+  Signal,
+  UserPlus,
+  Video,
+  Volume2,
+  VolumeX,
+  Wifi,
+} from 'lucide-react';
 import {
   EXTEMPORE_TOPICS,
   JUMBLED_SENTENCES_BANK,
@@ -791,37 +807,169 @@ function ExtemporeTab() {
 }
 
 /* ---------------- tab 6: mock call roleplay simulator ---------------- */
+function CallBtn({
+  label,
+  icon,
+  onClick,
+  active,
+  dim,
+  disabled,
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick?: () => void;
+  active?: boolean;
+  dim?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      className={`callbtn${active ? ' active' : ''}${dim ? ' dim' : ''}`}
+      onClick={onClick}
+      disabled={disabled || dim}
+      aria-label={dim ? `${label} (not in practice mode)` : label}
+      title={dim ? 'Not in practice mode' : label}
+    >
+      <span className="callbtn-ic">{icon}</span>
+      <span className="callbtn-lb">{label}</span>
+    </button>
+  );
+}
+
 function MockCallTab() {
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [scenarioIdx, setScenarioIdx] = useState(0);
-  // 'idle' → pick & start. 'live' → voice loop. 'ended' → marks report.
+  // 'idle' → pick & answer. 'live' → fully automatic voice loop. 'ended' → marks.
   const [phase, setPhase] = useState<'idle' | 'live' | 'ended'>('idle');
+  // status drives the phone screen: ai = customer speaking, user = your turn.
+  const [status, setStatus] = useState<'ai' | 'user' | 'thinking' | 'paused'>('ai');
   const [turns, setTurns] = useState<CallTurn[]>([]);
-  const [thinking, setThinking] = useState(false);
   const [err, setErr] = useState('');
   const [grade, setGrade] = useState<CallGrade | null>(null);
   const [grading, setGrading] = useState(false);
   const [misses, setMisses] = useState(0);
+  const [held, setHeld] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [keypad, setKeypad] = useState(false);
+  const [callSecs, setCallSecs] = useState(0);
+  const [clock, setClock] = useState('');
   const recorder = useRecorder();
   const turnsRef = useRef<CallTurn[]>([]);
   turnsRef.current = turns;
+  const heldRef = useRef(false);
+  heldRef.current = held;
+  const mutedRef = useRef(false);
+  mutedRef.current = muted;
+  const submittedRef = useRef<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const pendingRef = useRef<null | { kind: 'user' } | { kind: 'ai'; blob: Blob }>(null);
 
   const scenario = MOCK_CALL_SCENARIOS[scenarioIdx];
   const agentTurns = turns.filter((t) => t.speaker === 'agent').length;
 
-  async function playVoice(text: string) {
+  // Live clock + call timer.
+  useEffect(() => {
+    if (phase !== 'live') return;
+    const tick = () => {
+      const n = new Date();
+      setClock(`${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`);
+    };
+    tick();
+    const t = window.setInterval(() => {
+      tick();
+      setCallSecs((s) => s + 1);
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [phase]);
+
+  // Stop everything on unmount.
+  useEffect(
+    () => () => {
+      try {
+        audioRef.current?.pause();
+      } catch {
+        /* ignore */
+      }
+      try {
+        recorder.stop();
+      } catch {
+        /* ignore */
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  function stopAudio() {
     try {
-      const url = await speak(text, { voice: 'high' });
-      await new Audio(url).play();
-      return true;
+      audioRef.current?.pause();
+      audioRef.current = null;
     } catch {
-      return false;
+      /* ignore */
     }
   }
 
+  /** Play customer voice. Falls back to a timed estimate if autoplay blocks. */
+  async function playCustomer(text: string, onDone: () => void) {
+    stopAudio();
+    const estMs = Math.min(20000, 1500 + text.split(/\s+/).length * 420);
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      onDone();
+    };
+    try {
+      const url = await speak(text, { voice: 'high' });
+      const a = new Audio(url);
+      audioRef.current = a;
+      a.volume = speakerOn ? 1 : 0.35;
+      a.onended = done;
+      window.setTimeout(done, estMs + 4000);
+      await a.play();
+    } catch {
+      window.setTimeout(done, estMs);
+    }
+  }
+
+  function startUserRec() {
+    submittedRef.current = null;
+    recorder.reset();
+    setStatus('user');
+    recorder.start(30).catch(() => {});
+  }
+
+  /** Pause the auto-flow; resume() continues the exact pending step. */
+  function pauseFor(p: { kind: 'user' } | { kind: 'ai'; blob: Blob }) {
+    pendingRef.current = p;
+    setStatus('paused');
+  }
+
+  function resumePending() {
+    const p = pendingRef.current;
+    pendingRef.current = null;
+    if (!p) return;
+    if (p.kind === 'user') {
+      if (mutedRef.current || heldRef.current) {
+        pendingRef.current = p;
+        setStatus('paused');
+        return;
+      }
+      startUserRec();
+    } else {
+      void submitReply(p.blob);
+    }
+  }
+
+  function afterAiSpeech() {
+    if (heldRef.current || mutedRef.current) pauseFor({ kind: 'user' });
+    else startUserRec();
+  }
+
   async function customerReply(history: CallTurn[]) {
-    setThinking(true);
+    setStatus('thinking');
     setErr('');
     try {
       const n = await nextCustomerTurn(scenario.title, scenario.description, history);
@@ -829,18 +977,23 @@ function MockCallTab() {
       const entry: CallTurn = { speaker: 'customer', text: n.customerSay, coachNote: n.coachNote };
       const next = [...turnsRef.current, entry];
       setTurns(next);
-      void playVoice(n.customerSay);
-      if (done) {
-        await endCall(next, true);
-        return;
-      }
-      if (next.filter((t) => t.speaker === 'agent').length >= CALL_MAX_TURNS) {
-        await endCall(next, false, true);
-      }
+      setStatus('ai');
+      await playCustomer(n.customerSay, () => {
+        if (done) {
+          void endCall(next, true);
+          return;
+        }
+        if (next.filter((t) => t.speaker === 'agent').length >= CALL_MAX_TURNS) {
+          void endCall(next, false, true);
+          return;
+        }
+        afterAiSpeech();
+      });
     } catch (e) {
       setErr(friendlyError(e));
-    } finally {
-      setThinking(false);
+      // AI turn failed: hand the mic over anyway so the call never stalls.
+      if (heldRef.current || mutedRef.current) pauseFor({ kind: 'user' });
+      else startUserRec();
     }
   }
 
@@ -857,17 +1010,39 @@ function MockCallTab() {
         /* grace */
       }
     }
+    // Unlock audio on the tap gesture so autoplay works through the call.
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      if (Ctx) {
+        const ctx = new Ctx();
+        if (ctx.state === 'suspended') await ctx.resume();
+        ctx.close().catch(() => {});
+      }
+    } catch {
+      /* ignore */
+    }
     const opening: CallTurn = { speaker: 'customer', text: scenario.steps[0].customer };
+    turnsRef.current = [opening];
     setTurns([opening]);
     setGrade(null);
     setMisses(0);
+    setHeld(false);
+    setMuted(false);
+    setKeypad(false);
+    pendingRef.current = null;
+    submittedRef.current = null;
+    setCallSecs(0);
     setPhase('live');
+    setStatus('ai');
     recorder.reset();
-    void playVoice(opening.text);
+    await playCustomer(opening.text, afterAiSpeech);
   }
 
-  async function submitReply(blob: Blob, _secs: number) {
+  async function submitReply(blob: Blob) {
+    if (submittedRef.current === 'busy') return;
+    submittedRef.current = 'busy';
     setErr('');
+    setStatus('thinking');
     let heard = '';
     try {
       const r = await transcribeAudio(blob);
@@ -884,10 +1059,14 @@ function MockCallTab() {
       const retry: CallTurn = { speaker: 'customer', text: fallbackCustomerLine(m) };
       const next = [...turnsRef.current, entry, retry];
       setTurns(next);
-      void playVoice(retry.text);
-      if (next.filter((t) => t.speaker === 'agent').length >= CALL_MAX_TURNS) {
-        await endCall(next, false, true);
-      }
+      setStatus('ai');
+      await playCustomer(retry.text, () => {
+        if (next.filter((t) => t.speaker === 'agent').length >= CALL_MAX_TURNS) {
+          void endCall(next, false, true);
+          return;
+        }
+        afterAiSpeech();
+      });
       return;
     }
     setMisses(0);
@@ -897,7 +1076,51 @@ function MockCallTab() {
     await customerReply(next);
   }
 
+  // Recorder finished on its own (auto-stop at 30s): submit unless paused.
+  useEffect(() => {
+    if (phase !== 'live' || status !== 'user' || !recorder.url || !recorder.blob) return;
+    if (submittedRef.current) return;
+    if (heldRef.current || mutedRef.current) {
+      pauseFor({ kind: 'ai', blob: recorder.blob });
+      return;
+    }
+    void submitReply(recorder.blob);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.url]);
+
+  // Unmuting resumes a mic-paused turn.
+  useEffect(() => {
+    if (!muted && phase === 'live' && status === 'paused' && !heldRef.current) resumePending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [muted]);
+
+  function toggleHold() {
+    if (phase !== 'live') return;
+    if (held) {
+      setHeld(false);
+      if (status === 'paused') resumePending();
+    } else {
+      setHeld(true);
+      try {
+        recorder.stop();
+      } catch {
+        /* ignore */
+      }
+      if (status === 'user' || status === 'thinking' || status === 'ai') {
+        stopAudio();
+        setStatus('paused');
+      }
+    }
+  }
+
   async function endCall(history: CallTurn[], satisfied: boolean, capped = false) {
+    stopAudio();
+    try {
+      recorder.stop();
+    } catch {
+      /* ignore */
+    }
+    pendingRef.current = null;
     setGrading(true);
     try {
       const g = await gradeCall(scenario.title, history);
@@ -920,12 +1143,70 @@ function MockCallTab() {
 
   function resetCall(idx?: number) {
     if (typeof idx === 'number') setScenarioIdx(idx);
+    stopAudio();
+    turnsRef.current = [];
+    pendingRef.current = null;
+    submittedRef.current = null;
     setTurns([]);
     setGrade(null);
     setErr('');
     setMisses(0);
+    setHeld(false);
+    setMuted(false);
+    setKeypad(false);
+    setCallSecs(0);
     recorder.reset();
     setPhase('idle');
+  }
+
+  const mmss = `${String(Math.floor(callSecs / 60)).padStart(2, '0')}:${String(callSecs % 60).padStart(2, '0')}`;
+  const statusText =
+    phase !== 'live'
+      ? ''
+      : status === 'ai'
+        ? 'Customer speaking…'
+        : status === 'thinking'
+          ? 'Waiting for response…'
+          : status === 'paused'
+            ? held
+              ? 'On hold — tap Hold to resume'
+              : 'Muted — unmute to answer'
+            : recorder.recording
+              ? `Listening… ${recorder.secs}s — speak now`
+              : 'Getting your mic…';
+  const waving = phase === 'live' && (status === 'ai' || recorder.recording);
+
+  function dtmf(key: string) {
+    try {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const freqs: Record<string, [number, number]> = {
+        '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+        '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+        '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+        '*': [941, 1209], '0': [941, 1336], '#': [941, 1477],
+      };
+      const [f1, f2] = freqs[key] || [697, 1209];
+      const o1 = ctx.createOscillator();
+      const o2 = ctx.createOscillator();
+      const g = ctx.createGain();
+      o1.frequency.value = f1;
+      o2.frequency.value = f2;
+      g.gain.value = 0.12;
+      o1.connect(g);
+      o2.connect(g);
+      g.connect(ctx.destination);
+      o1.start();
+      o2.start();
+      window.setTimeout(() => {
+        o1.stop();
+        o2.stop();
+        ctx.close().catch(() => {});
+      }, 160);
+    } catch {
+      /* ignore */
+    }
   }
 
   return (
@@ -964,59 +1245,87 @@ function MockCallTab() {
       )}
 
       {phase !== 'idle' && (
-        <div className="svar-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-            <span className="qnum">📞 {scenario.title} • exchange {Math.min(agentTurns + 1, CALL_MAX_TURNS)} of {CALL_MAX_TURNS}</span>
-            {phase === 'live' && (
-              <button className="btn-ghost" onClick={() => endCall(turnsRef.current, false)}>
-                End call
-              </button>
-            )}
-          </div>
-
-          {/* Call thread */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '12px 0' }}>
-            {turns.map((t, i) => (
-              <div
-                key={i}
-                style={{
-                  alignSelf: t.speaker === 'customer' ? 'flex-start' : 'flex-end',
-                  maxWidth: '88%',
-                  background: t.speaker === 'customer' ? '#122550' : 'rgba(56,189,248,0.12)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 12,
-                  padding: '10px 14px',
-                }}
-              >
-                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', color: t.speaker === 'customer' ? '#f5a623' : '#38bdf8', marginBottom: 4 }}>
-                  {t.speaker === 'customer' ? '👤 CUSTOMER' : '🎧 YOU'}
-                </div>
-                <div style={{ fontSize: 14.5, color: '#fff', lineHeight: 1.55 }}>“{t.text}”</div>
-                {t.speaker === 'customer' && (
-                  <div style={{ marginTop: 6 }}>
-                    <PlayButton text={t.text} label="Replay" />
-                  </div>
-                )}
-                {t.coachNote && <div className="hint" style={{ marginTop: 6 }}>Coach: {t.coachNote}</div>}
-              </div>
-            ))}
-            {thinking && <div className="hint">Customer is responding…</div>}
-          </div>
-
-          {phase === 'live' && (
-            <>
-              <SessionRecorder
-                key={`call-${turns.length}`}
-                limit={30}
-                onDone={(r) => {
-                  if (r) void submitReply(r.blob, r.secs);
-                }}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div className="callphone" aria-label="Simulated phone call">
+            <div className="callphone-notch" />
+            <div className="callphone-status">
+              <span>{phase === 'live' ? clock || '--:--' : mmss}</span>
+              <span className="callphone-sicons">
+                <Signal size={14} />
+                <Wifi size={14} />
+                <BatteryMedium size={16} />
+              </span>
+            </div>
+            <div className="callphone-contact">
+              <span className="callphone-avatar">C</span>
+              <b>Customer Care</b>
+              <small>{scenario.title}</small>
+            </div>
+            <div className="callphone-state">
+              {phase === 'live' ? (
+                <>{status === 'thinking' && <span className="callphone-count">{agentTurns + 1}</span>} {statusText}</>
+              ) : (
+                <>Call ended • {mmss}</>
+              )}
+            </div>
+            <div className={`callwave${waving ? '' : ' still'}`} aria-hidden="true">
+              {[0.5, 0.9, 0.65, 1, 0.75, 0.55, 0.95, 0.6, 0.8, 0.5, 0.7, 0.9].map((h, i) => (
+                <span key={i} style={{ height: `${Math.round(h * 34)}px`, animationDelay: `${(i % 6) * 0.12}s` }} />
+              ))}
+            </div>
+            <div className="callphone-grid">
+              <CallBtn
+                label={muted ? 'Unmute' : 'Mute'}
+                active={muted}
+                onClick={() => setMuted((m) => !m)}
+                icon={muted ? <MicOff size={22} /> : <Mic size={22} />}
               />
-              {err && <div className="err" style={{ marginTop: 8 }}>{err}</div>}
-            </>
-          )}
+              <CallBtn label="Keypad" active={keypad} onClick={() => setKeypad((k) => !k)} icon={<LayoutGrid size={22} />} />
+              <CallBtn
+                label="Speaker"
+                active={speakerOn}
+                onClick={() => setSpeakerOn((s) => !s)}
+                icon={speakerOn ? <Volume2 size={22} /> : <VolumeX size={22} />}
+              />
+              <CallBtn
+                label={held && status === 'paused' ? 'Resume' : 'Hold'}
+                active={held}
+                disabled={phase !== 'live'}
+                onClick={toggleHold}
+                icon={held ? <Play size={22} /> : <Pause size={22} />}
+              />
+              <CallBtn label="Video" dim icon={<Video size={22} />} />
+              <CallBtn label="Add call" dim icon={<UserPlus size={22} />} />
+            </div>
+            {keypad && phase === 'live' && (
+              <div className="callphone-keys">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((k) => (
+                  <button key={k} onClick={() => dtmf(k)}>{k}</button>
+                ))}
+              </div>
+            )}
+            {phase === 'live' ? (
+              <button className="callphone-end" onClick={() => endCall(turnsRef.current, false)} aria-label="End call">
+                <PhoneOff size={30} />
+              </button>
+            ) : (
+              <div style={{ height: 8 }} />
+            )}
+            <div className="callphone-foot">
+              exchange {Math.min(Math.max(agentTurns, 1), CALL_MAX_TURNS)} of {CALL_MAX_TURNS}
+              {phase === 'live' && recorder.error && <div className="err" style={{ marginTop: 8 }}>{recorder.error}</div>}
+              {phase === 'live' && !recorder.error && recorder.url === null && status === 'user' && !recorder.recording && (
+                <button className="btn-ghost" style={{ marginTop: 8 }} onClick={() => recorder.start(30).catch(() => {})}>
+                  Enable microphone
+                </button>
+              )}
+              {err && phase === 'live' && <div className="err" style={{ marginTop: 8 }}>{err}</div>}
+            </div>
+          </div>
+        </div>
+      )}
 
-          {phase === 'ended' && (
+      {phase === 'ended' && (
             <>
               {grading ? (
                 <p className="hint"><span className="spinner" /> Writing your call report…</p>
@@ -1043,8 +1352,6 @@ function MockCallTab() {
               </div>
             </>
           )}
-        </div>
-      )}
     </div>
   );
 }

@@ -18,6 +18,151 @@
   .svar-tabs .radio-pill { flex: 1 1 46%; text-align: center; }
   .svar-audio audio { min-width: 0; }
 }
+
+/* ---------- live phone-call frame (mock call tab) ---------- */
+.callphone {
+  width: min(380px, 100%);
+  background: #0a0a0f;
+  color: #fff;
+  border-radius: 2rem;
+  padding: 14px 18px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  position: relative;
+}
+.callphone-notch {
+  width: 120px;
+  height: 22px;
+  background: #000;
+  border-radius: 999px;
+  margin: 0 auto 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.callphone-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #d7d7de;
+  font-variant-numeric: tabular-nums;
+}
+.callphone-sicons { display: inline-flex; gap: 6px; align-items: center; color: #d7d7de; }
+.callphone-contact { text-align: center; margin-top: 18px; }
+.callphone-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  background: linear-gradient(135deg, #4d7cfe, #38bdf8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 800;
+}
+.callphone-contact b { display: block; font-size: 21px; }
+.callphone-contact small { display: block; font-size: 12px; color: #9a9aa5; margin-top: 3px; }
+.callphone-state { text-align: center; font-size: 14px; color: #d7d7de; margin-top: 10px; min-height: 22px; }
+.callphone-count {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 800;
+  margin-right: 6px;
+}
+.callwave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 44px;
+  margin: 8px 0 4px;
+}
+.callwave span {
+  width: 4px;
+  border-radius: 4px;
+  background: #38bdf8;
+  transform-origin: center;
+}
+.callwave:not(.still) span { animation: callwave 1s ease-in-out infinite; }
+.callwave.still span { background: #3a3a44; }
+@keyframes callwave {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.callphone-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px 8px;
+  margin-top: 14px;
+}
+.callbtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: #fff;
+  font: inherit;
+}
+.callbtn-ic {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: #23232c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: transform 150ms ease, background-color 150ms ease;
+}
+.callbtn:not(:disabled):hover .callbtn-ic { transform: scale(1.06); }
+.callbtn-lb { font-size: 12px; color: #d7d7de; }
+.callbtn.active .callbtn-ic { background: #e8e8ec; color: #0a0a0f; }
+.callbtn.dim { cursor: default; opacity: 0.45; }
+.callbtn:disabled { cursor: default; }
+.callphone-keys {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.callphone-keys button {
+  background: #23232c;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.callphone-end {
+  display: flex;
+  margin: 18px auto 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: #e5484d;
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 28px rgba(229, 72, 77, 0.45);
+  transition: transform 150ms ease;
+}
+.callphone-end:hover { transform: scale(1.05); }
+.callphone-foot { text-align: center; font-size: 12px; color: #9a9aa5; margin-top: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .callwave span { animation: none !important; }
+  .callphone-end, .callbtn-ic { transition: none !important; }
+}
 .svar-duo .cell { border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
 .svar-duo .cell b { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
 
