@@ -213,6 +213,29 @@ export default function Landing() {
 
       {/* 2. hero with floating subject cards */}
       <header className="rv-hero">
+        <div className="rv-abstract" aria-hidden="true">
+          <svg width="900" height="420" viewBox="0 0 900 420" fill="none">
+            <g stroke="#3157d8" strokeOpacity="0.1">
+              {Array.from({ length: 12 }, (_, r) => (
+                <g key={r}>
+                  {Array.from({ length: 24 }, (_, c) => (
+                    <circle key={c} cx={30 + c * 36} cy={30 + r * 34} r="2" />
+                  ))}
+                </g>
+              ))}
+            </g>
+            <g stroke="#3157d8" strokeOpacity="0.14" strokeWidth="1.5">
+              <ellipse cx="450" cy="190" rx="330" ry="120" />
+              <ellipse cx="450" cy="190" rx="250" ry="88" />
+              <ellipse cx="450" cy="190" rx="170" ry="56" />
+            </g>
+            <rect x="392" y="120" width="116" height="140" rx="14" stroke="#3157d8" strokeOpacity="0.12" strokeWidth="1.5" />
+            <line x1="412" y1="155" x2="488" y2="155" stroke="#3157d8" strokeOpacity="0.12" strokeWidth="6" strokeLinecap="round" />
+            <line x1="412" y1="175" x2="488" y2="175" stroke="#3157d8" strokeOpacity="0.1" strokeWidth="6" strokeLinecap="round" />
+            <line x1="412" y1="195" x2="460" y2="195" stroke="#3157d8" strokeOpacity="0.1" strokeWidth="6" strokeLinecap="round" />
+            <circle cx="450" cy="232" r="10" fill="#3157d8" fillOpacity="0.1" />
+          </svg>
+        </div>
         {FLOAT_CARDS.slice(0, 2).map((c) => (
           <div key={c.title} className={`rv-float-card ${c.cls}`} aria-hidden="true">
             <div className="swatch" style={{ background: c.bg, color: c.color }}><c.Icon size={30} /></div>
@@ -220,21 +243,22 @@ export default function Landing() {
             <small>{c.cap}</small>
           </div>
         ))}
-        <div ref={heroRef} className="t-stagger">
-          <span className="rv-eyebrow t-stagger-line t-stagger-line--1">
-            <span className="pulse-dot" /> Concentrix hiring prep
+        <div ref={heroRef} className="t-stagger" style={{ position: 'relative' }}>
+          <span className="rv-announce t-stagger-line t-stagger-line--1">
+            <span className="new-dot">NEW</span> 120+ practice questions • fresh AI sets
           </span>
           <h1 className="t-stagger-line t-stagger-line--2">
-            Walk into the test hall <em>already warmed up.</em>
+            Walk in test-ready.<br /><em>Clear your AMCAT drive.</em>
           </h1>
           <p className="lede t-stagger-line t-stagger-line--3">
             Free Concentrix AMCAT mock test practice shaped exactly like the real hiring test — four timed sections,
             fresh questions every attempt, and an answer script that teaches you after every test.
           </p>
-          <div className="t-stagger-line t-stagger-line--4">
-            <button className="btn-pill" onClick={onEnter}>
-              {userId ? `Continue as @${profile?.username || '…'}` : 'Log in and start Set 1'}
+          <div className="rv-cta-row t-stagger-line t-stagger-line--4">
+            <button className="rv-btn-primary" onClick={onEnter}>
+              {userId ? `Continue as @${profile?.username || '…'}` : 'Start free'}
             </button>
+            <button className="rv-btn-secondary" onClick={() => scrollToId('demo')}>See how it works</button>
           </div>
         </div>
         <div className="rv-trust">
@@ -268,7 +292,7 @@ export default function Landing() {
       <div id="pattern" className="rv-shelf-wrap">
         <Reveal>
           <div className="wrap-narrow" style={{ marginBottom: 34 }}>
-            <span className="eyebrow-pill">One shelf, everything tested</span>
+            {/* <span className="eyebrow-pill">One shelf, everything tested</span> */}
             <h2 className="sec-title">Four sections, three guides</h2>
             <p className="sec-sub">Pick a book — sections drop you into timed practice, guides teach the method first.</p>
           </div>
