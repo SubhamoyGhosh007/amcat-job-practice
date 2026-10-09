@@ -160,12 +160,6 @@
 .wv-card h3 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
 .wv-card .card-sub { font-size: 13px; color: #98989d; margin-bottom: 12px; }
 .wv-chart { width: 100%; height: auto; display: block; }
-.wv-draw {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: wv-draw 1.4s ease-out forwards;
-}
-@keyframes wv-draw { to { stroke-dashoffset: 0; } }
 .wv-sim { font-size: 11.5px; color: #98989d; margin-top: 8px; }
 .wv-alert {
   background: #3a1c1c;
@@ -194,5 +188,4 @@
 @media (prefers-reduced-motion: reduce) {
   .wv-side, .wv-main, .wv-link, .wv-iconbtn, .wv-side-trigger { transition: none !important; }
   .wv-live i { animation: none !important; }
-  .wv-draw { animation: none !important; stroke-dashoffset: 0; }
 }

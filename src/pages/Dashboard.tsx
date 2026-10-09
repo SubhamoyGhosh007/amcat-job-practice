@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SECTIONS } from '../types';
 import { useSession } from '../stores/session';
 import { downloadSpeakingReport } from '../lib/pdf';
+import { ScoreChart } from '../components/ScoreChart';
 import { listSpeakingReports, type SpeakingReport } from '../lib/speakingStore';
 import type { ScoreSheet } from '../lib/store';
 
@@ -32,22 +33,6 @@ function streakOf(sheets: Sheet[]): number {
     d.setDate(d.getDate() - 1);
   }
   return streak;
-}
-
-function chartPath(vals: number[], w: number, h: number, pad: number): { line: string; area: string } {
-  if (!vals.length) return { line: '', area: '' };
-  const min = Math.min(...vals, 0);
-  const max = Math.max(...vals, 100);
-  const span = Math.max(1, max - min);
-  const step = vals.length > 1 ? (w - pad * 2) / (vals.length - 1) : 0;
-  const pts = vals.map((v, i) => {
-    const x = pad + i * step;
-    const y = h - pad - ((v - min) / span) * (h - pad * 2);
-    return [x, y] as const;
-  });
-  const line = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const area = `${line} L${(pad + (vals.length - 1) * step).toFixed(1)},${h - pad} L${pad},${h - pad} Z`;
-  return { line, area };
 }
 
 export default function Dashboard() {
@@ -100,7 +85,6 @@ export default function Dashboard() {
     return () => window.clearInterval(t);
   }, [base]);
   const series = [...base, ...live].slice(-14);
-  const { line, area } = chartPath(series.length ? series : [0], 600, 180, 28);
 
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
   const recent = [...sheets].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6);
@@ -142,29 +126,11 @@ export default function Dashboard() {
             <h3>Score trajectory</h3>
             <div className="card-sub">Latest {series.length} sets{live.length ? ' + live simulation' : ''}</div>
             {series.length ? (
-              <svg className="wv-chart" viewBox="0 0 600 180" role="img" aria-label="Score trajectory chart">
-                <defs>
-                  <linearGradient id="wvArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#30D158" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#30D158" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {[0.25, 0.5, 0.75].map((f) => (
-                  <line key={f} x1="28" x2="572" y1={28 + f * 124} y2={28 + f * 124} stroke="#2C2C2E" strokeWidth="1" />
-                ))}
-                <path d={area} fill="url(#wvArea)" />
-                <path d={line} fill="none" stroke="#00E5FF" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" pathLength={1} className="wv-draw" />
-                {series.map((v, i) => {
-                  const x = series.length > 1 ? 28 + (i / (series.length - 1)) * 544 : 28;
-                  const span = Math.max(1, 100 - 0);
-                  const y = 152 - (v / span) * 124;
-                  return <circle key={i} cx={x} cy={y} r={i === series.length - 1 ? 4.5 : 3} fill={i >= series.length - live.length && live.length ? '#32d74b' : '#00E5FF'} />;
-                })}
-              </svg>
+              <ScoreChart values={series} />
             ) : (
               <div className="card-sub">No sets yet — your line draws itself here after Set 1.</div>
             )}
-            <div className="wv-sim">Simulated live feed for demo • your real scores are the white-blue history.</div>
+            <div className="wv-sim">Simulated live feed for demo • your real scores are the history.</div>
           </div>
 
           <div className="wv-card wv-alerts-card">
