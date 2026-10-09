@@ -20,23 +20,49 @@
 }
 
 /* ---------- live phone-call frame (mock call tab) ---------- */
+/* Blue metallic bezel: speaker slit + camera up top, oval home key below. */
 .callphone {
   width: min(380px, 100%);
-  background: #0a0a0f;
   color: #fff;
-  border-radius: 2rem;
-  padding: 14px 18px 22px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  border-radius: 2.6rem;
+  padding: 40px 14px 52px;
+  background:
+    radial-gradient(circle at 32% 20px, #0b0b10 4px, transparent 5px),
+    linear-gradient(150deg, #7fb0fa 0%, #3b82f6 22%, #1e3a8a 60%, #2563eb 85%, #60a5fa 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), inset 0 0 0 2px rgba(0, 0, 0, 0.35);
   position: relative;
 }
-.callphone-notch {
-  width: 120px;
-  height: 22px;
-  background: #000;
+.callphone::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 72px;
+  height: 7px;
   border-radius: 999px;
-  margin: 0 auto 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0b0b10;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.callphone::after {
+  content: '';
+  position: absolute;
+  bottom: 13px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.25);
+}
+.callphone-notch { display: none; }
+.callphone-screen {
+  background: #0a0a0f;
+  border-radius: 1.6rem;
+  padding: 14px 16px 20px;
+  border: 1px solid rgba(0, 0, 0, 0.6);
 }
 .callphone-status {
   display: flex;

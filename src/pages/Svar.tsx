@@ -1270,7 +1270,7 @@ function MockCallTab() {
       {phase !== 'idle' && (
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <div className="callphone" aria-label="Simulated phone call">
-            <div className="callphone-notch" />
+            <div className="callphone-screen">
             <div className="callphone-status">
               <span>{phase === 'live' ? clock || '--:--' : mmss}</span>
               <span className="callphone-sicons">
@@ -1353,6 +1353,7 @@ function MockCallTab() {
                 </button>
               )}
               {err && phase === 'live' && <div className="err" style={{ marginTop: 8 }}>{err}</div>}
+            </div>
             </div>
           </div>
         </div>
