@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Minimal Concentrix AMCAT practice app — AI-generated sets, AMCAT-style UI, answer script with explanations. Static, antideploy-ready.",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
