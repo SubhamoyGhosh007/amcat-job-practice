@@ -8,7 +8,16 @@ import {
   REPEAT_BANK,
   SHORT_ANSWER_BANK,
 } from '../data/svar';
-import { ttsConfigured } from '../lib/tts';
+import {
+  CALL_MAX_TURNS,
+  CALL_MIN_TURNS,
+  fallbackCustomerLine,
+  gradeCall,
+  nextCustomerTurn,
+  type CallGrade,
+  type CallTurn,
+} from '../lib/callJudge';
+import { ttsConfigured, speak } from '../lib/tts';
 import { bumpQuota, quotaStatus } from '../lib/usage';
 import { rotatingSubset } from '../lib/genUtils';
 import {
@@ -783,50 +792,150 @@ function ExtemporeTab() {
 
 /* ---------------- tab 6: mock call roleplay simulator ---------------- */
 function MockCallTab() {
+  const userId = useSession((s) => s.userId);
+  const tier = useSession((s) => s.profile?.tier ?? 'free');
   const [scenarioIdx, setScenarioIdx] = useState(0);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<{ isCorrect: boolean; text: string } | null>(null);
+  // 'idle' → pick & start. 'live' → voice loop. 'ended' → marks report.
+  const [phase, setPhase] = useState<'idle' | 'live' | 'ended'>('idle');
+  const [turns, setTurns] = useState<CallTurn[]>([]);
+  const [thinking, setThinking] = useState(false);
+  const [err, setErr] = useState('');
+  const [grade, setGrade] = useState<CallGrade | null>(null);
+  const [grading, setGrading] = useState(false);
+  const [misses, setMisses] = useState(0);
+  const recorder = useRecorder();
+  const turnsRef = useRef<CallTurn[]>([]);
+  turnsRef.current = turns;
 
   const scenario = MOCK_CALL_SCENARIOS[scenarioIdx];
-  const step = scenario.steps[currentStep];
+  const agentTurns = turns.filter((t) => t.speaker === 'agent').length;
 
-  function handleSelect(idx: number) {
-    if (feedback?.isCorrect) return;
-    setSelectedOpt(idx);
-    setFeedback(null);
-  }
-
-  function submitChoice() {
-    if (selectedOpt === null) return;
-    const opt = step.agentOptions[selectedOpt];
-    setFeedback({ isCorrect: opt.isCorrect, text: opt.feedback });
-  }
-
-  function nextStep() {
-    setSelectedOpt(null);
-    setFeedback(null);
-    if (currentStep < scenario.steps.length - 1) {
-      setCurrentStep(currentStep + 1);
+  async function playVoice(text: string) {
+    try {
+      const url = await speak(text, { voice: 'high' });
+      await new Audio(url).play();
+      return true;
+    } catch {
+      return false;
     }
   }
 
-  function resetScenario(idx: number) {
-    setScenarioIdx(idx);
-    setCurrentStep(0);
-    setSelectedOpt(null);
-    setFeedback(null);
+  async function customerReply(history: CallTurn[]) {
+    setThinking(true);
+    setErr('');
+    try {
+      const n = await nextCustomerTurn(scenario.title, scenario.description, history);
+      const done = n.satisfied && agentTurns + 1 >= CALL_MIN_TURNS;
+      const entry: CallTurn = { speaker: 'customer', text: n.customerSay, coachNote: n.coachNote };
+      const next = [...turnsRef.current, entry];
+      setTurns(next);
+      void playVoice(n.customerSay);
+      if (done) {
+        await endCall(next, true);
+        return;
+      }
+      if (next.filter((t) => t.speaker === 'agent').length >= CALL_MAX_TURNS) {
+        await endCall(next, false, true);
+      }
+    } catch (e) {
+      setErr(friendlyError(e));
+    } finally {
+      setThinking(false);
+    }
   }
 
-  const isComplete = currentStep === scenario.steps.length - 1 && feedback?.isCorrect;
+  async function startCall() {
+    setErr('');
+    if (userId) {
+      try {
+        const q = await quotaStatus('speaking', userId, tier);
+        if (!q.allowed && !q.offline) {
+          setErr(`Free plan: ${q.limit} voice sessions per day — back tomorrow.`);
+          return;
+        }
+      } catch {
+        /* grace */
+      }
+    }
+    const opening: CallTurn = { speaker: 'customer', text: scenario.steps[0].customer };
+    setTurns([opening]);
+    setGrade(null);
+    setMisses(0);
+    setPhase('live');
+    recorder.reset();
+    void playVoice(opening.text);
+  }
+
+  async function submitReply(blob: Blob, _secs: number) {
+    setErr('');
+    let heard = '';
+    try {
+      const r = await transcribeAudio(blob);
+      heard = r.text;
+    } catch (e) {
+      heard = '';
+    }
+    if (heard.trim().split(/\s+/).filter(Boolean).length < 3) {
+      // Silence / unheard reply: customer asks to repeat. Counts as a turn —
+      // the cap still guarantees termination.
+      const m = misses + 1;
+      setMisses(m);
+      const entry: CallTurn = { speaker: 'agent', text: '(no clear reply heard)' };
+      const retry: CallTurn = { speaker: 'customer', text: fallbackCustomerLine(m) };
+      const next = [...turnsRef.current, entry, retry];
+      setTurns(next);
+      void playVoice(retry.text);
+      if (next.filter((t) => t.speaker === 'agent').length >= CALL_MAX_TURNS) {
+        await endCall(next, false, true);
+      }
+      return;
+    }
+    setMisses(0);
+    const next = [...turnsRef.current, { speaker: 'agent', text: heard } as CallTurn];
+    setTurns(next);
+    recorder.reset();
+    await customerReply(next);
+  }
+
+  async function endCall(history: CallTurn[], satisfied: boolean, capped = false) {
+    setGrading(true);
+    try {
+      const g = await gradeCall(scenario.title, history);
+      setGrade({ ...g, feedback: capped ? ['Call reached the 8-turn cap — resolve faster next time.', ...g.feedback].slice(0, 3) : g.feedback });
+    } catch {
+      setGrade(null);
+    } finally {
+      setGrading(false);
+    }
+    setPhase('ended');
+    try {
+      const prev: string[] = JSON.parse(localStorage.getItem('amcat_call_last') || '[]');
+      localStorage.setItem('amcat_call_last', JSON.stringify([{ at: Date.now(), satisfied, turns: history.length }, ...prev].slice(0, 10)));
+    } catch {
+      /* ignore */
+    }
+    if (userId) bumpQuota('speaking', userId).catch(() => {});
+    void satisfied;
+  }
+
+  function resetCall(idx?: number) {
+    if (typeof idx === 'number') setScenarioIdx(idx);
+    setTurns([]);
+    setGrade(null);
+    setErr('');
+    setMisses(0);
+    recorder.reset();
+    setPhase('idle');
+  }
 
   return (
     <div>
       <TtsGate />
       <div className="card" style={{ marginBottom: 14 }}>
-        <h3 style={{ margin: '0 0 6px' }}>Interactive Customer Mock Call Simulation</h3>
+        <h3 style={{ margin: '0 0 6px' }}>Live Customer Call — speak, don’t pick</h3>
         <p className="hint" style={{ margin: 0 }}>
-          Real Concentrix support call scenarios. Practice applying the 4-step model (Listen, Empathise, Resolve, Confirm) under live customer interactions.
+          A real voice loop: the customer speaks, you answer out loud, the AI judges every reply and ends the call
+          when satisfied (max {CALL_MAX_TURNS} exchanges — it can never loop forever).
         </p>
       </div>
 
@@ -835,90 +944,107 @@ function MockCallTab() {
           <button
             key={sc.id}
             className={`radio-pill ${scenarioIdx === idx ? 'active' : ''}`}
-            onClick={() => resetScenario(idx)}
+            onClick={() => resetCall(idx)}
           >
             {sc.title}
           </button>
         ))}
       </div>
 
-      <div className="svar-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <span className="qnum">Step {currentStep + 1} of {scenario.steps.length}</span>
-          <span className="chip ghost">{scenario.title}</span>
+      {phase === 'idle' && (
+        <div className="card" style={{ textAlign: 'center', padding: '32px 24px' }}>
+          <div style={{ fontSize: 40 }}>📞</div>
+          <h3 style={{ margin: '12px 0 6px' }}>{scenario.title}</h3>
+          <p className="hint">{scenario.description}</p>
+          <div className="btnrow" style={{ justifyContent: 'center' }}>
+            <button className="btn-big" onClick={startCall}>Answer the call →</button>
+          </div>
+          <p className="hint">One call = one voice session. The customer hangs up when satisfied.</p>
         </div>
+      )}
 
-        {/* Customer bubble */}
-        <div style={{ background: '#122550', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, padding: '16px 18px', margin: '14px 0' }}>
-          <div className="mockcall-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 10 }}>
-            <span style={{ color: '#f5a623', fontWeight: 700, fontSize: 13, textTransform: 'uppercase' }}>
-              👤 Customer on line
-            </span>
-            <PlayButton text={step.customer} label="Hear customer voice" />
-          </div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: '#fff', lineHeight: 1.5 }}>
-            “{step.customer}”
-          </div>
-        </div>
-
-        {/* Agent options */}
-        <div style={{ marginTop: 18 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#9fb0cc', marginBottom: 10 }}>
-            🎧 Your response as Concentrix Support Agent (Choose the most professional):
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {step.agentOptions.map((opt, i) => (
-              <label
-                key={i}
-                className={`opt ${selectedOpt === i ? 'selected' : ''}`}
-                style={{
-                  padding: '12px 16px',
-                  borderRadius: 10,
-                  cursor: feedback?.isCorrect ? 'default' : 'pointer',
-                  fontSize: 14.5,
-                  lineHeight: 1.55,
-                }}
-              >
-                <input
-                  type="radio"
-                  name="agent-opt"
-                  checked={selectedOpt === i}
-                  disabled={feedback?.isCorrect}
-                  onChange={() => handleSelect(i)}
-                />
-                <span>{opt.text}</span>
-              </label>
-            ))}
-          </div>
-
-          <div className="btnrow" style={{ marginTop: 16 }}>
-            {!feedback?.isCorrect ? (
-              <button className="btn-primary" disabled={selectedOpt === null} onClick={submitChoice}>
-                Submit Agent Response ✓
-              </button>
-            ) : isComplete ? (
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <span style={{ color: '#38d98a', fontWeight: 800 }}>🎉 Call successfully resolved!</span>
-                <button className="btn-big" onClick={() => resetScenario((scenarioIdx + 1) % MOCK_CALL_SCENARIOS.length)}>
-                  Next Scenario →
-                </button>
-              </div>
-            ) : (
-              <button className="btn-big" onClick={nextStep}>
-                Customer continues → Next Turn
+      {phase !== 'idle' && (
+        <div className="svar-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+            <span className="qnum">📞 {scenario.title} • exchange {Math.min(agentTurns + 1, CALL_MAX_TURNS)} of {CALL_MAX_TURNS}</span>
+            {phase === 'live' && (
+              <button className="btn-ghost" onClick={() => endCall(turnsRef.current, false)}>
+                End call
               </button>
             )}
           </div>
 
-          {feedback && (
-            <div className={`rev ${feedback.isCorrect ? 'correct' : 'wrong'}`} style={{ marginTop: 16 }}>
-              <div className="qnum">{feedback.isCorrect ? '✅ Excellent Response' : '⚠ Coaching Feedback'}</div>
-              <div className="exp" style={{ marginTop: 4, fontSize: 14 }}>{feedback.text}</div>
-            </div>
+          {/* Call thread */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, margin: '12px 0' }}>
+            {turns.map((t, i) => (
+              <div
+                key={i}
+                style={{
+                  alignSelf: t.speaker === 'customer' ? 'flex-start' : 'flex-end',
+                  maxWidth: '88%',
+                  background: t.speaker === 'customer' ? '#122550' : 'rgba(56,189,248,0.12)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 12,
+                  padding: '10px 14px',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.05em', color: t.speaker === 'customer' ? '#f5a623' : '#38bdf8', marginBottom: 4 }}>
+                  {t.speaker === 'customer' ? '👤 CUSTOMER' : '🎧 YOU'}
+                </div>
+                <div style={{ fontSize: 14.5, color: '#fff', lineHeight: 1.55 }}>“{t.text}”</div>
+                {t.speaker === 'customer' && (
+                  <div style={{ marginTop: 6 }}>
+                    <PlayButton text={t.text} label="Replay" />
+                  </div>
+                )}
+                {t.coachNote && <div className="hint" style={{ marginTop: 6 }}>Coach: {t.coachNote}</div>}
+              </div>
+            ))}
+            {thinking && <div className="hint">Customer is responding…</div>}
+          </div>
+
+          {phase === 'live' && (
+            <>
+              <SessionRecorder
+                key={`call-${turns.length}`}
+                limit={30}
+                onDone={(r) => {
+                  if (r) void submitReply(r.blob, r.secs);
+                }}
+              />
+              {err && <div className="err" style={{ marginTop: 8 }}>{err}</div>}
+            </>
+          )}
+
+          {phase === 'ended' && (
+            <>
+              {grading ? (
+                <p className="hint"><span className="spinner" /> Writing your call report…</p>
+              ) : grade ? (
+                <div className="rev correct" style={{ marginTop: 4 }}>
+                  <div className="qnum">
+                    ⭐ {grade.marks}/10 • empathy {grade.empathy} • resolution {grade.resolution} • professionalism {grade.professionalism}
+                    {grade.estimated ? ' • estimated' : ''}
+                  </div>
+                  <div className="exp" style={{ marginTop: 6 }}>
+                    <b>Coach feedback:</b>
+                    <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                      {grade.feedback.map((f, i) => (
+                        <li key={i}>{f}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <p className="hint">Call ended — grading unavailable offline.</p>
+              )}
+              <div className="btnrow" style={{ marginTop: 12 }}>
+                <button className="btn-big" onClick={() => resetCall()}>Call again →</button>
+              </div>
+            </>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
