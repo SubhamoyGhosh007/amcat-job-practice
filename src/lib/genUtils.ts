@@ -12,7 +12,10 @@ export function rotatingSubset<T extends { id: string }>(items: T[], count: numb
     /* ignore */
   }
   const unseen = items.filter((i) => !seen.includes(i.id));
-  const pool = unseen.length >= count ? unseen : [...unseen, ...items.filter((i) => seen.includes(i.id))];
+  const pool =
+    unseen.length >= count
+      ? unseen
+      : [...unseen, ...shuffle(items.filter((i) => seen.includes(i.id)))];
   const picked = shuffle(pool).slice(0, count);
   try {
     localStorage.setItem(key, JSON.stringify([...picked.map((p) => p.id), ...seen].slice(0, items.length * 2)));

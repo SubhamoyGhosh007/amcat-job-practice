@@ -934,6 +934,13 @@ function MockCallTab() {
     }
   }
 
+  // Update volume of currently playing audio when speakerOn changes
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = speakerOn ? 1 : 0.35;
+    }
+  }, [speakerOn]);
+
   function startUserRec() {
     submittedRef.current = null;
     recorder.reset();
@@ -1674,7 +1681,9 @@ export default function Svar() {
         }
       }
       const have = built.filter((b) => b.kind === kind).length;
-      const bank = (kind === 'read' ? READ_BANK : REPEAT_BANK).slice(0, Math.max(0, WANT - have));
+      const bankSource = kind === 'read' ? READ_BANK : REPEAT_BANK;
+      const needed = Math.max(0, WANT - have);
+      const bank = rotatingSubset(bankSource, needed, `amcat_svar_fallback_${kind}`);
       for (const r of bank as any[]) {
         built.push({
           key: `${kind}-${r.id}`,

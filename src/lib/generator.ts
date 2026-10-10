@@ -316,11 +316,13 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
   const adaptive = !!opts?.adaptive;
   const userId = useSession.getState().userId;
   const tier = useSession.getState().profile?.tier ?? 'free';
+  // Pool tiers are free/pro only — premium shares the pro pool.
+  const poolTier = tier === 'premium' ? 'pro' : tier;
   const seed = Math.floor(Math.random() * 1_000_000);
   const avoid = recentAvoid();
 
   // 1. serve a set this learner hasn't attempted yet (same tier only)
-  const shared = await fetchUnattempted(userId, difficulty, source, tier);
+  const shared = await fetchUnattempted(userId, difficulty, source, poolTier);
   if (shared) {
     rememberAvoid(shared.questions);
     return shared;
@@ -350,7 +352,7 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
           if (qs.length >= 24) {
             const set: ExamSet = { id: uid(), createdAt: Date.now(), source: `ai-${p}`, difficulty, origin: source, adaptive, questions: qs };
             rememberAvoid(qs);
-            await publishSet(set, userId, difficulty, source, tier);
+            await publishSet(set, userId, difficulty, source, poolTier);
             return set;
           }
         } catch (parallelErr) {
@@ -362,7 +364,7 @@ export async function generateSet(opts?: { difficulty?: Difficulty; pyq?: boolea
       const qs = await callProviderForSections(p, seed, avoid, difficulty, source, adaptive);
       const set: ExamSet = { id: uid(), createdAt: Date.now(), source: `ai-${p}`, difficulty, origin: source, adaptive, questions: qs };
       rememberAvoid(qs);
-      await publishSet(set, userId, difficulty, source, tier);
+      await publishSet(set, userId, difficulty, source, poolTier);
       return set;
     } catch (e) {
       if (e instanceof TypeError) console.info(`AI provider ${p} unreachable from browser — trying next.`);

@@ -264,6 +264,12 @@ function stepPart(s: Step): string {
 function Extempore({ item, onDone }: { item: PartEItem; onDone: (blob?: Blob, secs?: number) => void }) {
   const [phase, setPhase] = useState<'ready' | 'prep' | 'speak'>('ready');
   const fired = useRef(false);
+
+  useEffect(() => {
+    fired.current = false;
+    setPhase('ready');
+  }, [item.id, item.topic]);
+
   const prepLeft = useCountdown(item.prepSec, phase === 'prep', () => setPhase('speak'));
 
   function done(url: string | null, blob?: Blob, secs?: number) {
@@ -338,6 +344,7 @@ export default function Interview() {
   const T = mockTest.sections;
   const [t0, setT0] = useState(() => Date.now());
   const [answers, setAnswers] = useState(0);
+  const answersRef = useRef(0);
   const [history, setHistory] = useState<MockSession[]>(() => listMockSessions());
   const [playedCtx, setPlayedCtx] = useState<Record<string, boolean>>({});
   const [showKeys, setShowKeys] = useState(false);
@@ -385,7 +392,10 @@ export default function Interview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, tier, phase]);
 
-  const bump = () => setAnswers((a) => a + 1);
+  const bump = () => {
+    answersRef.current += 1;
+    setAnswers((a) => a + 1);
+  };
   const heard = (id: string) => setPlayedCtx((p) => ({ ...p, [id]: true }));
 
   // Quota gate: free = 1/day, pro = 1/3h, premium = unlimited. Cloud truth,
@@ -521,6 +531,7 @@ export default function Interview() {
     extemporeRef.current = [];
     setT0(Date.now());
     setStepIdx(0);
+    answersRef.current = 0;
     setAnswers(0);
     setPlayedCtx({});
     setPhase('running');
@@ -565,17 +576,18 @@ export default function Interview() {
     if (savedRef.current) return;
     savedRef.current = true;
     const durationSec = Math.round((Date.now() - t0) / 1000);
+    const recordedAnswers = answersRef.current;
     const s: MockSession = {
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
       at: Date.now(),
-      answers,
+      answers: recordedAnswers,
       durationSec,
       flags: flagsRef.current,
       testId: mockTest.test_id,
     };
     setHistory(saveMockSession(s));
     if (!practiceModeRef.current) {
-      recordRun(userId, answers, durationSec).catch(() => {});
+      recordRun(userId, recordedAnswers, durationSec).catch(() => {});
       recordMockAttempt(userId, mockTest.test_id).catch(() => {});
       void mockQuotaStatus(userId, tier).then((q) => {
         setLocked(q.locked);

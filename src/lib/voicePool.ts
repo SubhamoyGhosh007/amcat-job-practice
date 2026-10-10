@@ -4,13 +4,18 @@ import type { VoiceSample } from './voiceGen';
 
 export type VoiceTier = 'free' | 'pro';
 
-/** Set once the cloud tables prove missing — stops spamming 404s until the SQL is run. */
+/** Set once the cloud tables prove missing — stops spamming 404s until the SQL is run. Auto-resets after 60s. */
 let noTable = false;
+let noTableTimer: any = null;
 function isMissingTable(error: any): boolean {
   if (noTable) return true;
   const msg = String(error?.message || '') + String(error?.code || '') + String(error?.status || '') + String(error?.details || '');
   if (/PGRST205|could not find the table|404|not found/i.test(msg) || error?.code === '404' || error?.status === 404) {
     noTable = true;
+    if (noTableTimer) clearTimeout(noTableTimer);
+    noTableTimer = setTimeout(() => {
+      noTable = false;
+    }, 60000);
     return true;
   }
   return false;
@@ -62,7 +67,7 @@ export async function fetchUnattemptedSamples(
         .select('id,kind,text,tip,times_used')
         .eq('kind', kind)
         .order('times_used', { ascending: true })
-        .limit(25);
+        .limit(60);
       if (tiered) q = q.eq('tier', tier);
       return q;
     };
@@ -72,13 +77,14 @@ export async function fetchUnattemptedSamples(
       res = await build(false);
       if (res.error) return [];
     }
-    const out: VoiceSample[] = [];
+    const candidates: VoiceSample[] = [];
     for (const r of ((res.data as any[]) || [])) {
       if (done.has(String(r.id))) continue;
-      out.push({ id: String(r.id), kind, text: String(r.text || ''), tip: r.tip ? String(r.tip) : undefined });
-      if (out.length >= limit) break;
+      candidates.push({ id: String(r.id), kind, text: String(r.text || ''), tip: r.tip ? String(r.tip) : undefined });
     }
-    return out;
+    // Shuffle the least-used candidates so users don't all receive the same identical order
+    const shuffled = candidates.sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, limit);
   } catch {
     return [];
   }
@@ -108,7 +114,6 @@ export async function publishSamples(
       isMissingTable(error);
       return [];
     }
-    for (const w of withIds) void bumpUsage(db, w.id);
     return withIds.map((w) => ({ id: w.id, kind: w.kind as 'read' | 'repeat', text: w.text, tip: w.tip || undefined }));
   } catch {
     return [];

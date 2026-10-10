@@ -41,20 +41,38 @@ export function AiProctorOverlay({
 
   const logViolation = useExam((s) => s.logViolation);
 
+  const lastFiredRef = useRef<Record<string, number>>({});
+  const lastBoxRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const mediaStartTimeRef = useRef<number>(Date.now());
+
   // Helper to record a proctor violation with throttling & UI feedback
   const triggerViolation = useCallback(
     (type: string, msg: string) => {
       const now = Date.now();
+      // Skip blur/no-cam violations if within initial 3.5s grace period (permission dialogs)
+      if (type === 'window-blur' && now - mediaStartTimeRef.current < 3500) return;
+      // Per-violation throttling (5-second cooldown per violation type)
+      if (now - (lastFiredRef.current[type] || 0) < 5000) return;
+      lastFiredRef.current[type] = now;
+
       logViolation({ type, at: now });
       onViolation?.(type, msg);
 
       setActiveViolations((prev) => [
         { id: `${now}-${Math.random()}`, msg, time: now },
-        ...prev.slice(0, 4),
+        ...prev.slice(0, 3),
       ]);
     },
     [logViolation, onViolation]
   );
+
+  // Auto-clean expired toast violations after 4 seconds
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setActiveViolations((prev) => prev.filter((v) => Date.now() - v.time < 4000));
+    }, 1500);
+    return () => window.clearInterval(t);
+  }, []);
 
   // 1. Initialize MediaPipe FaceDetector
   useEffect(() => {
@@ -108,6 +126,7 @@ export function AiProctorOverlay({
   useEffect(() => {
     let videoStream: MediaStream | null = null;
     isRunningRef.current = true;
+    mediaStartTimeRef.current = Date.now();
 
     async function startMedia() {
       try {
@@ -193,22 +212,33 @@ export function AiProctorOverlay({
           try {
             const detections = detector.detectForVideo(video, now).detections;
             const count = detections.length;
-            setFacesDetected(count);
+            // Prevent re-rendering churn if facesDetected didn't change
+            setFacesDetected((prev) => (prev === count ? prev : count));
+
+            const targetW = video.videoWidth || 320;
+            const targetH = video.videoHeight || 240;
+            if (canvas.width !== targetW) canvas.width = targetW;
+            if (canvas.height !== targetH) canvas.height = targetH;
 
             const ctx = canvas.getContext('2d');
             if (ctx) {
-              canvas.width = video.videoWidth || 320;
-              canvas.height = video.videoHeight || 240;
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-
               if (count === 1) {
                 const det = detections[0];
                 const box = det.boundingBox;
                 if (box) {
-                  // Draw proctor bounding box
-                  ctx.strokeStyle = '#1e9e62';
-                  ctx.lineWidth = 2.5;
-                  ctx.strokeRect(box.originX, box.originY, box.width, box.height);
+                  const prevBox = lastBoxRef.current;
+                  const delta = prevBox
+                    ? Math.abs(box.originX - prevBox.x) + Math.abs(box.originY - prevBox.y)
+                    : 999;
+
+                  // Only redraw if box position shifted significantly (avoids blank frame flicker)
+                  if (delta > 4 || !prevBox) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.strokeStyle = '#1e9e62';
+                    ctx.lineWidth = 2.5;
+                    ctx.strokeRect(box.originX, box.originY, box.width, box.height);
+                    lastBoxRef.current = { x: box.originX, y: box.originY, w: box.width, h: box.height };
+                  }
 
                   // Estimate head pose from keypoints (nose tip vs ear landmarks)
                   // Keypoints order in MediaPipe BlazeFace:
@@ -224,7 +254,7 @@ export function AiProctorOverlay({
 
                     // If nose deviates significantly from eye center, candidate is looking away
                     const isAway = diffX > 0.085;
-                    setLookingAway(isAway);
+                    setLookingAway((prev) => (prev === isAway ? prev : isAway));
 
                     if (isAway) {
                       lookingAwayCounter++;
@@ -237,6 +267,10 @@ export function AiProctorOverlay({
                     }
                   }
                 }
+              } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                lastBoxRef.current = null;
+                setLookingAway((prev) => (prev ? false : prev));
               }
             }
 
@@ -274,12 +308,11 @@ export function AiProctorOverlay({
           for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
           const averageVolume = sum / dataArray.length;
 
-          // If volume spikes consistently (> 65), flag as background noise / speaking
-          if (averageVolume > 65) {
-            setNoiseAlert(true);
-            triggerViolation('ambient-speech', 'Unusual background noise or voice detected');
-          } else {
-            setNoiseAlert(false);
+          // Raised threshold to 125 so normal speech during spoken exams does not falsely trigger
+          const isLoud = averageVolume > 125;
+          setNoiseAlert((prev) => (prev === isLoud ? prev : isLoud));
+          if (isLoud) {
+            triggerViolation('ambient-speech', 'Unusual loud background noise detected');
           }
         }
       }
@@ -298,14 +331,7 @@ export function AiProctorOverlay({
   useEffect(() => {
     if (!autoLockdown) return;
 
-    // Visibility change / tab switch
-    const onVisibility = () => {
-      if (document.hidden) {
-        triggerViolation('tab-switch', 'Switched browser tab or minimized window');
-      }
-    };
-
-    // Window blur
+    // Window blur (throttled and excludes initial permission modal window)
     const onBlur = () => {
       triggerViolation('window-blur', 'Window lost focus (Alt+Tab or external click)');
     };
@@ -348,7 +374,6 @@ export function AiProctorOverlay({
       }
     };
 
-    document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('blur', onBlur);
     document.addEventListener('fullscreenchange', onFullscreen);
     document.addEventListener('contextmenu', onContextMenu);
@@ -357,7 +382,6 @@ export function AiProctorOverlay({
     window.addEventListener('keydown', onKeyDown);
 
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('blur', onBlur);
       document.removeEventListener('fullscreenchange', onFullscreen);
       document.removeEventListener('contextmenu', onContextMenu);
