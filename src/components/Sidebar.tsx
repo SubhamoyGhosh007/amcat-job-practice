@@ -278,11 +278,11 @@ export function Sidebar({ groups }: { groups: SideGroup[] }) {
           </span>
         </nav>
         <div className="wv-side-mid">
-          {tier === 'pro' ? (
+          {tier !== 'free' ? (
             <div className="wv-procard live">
               <div className="wv-prohead">
                 <Zap size={17} />
-                <b>Pro active</b>
+                <b>{tier === 'premium' ? 'Premium active' : 'Pro active'}</b>
               </div>
               <p>Unlimited everything. Keep the streak burning.</p>
             </div>

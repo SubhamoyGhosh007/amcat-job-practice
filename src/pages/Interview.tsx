@@ -5,24 +5,26 @@ import { friendlyError } from '../lib/friendly';
 import { PageSkeleton } from '../ui/page-skeleton';
 import { useUi } from '../stores/ui';
 import { speak, ttsConfigured } from '../lib/tts';
+import { gradeJam, transcribeAudio } from '../lib/speechReview';
 import { useSession } from '../stores/session';
 import {
   MOCK_TEST_01,
   STATIC_MOCK_TESTS,
   deleteMockSession,
-  fetchTodayRun,
-  fetchUnattemptedMockTest,
-  getLastCompletion,
   listMockSessions,
+  fetchUnattemptedMockTest,
+  mockQuotaStatus,
   publishMockTest,
   recordMockAttempt,
   recordRun,
   saveMockSession,
-  todayKey,
+  patchMockGrades,
   type MockSession,
   type MockTest,
   type PartEItem,
 } from '../data/mockInterview';
+import { formatWait } from '../lib/mathQuota';
+import { downloadMockReport } from '../lib/pdf';
 import { AiProctorOverlay } from '../components/AiProctorOverlay';
 import '../svar.css';
 
@@ -100,21 +102,22 @@ function OnceAudio({ text, label, onPlayed }: { text: string; label: string; onP
 }
 
 /* ---------------- timed recorder: manual start, auto-stop at 0 ---------------- */
-function TimedRecorder({ seconds, armed, hint, onDone }: { seconds: number; armed: boolean; hint?: string; onDone: (url: string | null) => void }) {
+function TimedRecorder({ seconds, armed, hint, onDone }: { seconds: number; armed: boolean; hint?: string; onDone: (url: string | null, blob?: Blob, secs?: number) => void }) {
   const [phase, setPhase] = useState<'idle' | 'rec' | 'done'>('idle');
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
   const recRef = useRef<{ stop: () => void } | null>(null);
   const doneRef = useRef(false);
+  const t0Ref = useRef(0);
   const cb = useRef(onDone);
   cb.current = onDone;
 
-  const finish = (u: string | null) => {
+  const finish = (u: string | null, b?: Blob) => {
     if (doneRef.current) return;
     doneRef.current = true;
     if (u) setUrl(u);
     setPhase('done');
-    cb.current(u);
+    cb.current(u, b, Math.max(1, Math.round((Date.now() - t0Ref.current) / 1000)));
   };
 
   async function start() {
@@ -133,13 +136,15 @@ function TimedRecorder({ seconds, armed, hint, onDone }: { seconds: number; arme
       };
       rec.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        finish(URL.createObjectURL(new Blob(chunks, { type: rec.mimeType || 'audio/webm' })));
+        const b = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+        finish(URL.createObjectURL(b), b);
       };
       recRef.current = {
         stop: () => {
           if (rec.state !== 'inactive') rec.stop();
         },
       };
+      t0Ref.current = Date.now();
       rec.start();
       setPhase('rec');
     } catch {
@@ -256,15 +261,15 @@ function stepPart(s: Step): string {
 }
 
 /* ---------------- Part E: prep then speak ---------------- */
-function Extempore({ item, onDone }: { item: PartEItem; onDone: () => void }) {
+function Extempore({ item, onDone }: { item: PartEItem; onDone: (blob?: Blob, secs?: number) => void }) {
   const [phase, setPhase] = useState<'ready' | 'prep' | 'speak'>('ready');
   const fired = useRef(false);
   const prepLeft = useCountdown(item.prepSec, phase === 'prep', () => setPhase('speak'));
 
-  function done(url: string | null) {
+  function done(url: string | null, blob?: Blob, secs?: number) {
     if (url && !fired.current) {
       fired.current = true;
-      onDone();
+      onDone(blob, secs);
     }
   }
 
@@ -295,17 +300,9 @@ function Extempore({ item, onDone }: { item: PartEItem; onDone: () => void }) {
   );
 }
 
-function untilMidnight(now: number): string {
-  const end = new Date();
-  end.setHours(24, 0, 0, 0);
-  const ms = Math.max(0, end.getTime() - now);
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return `${h}h ${m}m ${s}s`;
-}
+/* ---------------- interview screen ---------------- */
 
-function HistoryList({ history, remove, testId }: { history: MockSession[]; remove: (id: string) => void; testId: string }) {
+function HistoryList({ history, remove, test, onPdf }: { history: MockSession[]; remove: (id: string) => void; test: MockTest; onPdf: (s: MockSession) => void }) {
   if (!history.length) return <p className="hint">No sessions yet — finish one above and it lands here.</p>;
   return (
     <>
@@ -315,11 +312,13 @@ function HistoryList({ history, remove, testId }: { history: MockSession[]; remo
           <div className="meta">
             <div style={{ fontWeight: 700 }}>{h.answers} answers • {Math.floor(h.durationSec / 60)}m {h.durationSec % 60}s run</div>
             <div className="hint">
-              {new Date(h.at).toLocaleString()} • {h.testId || testId}
+              {new Date(h.at).toLocaleString()} • {h.testId || test.test_id}
               {typeof h.flags === 'number' && h.flags > 0 && <> • ⚠ {h.flags} tab {h.flags === 1 ? 'switch' : 'switches'}</>}
+              {h.grades?.length ? <> • ⭐ extempore {Math.round(h.grades.reduce((a, g) => a + g.marks, 0) / h.grades.length)}/10</> : null}
             </div>
           </div>
           <div className="btnrow" style={{ marginTop: 0 }}>
+            <button className="btn-ghost" onClick={() => onPdf(h)}>PDF</button>
             <button className="btn-ghost" onClick={() => remove(h.id)}>Delete</button>
           </div>
         </div>
@@ -332,6 +331,8 @@ export default function Interview() {
   const ask = useConfirm();
   const userId = useSession((s) => s.userId);
   const tier = useSession((s) => s.profile?.tier ?? 'free');
+  // Mock-test pool tiers are free/pro only — premium shares the pro pool.
+  const poolTier = tier === 'premium' ? 'pro' : tier;
   // Pooled test when available, static MOCK_TEST_01 otherwise (offline included).
   const [mockTest, setMockTest] = useState<MockTest>(MOCK_TEST_01);
   const T = mockTest.sections;
@@ -346,10 +347,13 @@ export default function Interview() {
   const [phase, setPhase] = useState<'idle' | 'running'>('idle');
   const [cam, setCam] = useState<'checking' | 'ok' | 'missing'>('checking');
   const [camTick, setCamTick] = useState(0);
+  const [fsError, setFsError] = useState('');
   const flagsRef = useRef(0);
   const dialogOpen = useRef(false);
   const leavingRef = useRef(false);
   const savedRef = useRef(false);
+  // Extempore recordings collected during the run for end-of-mock grading.
+  const extemporeRef = useRef<{ topic: string; blob?: Blob; secs?: number }[]>([]);
   const practiceModeRef = useRef(false);
   const setLeaveGuard = useUi((s) => s.setLeaveGuard);
   const finalizeRef = useRef(() => {});
@@ -365,14 +369,14 @@ export default function Interview() {
     if (phase !== 'idle') return;
     let live = true;
     (async () => {
-      const pooled = await fetchUnattemptedMockTest(userId, tier);
+      const pooled = await fetchUnattemptedMockTest(userId, poolTier);
       if (!live) return;
       if (pooled) setMockTest(pooled);
       else {
         const sessions = listMockSessions();
         const fallbackTest = STATIC_MOCK_TESTS[sessions.length % STATIC_MOCK_TESTS.length] || MOCK_TEST_01;
         setMockTest(fallbackTest);
-        publishMockTest(fallbackTest, tier).catch(() => {});
+        publishMockTest(fallbackTest, poolTier).catch(() => {});
       }
     })();
     return () => {
@@ -384,26 +388,41 @@ export default function Interview() {
   const bump = () => setAnswers((a) => a + 1);
   const heard = (id: string) => setPlayedCtx((p) => ({ ...p, [id]: true }));
 
-  // Daily gate: cloud row is truth, local mirror is instant. Paid tiers plug in here later.
+  // Quota gate: free = 1/day, pro = 1/3h, premium = unlimited. Cloud truth,
+  // local mirror instant. Re-checks when the countdown hits zero.
+  const [waitMs, setWaitMs] = useState(0);
+  const lockUntilRef = useRef(0);
   useEffect(() => {
     let live = true;
-    (async () => {
-      if (getLastCompletion(userId) === todayKey()) {
-        if (live) setLocked(true);
-        return;
-      }
-      const cloud = await fetchTodayRun(userId);
-      if (live) setLocked(cloud);
+    void (async () => {
+      const q = await mockQuotaStatus(userId, tier);
+      if (!live) return;
+      setLocked(q.locked);
+      setWaitMs(q.retryInMs);
+      lockUntilRef.current = Date.now() + q.retryInMs;
     })();
     return () => {
       live = false;
     };
-  }, [userId]);
+  }, [userId, tier]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (locked && lockUntilRef.current && Date.now() >= lockUntilRef.current) {
+      lockUntilRef.current = 0;
+      void (async () => {
+        const q = await mockQuotaStatus(userId, tier);
+        setLocked(q.locked);
+        setWaitMs(q.retryInMs);
+        lockUntilRef.current = Date.now() + q.retryInMs;
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [now]);
 
   // Camera presence check while waiting to start (labels need no permission).
   useEffect(() => {
@@ -484,14 +503,22 @@ export default function Interview() {
   async function startInterview(practice = false) {
     practiceModeRef.current = practice;
     if (!practice) {
+      // Fullscreen is mandatory for the monitored mock — refuse to start without it.
       try {
-        await document.documentElement.requestFullscreen();
+        if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
       } catch {
-        /* unsupported/denied — the run still starts monitored */
+        setFsError('Fullscreen is required for the monitored mock — allow it when the browser asks, then start again.');
+        return;
+      }
+      if (!document.fullscreenElement) {
+        setFsError('Fullscreen is required for the monitored mock — allow it when the browser asks, then start again.');
+        return;
       }
     }
+    setFsError('');
     flagsRef.current = 0;
     savedRef.current = false;
+    extemporeRef.current = [];
     setT0(Date.now());
     setStepIdx(0);
     setAnswers(0);
@@ -517,7 +544,13 @@ export default function Interview() {
       danger: true,
     });
     dialogOpen.current = false;
-    if (!ok) return;
+    if (!ok) {
+      // Resuming re-locks the hall: back to fullscreen immediately.
+      if (!practiceModeRef.current && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+      return;
+    }
     if (kind === 'back') {
       // Re-armed history above; step back for real exactly once.
       leavingRef.current = true;
@@ -544,10 +577,32 @@ export default function Interview() {
     if (!practiceModeRef.current) {
       recordRun(userId, answers, durationSec).catch(() => {});
       recordMockAttempt(userId, mockTest.test_id).catch(() => {});
-      setLocked(true);
+      void mockQuotaStatus(userId, tier).then((q) => {
+        setLocked(q.locked);
+        setWaitMs(q.retryInMs);
+        lockUntilRef.current = Date.now() + q.retryInMs;
+      });
     }
+    // Background extempore grading: session already saved + counted, marks land when ready.
+    void gradeExtempore(s.id);
     setPhase('idle');
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+
+  async function gradeExtempore(sessionId: string) {
+    const recs = extemporeRef.current.filter((r) => r.blob);
+    if (!recs.length) return;
+    const grades: { label: string; marks: number }[] = [];
+    for (const r of recs.slice(0, 6)) {
+      try {
+        const { text } = await transcribeAudio(r.blob!);
+        const g = await gradeJam(r.topic, text, r.secs || 60);
+        grades.push({ label: r.topic, marks: g.marks });
+      } catch {
+        /* one bad apple never blocks the rest */
+      }
+    }
+    if (grades.length) setHistory(patchMockGrades(sessionId, grades));
   }
 
   async function remove(id: string) {
@@ -573,7 +628,11 @@ export default function Interview() {
         </div>
         <div className="card" style={{ textAlign: 'center', marginTop: 6 }}>
           <h3 style={{ marginTop: 0 }}>Today’s monitored mock is done ✓</h3>
-          <p className="hint">One full proctored interview per day keeps it exam-real. Next unlocks in <b>{untilMidnight(now)}</b>.</p>
+          {tier === 'pro' ? (
+            <p className="hint">Pro plan: one mock every 3 hours. Next unlocks in <b>{formatWait(Math.max(0, lockUntilRef.current - now))}</b>.</p>
+          ) : (
+            <p className="hint">One full proctored interview per day keeps it exam-real. Next unlocks in <b>{formatWait(Math.max(0, lockUntilRef.current - now))}</b>.</p>
+          )}
           <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
             {STATIC_MOCK_TESTS.map((t) => (
               <button
@@ -591,7 +650,7 @@ export default function Interview() {
           </button>
         </div>
         <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
-        <HistoryList history={history} remove={remove} testId={mockTest.test_id} />
+        <HistoryList history={history} remove={remove} test={mockTest} onPdf={(s) => downloadMockReport(s, mockTest)} />
       </div>
     );
   }
@@ -632,8 +691,8 @@ export default function Interview() {
 
           <div className="banner warn" style={{ textAlign: 'left', maxWidth: 540, margin: '16px auto' }}>
             <b>⚠ Monitored conditions —</b> your camera must stay connected, this tab stays in focus,
-            and the test runs fullscreen. Leaving the tab or exiting fullscreen pauses with a warning:
-            cancel the mock, or resume where you left off (leaves are counted on your session).
+            and fullscreen is mandatory throughout. Leaving the tab or exiting fullscreen pauses with a warning:
+            submit the mock as-is, or resume back into fullscreen (leaves are counted on your session).
           </div>
           <div style={{ margin: '12px 0' }}>
             {cam === 'checking' && <span className="hint">Checking camera…</span>}
@@ -645,6 +704,7 @@ export default function Interview() {
               </>
             )}
           </div>
+          {fsError && <div className="err" style={{ maxWidth: 540, margin: '12px auto' }}>{fsError}</div>}
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginTop: 12 }}>
             <button className="btn-big" disabled={cam !== 'ok'} onClick={() => startInterview(false)}>
               Start Monitored Full Mock →
@@ -726,7 +786,7 @@ export default function Interview() {
             <div className="svar-card">
               <span className="topic">Extempore — 30s think, 60s speak</span>
               <div style={{ marginTop: 8 }}>
-                <Extempore item={step.item} onDone={bump} />
+                <Extempore item={step.item} onDone={(blob, secs) => { extemporeRef.current.push({ topic: step.item.topic, blob, secs }); bump(); }} />
               </div>
             </div>
           )}
@@ -785,7 +845,7 @@ export default function Interview() {
       )}
 
       <h3>Past sessions {history.length > 0 && <span className="hint">• {history.length} saved</span>}</h3>
-      <HistoryList history={history} remove={remove} testId={mockTest.test_id} />
+      <HistoryList history={history} remove={remove} test={mockTest} onPdf={(s) => downloadMockReport(s, mockTest)} />
     </div>
   );
 }

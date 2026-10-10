@@ -35,7 +35,7 @@ import {
 } from '../lib/callJudge';
 import { ttsConfigured, speak } from '../lib/tts';
 import { bumpQuota, quotaStatus } from '../lib/usage';
-import { rotatingSubset } from '../lib/genUtils';
+import { rotatingSubset, shuffle } from '../lib/genUtils';
 import {
   gradeJam,
   readJamGrade,
@@ -1472,12 +1472,12 @@ interface SessionItem {
   poolId?: string;
 }
 
-/** Static fallback — always available offline. Pool items replace these when served. */
+/** Static fallback — always available offline. Shuffled per session so repeats vary. */
 function staticItems(): SessionItem[] {
-  return [
+  return shuffle([
     ...READ_BANK.map((r) => ({ key: `read-${r.id}`, kind: 'read' as const, id: r.id, text: r.text, tip: r.tip, limit: SPEAK_LIMITS.read })),
     ...REPEAT_BANK.map((r) => ({ key: `repeat-${r.id}`, kind: 'repeat' as const, id: r.id, text: r.text, limit: SPEAK_LIMITS.repeat })),
-  ];
+  ]);
 }
 
 export interface SessionRec {
@@ -1640,10 +1640,12 @@ export default function Svar() {
    */
   async function assembleItems(): Promise<SessionItem[]> {
     const WANT = 6;
+    // Voice pool tiers are free/pro only — premium shares the pro pool.
+    const poolTier = tier === 'premium' ? 'pro' : tier;
     const built: SessionItem[] = [];
     for (const kind of ['read', 'repeat'] as const) {
       const limit = SPEAK_LIMITS[kind];
-      const pooled = await fetchUnattemptedSamples(userId, kind, WANT, tier);
+      const pooled = await fetchUnattemptedSamples(userId, kind, WANT, poolTier);
       for (const p of pooled) {
         built.push({ key: `pool-${p.id}`, kind, id: p.id, text: p.text, tip: p.tip, limit, poolId: p.id });
       }
@@ -1653,7 +1655,7 @@ export default function Svar() {
           const fresh = await generateVoiceBatch(kind, short);
           const published = await publishSamples(
             fresh.map((f) => ({ kind, text: f.text, tip: f.tip })),
-            tier
+            poolTier
           );
           const use = published.length ? published : fresh.map((f, i) => ({ ...f, id: `ai-${Date.now().toString(36)}-${i}` }));
           for (const u of use) {
@@ -1814,8 +1816,8 @@ export default function Svar() {
         <div style={{ marginTop: 10 }}>
           <span className="chip ghost">🎙 {items.length} spoken items</span>{' '}
           <span className="chip ghost">📄 report + PDF</span>{' '}
-          {tier === 'pro' ? (
-            <span className="chip green">Pro • unlimited</span>
+          {tier !== 'free' ? (
+            <span className="chip green">{tier === 'premium' ? 'Premium • unlimited' : 'Pro • unlimited'}</span>
           ) : (
             leftS !== null && <span className="chip green">Free • {leftS} of 5 left</span>
           )}

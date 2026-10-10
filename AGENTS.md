@@ -17,7 +17,7 @@ Live: https://amcat-practice.antideploy.app · Repo: `SubhamoyGhosh007/amcat-job
 | Practice sets (full-paper, grouped by section) | `/app` → `/app/instructions` → `/app/exam` → `/app/result` | 30Q, answer script + PDFs, difficulty + PYQ mode |
 | Typing arena | `/app/typing` | WPM/acc/consistency, history, 10/day free |
 | Speaking lab (SVAR) | `/app/speaking` | listen practice + recorded sessions (6 read + 6 repeat, fixed 45s/25s limits, items from shared voice pool w/ per-user completion tracking), one marks report per session (Whisper turbo + clarity/coverage/pace), report PDF, dashboard mirror |
-| Mock interview (7 parts, monitored) | `/app/interview` | gated start, fullscreen, tab-leave dialog, 1/day |
+| Mock interview (7 parts, monitored) | `/app/interview` | gated start, mandatory fullscreen (re-locks on resume), tab-leave dialog, free 1/day · pro 1/3h · premium unlimited; extempore auto-graded post-run; report + answer-key PDF per session |
 | Maths arena (40Q, 10×4 pages) | `/app/maths` | shadcn pagination, sheet + tricks + PDF, 1 per 4h free |
 | Guides (SEO) | `/guides/*`, FAQ band, sitemap | original content only, never paraphrased |
 | Auth/profile | `/login`, settings | username + avatar, TOTP 2FA + backup codes, pro tier flag |
@@ -36,7 +36,7 @@ Maths pages: **Groq → Gemini proxy** (`src/lib/mathGen.ts`).
 
 ## 4. Quotas & tiers
 
-Free: 5 sets, 5 speaking, 10 typing /day; 1 mock/day; 1 maths /4h. **Pro (`profiles.tier='pro'`) = unlimited everything.** Grant via SQL or dashboard Table Editor. Checks run *before* effort; offline = grace mode. Maths quota is cloud (`math_sessions`) truth + local mirror.
+Free: 5 sets, 5 speaking, 10 typing /day; 1 mock/day; 1 maths /4h. **Pro (`profiles.tier='pro'`) = unlimited everything + mock every 3h. Premium (`tier='premium'`) = unlimited everything including mocks.** Grant via SQL or dashboard Table Editor. Checks run *before* effort; offline = grace mode. Maths quota is cloud (`math_sessions`) truth + local mirror. Mock quota: free calendar-day, pro 3h window, premium none (`mockQuotaStatus`).
 
 ## 5. Question pool & shared bank design
 

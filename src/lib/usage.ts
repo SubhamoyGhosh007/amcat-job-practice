@@ -11,10 +11,15 @@ const PRO_QUOTAS = {
   typing: Number.MAX_SAFE_INTEGER,
 } as const;
 export type QuotaKind = keyof typeof FREE_QUOTAS;
-export type Tier = 'free' | 'pro';
+export type Tier = 'free' | 'pro' | 'premium';
 
 export function quotasFor(tier: Tier | undefined): Record<QuotaKind, number> {
-  return tier === 'pro' ? { ...PRO_QUOTAS } : { ...FREE_QUOTAS };
+  return tier === 'free' || !tier ? { ...FREE_QUOTAS } : { ...PRO_QUOTAS };
+}
+
+/** Paid tiers (pro + premium) bypass every daily gate. */
+export function isPaid(tier: Tier | string | undefined): boolean {
+  return tier === 'pro' || tier === 'premium';
 }
 
 export interface QuotaStatus {

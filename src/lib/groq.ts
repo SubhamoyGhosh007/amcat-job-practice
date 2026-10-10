@@ -21,7 +21,7 @@ export function groqConfigured(): boolean {
 export function groqModelsFor(): string[] {
   try {
     const tier = useSession.getState().profile?.tier ?? 'free';
-    return [...(tier === 'pro' ? GROQ_PRO_MODELS : GROQ_FREE_MODELS)];
+    return [...(tier === 'free' ? GROQ_FREE_MODELS : GROQ_PRO_MODELS)];
   } catch {
     return [...GROQ_FREE_MODELS];
   }

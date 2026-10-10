@@ -15,7 +15,7 @@ interface SharedRow {
   times_used: number;
 }
 
-export type Tier = 'free' | 'pro';
+export type Tier = 'free' | 'pro' | 'premium';
 
 function toExamSet(row: SharedRow, difficulty: Difficulty): ExamSet {
   return {

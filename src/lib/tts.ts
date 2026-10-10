@@ -50,7 +50,7 @@ function evict() {
   }
 }
 
-/** Speak text → object URL of WAV audio. Throws with status on failure. */
+/** Speak text → object URL of WAV audio. One retry on transient failures. */
 export async function speak(text: string, opts?: { voice?: string }): Promise<string> {
   const key = text.trim().slice(0, 3000);
   if (!key) throw new Error('Nothing to speak.');
@@ -58,16 +58,30 @@ export async function speak(text: string, opts?: { voice?: string }): Promise<st
   const cacheKey = `${voice || 'default'}::${key}`;
   const hit = cache.get(cacheKey);
   if (hit) return hit;
-  const res = await fetch(`${TTS_URL}/speak`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({ text: key, ...(voice ? { voice } : {}) }),
-  });
-  if (!res.ok) throw new Error(`Voice server answered ${res.status}. Check VITE_TTS_URL / token.`);
-  const url = URL.createObjectURL(await res.blob());
-  cache.set(cacheKey, url);
-  evict();
-  return url;
+  let lastErr = '';
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const res = await fetch(`${TTS_URL}/speak`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ text: key, ...(voice ? { voice } : {}) }),
+      });
+      if (res.status === 429 || res.status >= 500) {
+        lastErr = `Voice server answered ${res.status}.`;
+        continue;
+      }
+      if (!res.ok) throw new Error(`Voice server answered ${res.status}. Check voice setup.`);
+      const url = URL.createObjectURL(await res.blob());
+      cache.set(cacheKey, url);
+      evict();
+      return url;
+    } catch (e: any) {
+      if (e?.message?.startsWith('Voice server answered')) throw e;
+      lastErr = 'Voice server unreachable.';
+    }
+  }
+  throw new Error(`${lastErr} Check connection and retry.`);
 }
 
 /** Split a passage into speakable chunks (one request per chunk). */export function chunkText(text: string, max = 700): string[] {

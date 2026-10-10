@@ -17,11 +17,13 @@ const iconStyle = { width: ICON, height: ICON, flex: 'none' } as const;
  * Classic seek-bar player: thin gray track, orange fill, ringed knob.
  * Play/pause, click-to-seek, time readout.
  */
-export function VoicePlayer({ src, autoPlay = false }: { src: string; autoPlay?: boolean }) {
+export function VoicePlayer({ src, autoPlay = false, onAutoPlayBlocked }: { src: string; autoPlay?: boolean; onAutoPlayBlocked?: () => void }) {
   const [playing, setPlaying] = useState(false);
   const [t, setT] = useState(0);
   const [dur, setDur] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const blockedRef = useRef(onAutoPlayBlocked);
+  blockedRef.current = onAutoPlayBlocked;
 
   useEffect(() => {
     const audio = new Audio(src);
@@ -34,7 +36,7 @@ export function VoicePlayer({ src, autoPlay = false }: { src: string; autoPlay?:
     audio.addEventListener('timeupdate', onTime);
     audio.addEventListener('ended', onEnd);
     if (autoPlay) {
-      audio.play().then(() => setPlaying(true)).catch(() => {});
+      audio.play().then(() => setPlaying(true)).catch(() => blockedRef.current?.());
     }
     return () => {
       audio.pause();
@@ -87,11 +89,12 @@ export function VoicePlayer({ src, autoPlay = false }: { src: string; autoPlay?:
   );
 }
 
-/** Fetches TTS audio, then hands it to the player (autoplays). */
+/** Fetches TTS audio, then hands it to the player (autoplays, manual fallback). */
 export function TTSVoicePlayer({ text, label, voice, onPlayed }: { text: string; label?: string; voice?: string; onPlayed?: () => void }) {
   const [src, setSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [auto, setAuto] = useState(true);
 
   async function load() {
     setError('');
@@ -99,6 +102,7 @@ export function TTSVoicePlayer({ text, label, voice, onPlayed }: { text: string;
     try {
       const u = await speak(text, voice ? { voice } : undefined);
       setSrc(u);
+      setAuto(true);
       onPlayed?.();
     } catch (e: any) {
       setError(friendlyError(e));
@@ -110,12 +114,14 @@ export function TTSVoicePlayer({ text, label, voice, onPlayed }: { text: string;
   if (!src) {
     return (
       <span className="svar-audio" style={{ margin: 0 }}>
-        <button className="btn-primary" disabled={loading} onClick={load}>
+        <button type="button" className="btn-primary" disabled={loading} onClick={load}>
           {loading ? 'Loading voice…' : `▶ ${label || 'Play'}`}
         </button>
         {error && <span className="err">{error}</span>}
       </span>
     );
   }
-  return <VoicePlayer src={src} autoPlay />;
+  // Autoplay can be blocked when the audio arrives long after the tap —
+  // fall back to a manual player instead of going silent.
+  return <VoicePlayer src={src} autoPlay={auto} onAutoPlayBlocked={() => setAuto(false)} />;
 }

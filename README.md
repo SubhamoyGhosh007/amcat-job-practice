@@ -436,8 +436,9 @@ Free limits live in `FREE_QUOTAS` (`src/lib/usage.ts`): 5 sets, 5 voice sessions
 
 ```sql
 alter table profiles add column if not exists tier text not null default 'free';
--- grant:
+-- grant pro (mock every 3h) or premium (unlimited everything):
 update profiles set tier = 'pro' where username_lower = 'their_username';
+update profiles set tier = 'premium' where username_lower = 'their_username';
 -- revoke:
 update profiles set tier = 'free' where username_lower = 'their_username';
 ```

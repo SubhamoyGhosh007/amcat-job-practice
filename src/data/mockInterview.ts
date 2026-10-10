@@ -60,6 +60,8 @@ export interface MockSession {
   flags?: number;
   /** Which test paper was used (pool id or static id). */
   testId?: string;
+  /** Extempore marks graded after the run (best-effort, may be absent). */
+  grades?: { label: string; marks: number }[];
 }
 
 export const MOCK_TEST_01: MockTest = {
@@ -247,6 +249,17 @@ export function saveMockSession(s: MockSession): MockSession[] {
   return arr;
 }
 
+/** Patch grades onto an already-saved session (background extempore grading). */
+export function patchMockGrades(id: string, grades: { label: string; marks: number }[]): MockSession[] {
+  const arr = listMockSessions().map((s) => (s.id === id ? { ...s, grades } : s));
+  try {
+    localStorage.setItem(MKEY, JSON.stringify(arr));
+  } catch {
+    /* ignore */
+  }
+  return arr;
+}
+
 export function deleteMockSession(id: string): MockSession[] {
   const arr = listMockSessions().filter((s) => s.id !== id);
   try {
@@ -285,9 +298,75 @@ export function setLastCompletion(userId: string | null) {
     const o = JSON.parse(localStorage.getItem(LKEY) || '{}');
     o[userId] = todayKey();
     localStorage.setItem(LKEY, JSON.stringify(o));
+    const t: Record<string, number> = JSON.parse(localStorage.getItem(MLASTKEY) || '{}');
+    t[userId] = Date.now();
+    localStorage.setItem(MLASTKEY, JSON.stringify(t));
   } catch {
     /* ignore */
   }
+}
+
+const MLASTKEY = 'amcat_mock_last';
+
+/** Pro window: one mock per 3 hours. Premium: unlimited. Free: calendar day. */
+export const MOCK_PRO_WINDOW_MS = 3 * 3600 * 1000;
+
+export interface MockQuota {
+  locked: boolean;
+  retryInMs: number;
+}
+
+function msUntilMidnight(): number {
+  const end = new Date();
+  end.setHours(24, 0, 0, 0);
+  return Math.max(0, end.getTime() - Date.now());
+}
+
+async function lastCloudMockAt(userId: string | null): Promise<number> {
+  try {
+    if (!userId) return 0;
+    const token = await apiToken();
+    const db = sb(token);
+    if (!db || !token) return 0;
+    const { data, error } = await db
+      .from('mock_runs')
+      .select('created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return 0;
+    return new Date(data.created_at).getTime();
+  } catch {
+    return 0;
+  }
+}
+
+function lastLocalMockAt(userId: string | null): number {
+  try {
+    if (!userId) return 0;
+    return Number(JSON.parse(localStorage.getItem(MLASTKEY) || '{}')[userId] || 0);
+  } catch {
+    return 0;
+  }
+}
+
+export async function mockQuotaStatus(
+  userId: string | null,
+  tier: 'free' | 'pro' | 'premium' = 'free'
+): Promise<MockQuota> {
+  if (tier === 'premium') return { locked: false, retryInMs: 0 };
+  if (tier === 'pro') {
+    const last = Math.max(lastLocalMockAt(userId), await lastCloudMockAt(userId));
+    const elapsed = Date.now() - last;
+    if (last > 0 && elapsed < MOCK_PRO_WINDOW_MS) {
+      return { locked: true, retryInMs: MOCK_PRO_WINDOW_MS - elapsed };
+    }
+    return { locked: false, retryInMs: 0 };
+  }
+  if (getLastCompletion(userId) === todayKey()) return { locked: true, retryInMs: msUntilMidnight() };
+  const cloud = await fetchTodayRun(userId);
+  return cloud ? { locked: true, retryInMs: msUntilMidnight() } : { locked: false, retryInMs: 0 };
 }
 
 export async function fetchTodayRun(userId: string | null): Promise<boolean> {

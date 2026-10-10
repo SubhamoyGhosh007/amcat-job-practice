@@ -4,6 +4,7 @@ import { MATH_TOPICS, mathTopicName } from '../data/mathTopics';
 import type { ScoreSheet } from './store';
 import type { MathSession } from './mathStore';
 import type { SpeakingReport } from './speakingStore';
+import type { MockSession, MockTest } from '../data/mockInterview';
 
 type RGB = [number, number, number];
 
@@ -443,4 +444,92 @@ export function downloadSpeakingReport(r: SpeakingReport) {
 
   footer(doc);
   doc.save(`amcat-speaking-${new Date(r.at).toISOString().slice(0, 10)}.pdf`);
+}
+
+/** Mock interview: session report (answers, time, flags, extempore marks) + full answer key. */
+export function downloadMockReport(s: MockSession, test: MockTest) {
+  const doc = new jsPDF();
+  paintPage(doc);
+  let y = header(doc, 'Mock Interview — Report & Answer Key', `${new Date(s.at).toLocaleString()} • ${s.testId || test.test_id}`);
+
+  const heroH = 26;
+  y = ensureSpace(doc, y, heroH + 4);
+  doc.setDrawColor(...BORDER);
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(PM, y, PW, heroH, 3, 3, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(24);
+  doc.setTextColor(...INK);
+  doc.text(`${s.answers}`, PM + 6, y + 16);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...MUTED);
+  doc.text('answers recorded', PM + 30, y + 11);
+  doc.setFontSize(9);
+  const mins = Math.floor(s.durationSec / 60);
+  doc.text(`${mins}m ${s.durationSec % 60}s run${s.flags ? ` • ${s.flags} tab ${s.flags === 1 ? 'switch' : 'switches'}` : ''}`, PM + 30, y + 17.5);
+  y += heroH + 6;
+
+  if (s.grades?.length) {
+    y = ensureSpace(doc, y, 20);
+    doc.setFillColor(...BLUE);
+    doc.roundedRect(PM, y, PW, 11, 2.5, 2.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Extempore marks', PM + 5, y + 7.4);
+    y += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...DARK);
+    for (const g of s.grades) {
+      const lines = doc.splitTextToSize(`${g.label}: ${g.marks}/10`, PW - 10) as string[];
+      y = ensureSpace(doc, y, lines.length * 5 + 3);
+      doc.text(lines, PM + 5, y);
+      y += lines.length * 5 + 2;
+    }
+    y += 4;
+  }
+
+  const secs = test.sections;
+  const blocks: { title: string; lines: string[] }[] = [
+    {
+      title: 'Parts A–B • Expected answers',
+      lines: [...secs.part_a, ...secs.part_b].flatMap((sc) =>
+        sc.questions.map((qq, i) => `${sc.id.toUpperCase()} Q${i + 1}. ${qq.q} → ${qq.expected}`)
+      ),
+    },
+    {
+      title: 'Part F • Missing words',
+      lines: secs.part_f.map((f) => `${f.id.toUpperCase()}. missing: ${f.missing.join(' / ')} → ${f.full}`),
+    },
+    {
+      title: 'Part G • Corrections',
+      lines: secs.part_g.map((g) => `${g.id.toUpperCase()}. ${g.corrected} — ${g.rule}`),
+    },
+  ];
+  for (const b of blocks) {
+    if (!b.lines.length) continue;
+    y = ensureSpace(doc, y, 16);
+    doc.setFillColor(...BLUE);
+    doc.roundedRect(PM, y, PW, 11, 2.5, 2.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(b.title, PM + 5, y + 7.4);
+    y += 15;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(...DARK);
+    for (const ln of b.lines) {
+      const lines = doc.splitTextToSize(ln, PW - 10) as string[];
+      y = ensureSpace(doc, y, lines.length * 4.8 + 2);
+      doc.text(lines, PM + 5, y);
+      y += lines.length * 4.8 + 1.5;
+    }
+    y += 4;
+  }
+
+  footer(doc);
+  doc.save(`amcat-mock-${new Date(s.at).toISOString().slice(0, 10)}.pdf`);
 }

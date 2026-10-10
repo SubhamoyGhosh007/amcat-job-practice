@@ -283,8 +283,8 @@ export default function MathPractice() {
         <div style={{ marginTop: 10 }}>
           <span className="chip ghost">🧮 40 Q • 10 topics</span>{' '}
           <span className="chip ghost">📄 PDF sheet + tricks</span>{' '}
-          {tier === 'pro' ? (
-            <span className="chip green">Pro • unlimited</span>
+          {tier !== 'free' ? (
+            <span className="chip green">{tier === 'premium' ? 'Premium • unlimited' : 'Pro • unlimited'}</span>
           ) : wait > 0 ? (
             <span className="chip" style={{ background: '#fdeeee', color: '#b33737' }}>⏳ next free in {formatWait(wait)}</span>
           ) : (

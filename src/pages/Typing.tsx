@@ -319,7 +319,7 @@ export default function Typing() {
         )}
         <span className="sep" />
         <button className="radio-pill" onClick={() => restart()}>↻ restart (tab)</button>
-        {leftT !== null && <span className="hint">{tier === 'pro' ? 'Pro plan: unlimited tests.' : `${leftT} of 10 tests left today`}</span>}
+        {leftT !== null && <span className="hint">{tier !== 'free' ? `${tier === 'premium' ? 'Premium' : 'Pro'} plan: unlimited tests.` : `${leftT} of 10 tests left today`}</span>}
       </div>
       {mode === 'passage' && (
         <div style={{ margin: '8px 0', fontSize: 13, color: '#3b82f6', fontWeight: 600 }}>

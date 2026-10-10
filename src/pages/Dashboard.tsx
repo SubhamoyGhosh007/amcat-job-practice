@@ -99,7 +99,7 @@ export default function Dashboard() {
             <h2>Practice dashboard</h2>
             <div className="date">
               {today} • @{profile?.username || '…'}
-              {tier === 'pro' ? ' • PRO' : ''}
+              {tier === 'pro' ? ' • PRO' : tier === 'premium' ? ' • PREMIUM' : ''}
             </div>
           </div>
           <span className="wv-live"><i /> LIVE SIMULATION</span>
@@ -172,7 +172,7 @@ export default function Dashboard() {
             <div className="wv-alert info">
               <div className="a-title">Daily quotas reset midnight</div>
               <div className="a-body">
-                {tier === 'pro' ? 'Pro plan: everything unlimited.' : 'Free plan: 5 sets • 10 typing • 5 voice • 1 mock • 1 maths/4h.'}
+                {tier !== 'free' ? `${tier === 'premium' ? 'Premium' : 'Pro'} plan: everything unlimited.` : 'Free plan: 5 sets • 10 typing • 5 voice • 1 mock • 1 maths/4h.'}
               </div>
             </div>
             {stats.streak >= 2 && (
