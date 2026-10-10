@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../stores/session';
+import { useUi } from '../stores/ui';
 import { Reveal } from './aceternity';
 import { scrollToId } from './fx';
 import { IconBook, IconCalc, IconChat, IconMic, IconPuzzle } from './icons';
@@ -246,6 +247,8 @@ export default function Landing() {
   const [openRoad, setOpenRoad] = useState(ROADMAP[0].id);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [navOpen, setNavOpen] = useState(false);
+  const theme = useUi((s) => s.theme);
+  const toggleTheme = useUi((s) => s.toggleTheme);
 
   return (
     <div className="rv landing" id="top">
@@ -268,6 +271,14 @@ export default function Landing() {
             ))}
           </span>
           <button className="rv-nav-cta" onClick={onEnter}>Start free</button>
+          <button
+            className="rv-theme"
+            onClick={toggleTheme}
+            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
           <button className="rv-burger" aria-label="Open menu" onClick={() => setNavOpen(true)}>
             <span /><span /><span />
           </button>

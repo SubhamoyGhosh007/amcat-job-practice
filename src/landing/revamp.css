@@ -148,6 +148,19 @@
   transition: transform 180ms ease, box-shadow 180ms ease;
 }
 .rv-nav-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(32, 169, 224, 0.35); }
+.rv-theme {
+  background: var(--rv-soft);
+  border: 1px solid var(--rv-line);
+  border-radius: 999px;
+  width: 38px;
+  height: 38px;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .rv-burger {
   display: none;
   background: none;
@@ -743,6 +756,89 @@ a.rv-book .bnum { font-size: 22px; font-weight: 800; opacity: 0.9; }
 .rv-price-list li.off { color: #9ca3af; }
 .rv-price-list li.off::before { content: '–'; color: #cbd5e1; }
 .rv-price-note { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 20px; }
+
+/* ---------- dark mode for landing ---------- */
+[data-theme='dark'] .rv { background: #060d21; color: #eaf1ff; }
+[data-theme='dark'] .rv-nav-inner { background: rgba(10, 22, 51, 0.88); border-color: #1c2a4d; }
+[data-theme='dark'] .rv-brand { color: #fff; }
+[data-theme='dark'] .rv-nav-link { color: #9fb0cc; }
+[data-theme='dark'] .rv-nav-link:hover { color: #fff; background: rgba(255, 255, 255, 0.07); }
+[data-theme='dark'] .rv-nav-link.active { background: #eaf1ff; color: #0a1633; }
+[data-theme='dark'] .rv-theme { background: #0a1633; border-color: #1c2a4d; }
+[data-theme='dark'] .rv-burger { border-color: #1c2a4d; }
+[data-theme='dark'] .rv-burger span { background: #eaf1ff; }
+[data-theme='dark'] .rv-drawer { background: #0a1633; }
+[data-theme='dark'] .rv-drawer-link { color: #eaf1ff; }
+[data-theme='dark'] .rv-drawer-link:hover { background: rgba(255, 255, 255, 0.07); }
+[data-theme='dark'] .rv-drawer-link.active { color: #8fb0ff; background: #16294f; }
+[data-theme='dark'] .rv-drawer-x { background: #16294f; color: #eaf1ff; }
+[data-theme='dark'] .rv-hero h1 { color: #fff; }
+[data-theme='dark'] .rv-hero .lede { color: #9fb0cc; }
+[data-theme='dark'] .rv-announce { background: #0a1633; border-color: #1c2a4d; }
+[data-theme='dark'] .rv-btn-secondary { background: #0a1633; color: #eaf1ff; border-color: #1c2a4d; }
+[data-theme='dark'] .rv-btn-secondary:hover { border-color: #4d7cfe; }
+[data-theme='dark'] .rv-trust { color: #9fb0cc; }
+[data-theme='dark'] .rv-float-card { background: #101b36; border-color: #1c2a4d; }
+[data-theme='dark'] .rv-float-card b { color: #fff; }
+[data-theme='dark'] .rv-float-card small { color: #9fb0cc; }
+[data-theme='dark'] .rv h2.sec-title { color: #fff; }
+[data-theme='dark'] .rv p.sec-sub { color: #9fb0cc; }
+[data-theme='dark'] .rv-plank { background: linear-gradient(#3a4a6b, #1c2a4d); }
+[data-theme='dark'] .rv-shelf-cap { color: #9fb0cc; }
+[data-theme='dark'] .rv-tab { background: #101b36; border-color: #1c2a4d; color: #9fb0cc; }
+[data-theme='dark'] .rv-tab.active { background: #eaf1ff; color: #0a1633; border-color: #eaf1ff; }
+[data-theme='dark'] .rv-quiz { background: #101b36; border-color: #1c2a4d; }
+[data-theme='dark'] .rv-quiz .q-text { color: #fff; }
+[data-theme='dark'] .rv-quiz .q-opt { background: #0a1633; border-color: #1c2a4d; color: #eaf1ff; }
+[data-theme='dark'] .rv-quiz .q-opt .k { background: #16294f; color: #9fb0cc; }
+[data-theme='dark'] .rv-quiz .q-why { background: #0a1633; color: #c9d8ff; }
+[data-theme='dark'] .rv-road-pick { background: #0a1633; }
+[data-theme='dark'] .rv-road-pick button { background: #101b36; color: #eaf1ff; }
+[data-theme='dark'] .rv-road-pick small { color: #9fb0cc; }
+[data-theme='dark'] .rv-mod-head { background: #101b36; border-color: #1c2a4d; color: #eaf1ff; }
+[data-theme='dark'] .rv-mod-head small { color: #9fb0cc; }
+[data-theme='dark'] .rv-mod-body { background: #0a1633; border-color: #1c2a4d; color: #eaf1ff; }
+[data-theme='dark'] .rv-mod-lessons li { border-color: #1c2a4d; }
+[data-theme='dark'] .rv-mod-lessons .dur { color: #9fb0cc; }
+[data-theme='dark'] .rv-price-card { background: #101b36; border-color: #1c2a4d; }
+[data-theme='dark'] .rv-price-card b { color: #fff; }
+[data-theme='dark'] .rv-price-desc { color: #9fb0cc; }
+[data-theme='dark'] .rv-price-value { color: #fff; }
+[data-theme='dark'] .rv-price-value small { color: #9fb0cc; }
+[data-theme='dark'] .rv-price-btn.ghost { background: #101b36; color: #fff; border-color: #1c2a4d; }
+[data-theme='dark'] .rv-price-list li { color: #c9d8ff; }
+[data-theme='dark'] .rv-price-list li.off { color: #5a6b8f; }
+[data-theme='dark'] .rv-price-note { color: #5a6b8f; }
+[data-theme='dark'] .rv-feat-h { color: #fff; }
+[data-theme='dark'] .rv-feat-p { color: #9fb0cc; }
+[data-theme='dark'] .rv-feat-visual { box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4); }
+[data-theme='dark'] .rv-final h2 { color: #fff; }
+[data-theme='dark'] .rv-final p { color: #9fb0cc; }
+[data-theme='dark'] .rv-footer { background: #060d21; border-top-color: #1c2a4d; color: #9fb0cc; }
+[data-theme='dark'] .rv-foot-brand { color: #fff; }
+[data-theme='dark'] .rv-foot-blurb { color: #9fb0cc; }
+[data-theme='dark'] .rv-foot-cols h4 { color: #fff; }
+[data-theme='dark'] .rv-foot-cols a { color: #9fb0cc; }
+[data-theme='dark'] .rv-foot-cols a:hover { color: #ff8a00; }
+[data-theme='dark'] .rv-legal { border-top-color: #1c2a4d; color: #9fb0cc; }
+[data-theme='dark'] .rv-legal a { color: #9fb0cc; }
+[data-theme='dark'] .rv-wait input { background: #0a1633; border-color: #1c2a4d; color: #fff; }
+
+/* ---------- dark mode for auth ---------- */
+[data-theme='dark'] .au-shell { background: #060d21; }
+[data-theme='dark'] .au-card h1 { color: #fff; }
+[data-theme='dark'] .au-card .au-sub { color: #9fb0cc; }
+[data-theme='dark'] .au-back { color: #9fb0cc; }
+[data-theme='dark'] .au-back:hover { color: #fff; }
+[data-theme='dark'] .au-tabs { background: #0a1633; }
+[data-theme='dark'] .au-tabs button { color: #9fb0cc; }
+[data-theme='dark'] .au-tabs button.on { color: #fff; }
+[data-theme='dark'] .au-tabs button .pill-bg { background: #16294f; border-color: #27407a; }
+[data-theme='dark'] .au-field label { color: #eaf1ff; }
+[data-theme='dark'] .au-field input { background: #0a1633; border-color: #1c2a4d; color: #fff; }
+[data-theme='dark'] .au-divider::before, [data-theme='dark'] .au-divider::after { background: #1c2a4d; }
+[data-theme='dark'] .au-divider span { color: #9fb0cc; }
+[data-theme='dark'] .au-alt { color: #9fb0cc; }
 
 /* ---------- feature grid ---------- */
 .rv-feat-grid {

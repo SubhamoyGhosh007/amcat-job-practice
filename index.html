@@ -106,6 +106,12 @@
     </script>
   </head>
   <body>
+    <script>
+      try {
+        var t = JSON.parse(localStorage.getItem('amcat-ui') || '{}');
+        if (t && t.state && t.state.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (e) {}
+    </script>
     <noscript>
       <div style="font-family: system-ui, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 20px;">
         <h1>Free Concentrix AMCAT Mock Test Practice</h1>
