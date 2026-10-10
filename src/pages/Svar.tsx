@@ -761,11 +761,11 @@ function ExtemporeTab() {
             ) : (
               <div className="rev correct" style={{ marginTop: 4 }}>
                 <div className="qnum">
-                  ⭐ {grade.marks}/10 • content {grade.content} • language {grade.language} • delivery {grade.delivery}
+                  ⭐ {grade.marks}/10 • content {grade.content}/10 • language {grade.language}/10 • delivery {grade.delivery}%
                   {grade.estimated ? ' • estimated' : ''}
                 </div>
                 <div style={{ fontSize: 13.5, margin: '6px 0' }}>
-                  <div>Content {grade.content}/10 • Language {grade.language}/10 • Delivery {grade.delivery}/10</div>
+                  <div>Content {grade.content}/10 • Language {grade.language}/10 • Delivery {grade.delivery}%</div>
                   <div className="hint">Pace {grade.wpm} wpm • {grade.fillers} filler sounds</div>
                 </div>
                 <div className="exp" style={{ overflowWrap: 'anywhere' }}>
