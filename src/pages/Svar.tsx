@@ -669,7 +669,7 @@ function ExtemporeTab() {
 
       <div className="svar-card">
         <span className="topic">Extempore Speech • 30s prep → 60s speak (auto)</span>
-        <h2 style={{ fontSize: 24, margin: '8px 0 12px', color: '#fff' }}>“{topic.topic}”</h2>
+        <h2 style={{ fontSize: 24, margin: '8px 0 12px', color: '#16213a' }}>“{topic.topic}”</h2>
 
         <div style={{ background: '#122550', borderRadius: 10, padding: '14px 18px', margin: '14px 0', border: '1px solid rgba(255,255,255,0.1)' }}>
           <div style={{ color: '#38d98a', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
