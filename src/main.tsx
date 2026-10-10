@@ -8,6 +8,7 @@ import './modern.css';
 import './ui/shadcn.css';
 import './ui/motion.css';
 import './ui/wv.css';
+import './ui/dark.css';
 import './ui/tailwind.css';
 import './mobile.css';
 

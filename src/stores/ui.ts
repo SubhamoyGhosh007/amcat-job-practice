@@ -17,11 +17,13 @@ export interface LeaveGuard {
 interface UiState {
   collapsed: boolean;
   mobileOpen: boolean;
+  theme: 'light' | 'dark';
   dialog: ConfirmOptions | null;
   /** Set while a monitored mock interview is running; sidebar/logout consult it. */
   leaveGuard: LeaveGuard | null;
   toggleCollapsed: () => void;
   setMobileOpen: (v: boolean) => void;
+  toggleTheme: () => void;
   setLeaveGuard: (g: LeaveGuard | null) => void;
   ask: (o: ConfirmOptions) => Promise<boolean>;
   answer: (v: boolean) => void;
@@ -34,10 +36,21 @@ export const useUi = create<UiState>()(
     (set) => ({
       collapsed: false,
       mobileOpen: false,
+      theme: 'light',
       dialog: null,
       leaveGuard: null,
       toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
       setMobileOpen: (v) => set({ mobileOpen: v }),
+      toggleTheme: () =>
+        set((s) => {
+          const next = s.theme === 'light' ? 'dark' : 'light';
+          try {
+            document.documentElement.setAttribute('data-theme', next);
+          } catch {
+            /* ignore */
+          }
+          return { theme: next };
+        }),
       setLeaveGuard: (g) => set({ leaveGuard: g }),
       ask: (o) =>
         new Promise<boolean>((resolve) => {
@@ -50,6 +63,6 @@ export const useUi = create<UiState>()(
         set({ dialog: null });
       },
     }),
-    { name: 'amcat-ui', partialize: (s) => ({ collapsed: s.collapsed, mobileOpen: false }) as UiState }
+      { name: 'amcat-ui', partialize: (s) => ({ collapsed: s.collapsed, mobileOpen: false, theme: s.theme }) as UiState }
   )
 );

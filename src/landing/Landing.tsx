@@ -749,6 +749,7 @@ export default function Landing() {
           <nav>
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>
+            <a href="https://github.com/SubhamoyGhosh007/amcat-job-practice" target="_blank" rel="noreferrer">★ GitHub repo</a>
           </nav>
           <span className="status"><i /> All systems normal</span>
         </div>

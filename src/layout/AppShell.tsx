@@ -11,8 +11,10 @@ import {
   LayoutDashboard,
   LogOut,
   Mic,
+  Moon,
   Plus,
   Settings as SettingsIcon,
+  Sun,
 } from 'lucide-react';
 import { useAuthActions } from '../auth/actions';
 import { AvatarFace, UsernameModal } from '../components/AuthWidgets';
@@ -67,6 +69,17 @@ export default function AppShell() {
   const ask = useConfirm();
   const profile = useSession((s) => s.profile);
   const collapsed = useUi((s) => s.collapsed);
+  const theme = useUi((s) => s.theme);
+  const toggleTheme = useUi((s) => s.toggleTheme);
+
+  // Apply persisted theme on boot and every toggle.
+  useEffect(() => {
+    try {
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch {
+      /* ignore */
+    }
+  }, [theme]);
 
   // Closing / reloading the tab mid-session also submits it as completed
   // (local persist is sync, so it always lands; cloud sync best-effort).
@@ -102,6 +115,21 @@ export default function AppShell() {
           <MobileTrigger className="sb-iconbtn sb-hamburger" />
           <span className="sb-title">{TITLES[location.pathname] || 'Practice'}</span>
           <span className="spacer" />
+          <button
+            className="sb-iconbtn"
+            onClick={toggleTheme}
+            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            style={{ color: '#1b4fa0' }}
+          >
+            <span className="t-icon-swap" data-state={theme === 'light' ? 'a' : 'b'}>
+              <span className="t-icon" data-icon="a">
+                <Moon size={18} />
+              </span>
+              <span className="t-icon" data-icon="b">
+                <Sun size={18} />
+              </span>
+            </span>
+          </button>
           <AvatarFace id={profile?.avatarId ?? 0} size={30} />
           <b className="sb-topuser" style={{ fontSize: 13 }}>@{profile?.username || '…'}</b>
           <button className="sb-iconbtn" onClick={doLogout} title="Log out" style={{ color: '#1b4fa0' }}>
